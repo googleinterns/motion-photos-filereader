@@ -7,8 +7,6 @@ included in a motion photos JPEG file.
 
 **This is not an officially supported Google product.**
 
-# Miscellaneous Information to Developers
-
 ## Coding Style Guide
 
 Code will follow the Google style guide. Please refer to the language specific
