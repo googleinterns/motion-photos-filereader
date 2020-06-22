@@ -3,14 +3,14 @@ MotionPhotoReader/*
 
 # Allow list these files...
 # gradle scripts
-!MotionPhotoReader/app/build.gradle
+!*/MotionPhotoReader/app/build.gradle
 
 # Android manifest
-!MotionPhotoReader/app/src/main/AndroidManifest.xml
+!*/MotionPhotoReader/app/src/main/AndroidManifest.xml
 
 # resources
-!MotionPhotoReader/app/src/main/res/*
+!*/MotionPhotoReader/app/src/main/res/*
 
 # API java files
-!MotionPhotoReader/app/src/main/java/com/example/motionphotoreader/MotionPhotoReader.java
+!*/MotionPhotoReader/app/src/main/java/com/example/motionphotoreader/MotionPhotoReader.java
 
