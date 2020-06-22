@@ -1,9 +1,22 @@
 # Deny list all files and folders in MotionPhotoReader project
-/MotionPhotoReader/*
+MotionPhotoReader/*
 
-# Allow list these files
-!*/MotionPhotoReader/app/build.gradle
-!*/MotionPhotoReader/app/src/main/AndroidManifest.xml
-!*/MotionPhotoReader/app/src/main/res
-!*/MotionPhotoReader/app/src/main/java/com/example/motionphotoreader/MotionPhotoReader.java
+# Allow list these files...
+# gradle scripts
+!MotionPhotoReader/app
+MotionPhotoReader/app/*
+!MotionPhotoReader/app/build.gradle
+
+# Android manifest
+!MotionPhotoReader/app/src
+MotionPhotoReader/app/src/*
+!MotionPhotoReader/app/src/main
+MotionPhotoReader/app/src/main/*
+!MotionPhotoReader/app/src/main/AndroidManifest.xml
+
+# resources
+!MotionPhotoReader/app/src/main/res/*
+
+# API java files
+!MotionPhotoReader/app/src/main/java/com/example/motionphotoreader/MotionPhotoReader.java
 
