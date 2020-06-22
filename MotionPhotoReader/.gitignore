@@ -2,15 +2,12 @@
 /*
 
 # Allow list these files...
-# gitignore
 !.gitignore
-
-# gradle scripts
-!app
-app/*
-!app/build.gradle
+!*.gradle  # gradle script
 
 # Android manifest
+!app
+app/*
 !app/src/
 app/src/*
 !app/src/main/
