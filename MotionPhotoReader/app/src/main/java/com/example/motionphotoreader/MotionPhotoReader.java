@@ -1,9 +1,19 @@
 package com.example.motionphotoreader;
 
+import android.util.Log;
 import android.view.Surface;
 
+import com.adobe.internal.xmp.XMPException;
+import com.adobe.internal.xmp.XMPMeta;
+import com.adobe.internal.xmp.XMPMetaFactory;
+
+import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Arrays;
 
 /**
  * The MotionPhotoReader API allows developers to read through the video portion of Motion Photos in
@@ -72,14 +82,20 @@ public class MotionPhotoReader {
      */
     private static class XmpParser {
 
-        private static final byte[] OPEN_ARR = "<x:xmpmeta".getBytes(); /** Start of XMP metadata tag */
-        private static final byte[] CLOSE_ARR = "</x:xmpmeta>".getBytes(); /** End of XMP metadata tag */
+        private static final byte[] OPEN_ARR = "<x:xmpmeta".getBytes();  /* Start of XMP metadata tag */
+        private static final byte[] CLOSE_ARR = "</x:xmpmeta>".getBytes();  /* End of XMP metadata tag */
 
         /**
          * Copies the input stream from a file to an output stream.
          */
-        private static void copy(String filename, InputStream in, OutputStream out) {
-
+        private static void copy(String filename, InputStream in, OutputStream out) throws IOException {
+            int len;
+            byte[] buf = new byte[1024];
+            while((len = in.read(buf)) >= 0) {
+                out.write(buf, 0, len);
+            }
+            in.close();
+            out.close();
         }
 
         /**
@@ -91,6 +107,18 @@ public class MotionPhotoReader {
          * byte array. If the sequence is not found, return -1.
          */
         private static int indexOf(byte[] arr, byte[] seq, int start) {
+            int subIdx = 0;
+            for (int x = start; x < arr.length; x++) {
+                if (arr[x] == seq[subIdx]) {
+                    if (subIdx == seq.length - 1) {
+                        return x - subIdx;
+                    }
+                    subIdx++;
+                }
+                else {
+                    subIdx = 0;
+                }
+            }
             return -1;
         }
 
@@ -98,8 +126,26 @@ public class MotionPhotoReader {
          * Returns the video offset of the microvideo in the Motion Photo file, in bytes from the end
          * of the file.
          */
-        public static int getVideoOffset(String filename) {
-            return -1;
+        public static int getVideoOffset(String filename) throws XMPException, IOException {
+            FileInputStream in = new FileInputStream(filename);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+            copy(filename, in, out);
+            byte[] fileData = out.toByteArray();
+
+            int openIdx = indexOf(fileData, OPEN_ARR, 0);
+            if (openIdx >= 0) {
+                int closeIdx = indexOf(fileData, CLOSE_ARR, openIdx + 1) + CLOSE_ARR.length;
+
+                byte[] segArr = Arrays.copyOfRange(fileData, openIdx, closeIdx);
+                XMPMeta meta = XMPMetaFactory.parseFromBuffer(segArr);
+
+                int videoOffset = meta.getPropertyInteger("http://ns.google.com/photos/1.0/camera/", "MicroVideoOffset");
+                Log.d("XmlParserActivity", "Micro video offset: " + videoOffset);
+                return videoOffset;
+            }
+            return 0;
+
         }
 
     }
