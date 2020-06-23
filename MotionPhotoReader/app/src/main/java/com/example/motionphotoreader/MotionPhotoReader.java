@@ -302,8 +302,23 @@ public class MotionPhotoReader {
      * Checks whether the Motion Photo video has a succeeding frame.
      * @return 1 if there is no frame, 0 if the next frame exists, and -1 if no buffers are available.
      */
-    public int hasNextFrame() {
-        return -1;
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    public int hasNextFrame() throws InterruptedException {
+        Integer bufferIndex = availableInputBuffers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        if (bufferIndex == null) {
+            return -1;
+        }
+        availableInputBuffers.offer(bufferIndex);  /* Put buffer back in queue */
+
+        // Read the next packet and check if it shows a full frame
+        ByteBuffer inputBuffer = lowResDecoder.getInputBuffer(bufferIndex);
+        int sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
+        if (sampleSize < 0) {
+            return 1;
+        }
+        else {
+            return 0;
+        }
     }
 
     /**
