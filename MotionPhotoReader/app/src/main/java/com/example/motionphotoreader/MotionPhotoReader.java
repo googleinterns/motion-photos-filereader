@@ -22,7 +22,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -48,7 +47,7 @@ public class MotionPhotoReader {
     private FileInputStream fileInputStream;
 
     // motion photo player settings
-    private final boolean LOOP = true;
+    private final boolean LOOP = true; /** Loop the video **/
 
     // message keys
     private static final int MSG_HAS_MSG_NEXT_FRAME = 0x0001;
@@ -140,14 +139,12 @@ public class MotionPhotoReader {
             @Override
             public void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
                 boolean result = availableInputBuffers.offer(index);
-                Log.d("DecodeActivity", "Sent available input buffer " + index + ": " + result);
                 Log.d("DecodeActivity", "Input buffers: " + availableInputBuffers.toString());
             }
 
             @Override
             public void onOutputBufferAvailable(@NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
                 boolean result = availableOutputBuffers.offer(index);
-                Log.d("DecodeActivity", "Sent available output buffer " + index + ": " + result);
                 Log.d("DecodeActivity", "Output buffers: " + availableOutputBuffers.toString());
             }
 
@@ -173,6 +170,8 @@ public class MotionPhotoReader {
         mBufferWorker = new HandlerThread("bufferHandler");
         mBufferWorker.start();
         bufferHandler = new Handler(mBufferWorker.getLooper()) {
+
+            @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
             @Override
             public void handleMessage(Message inputMessage) {
                 Bundle messageData = inputMessage.getData();
@@ -180,9 +179,57 @@ public class MotionPhotoReader {
                 Integer bufferIndex = -1;
                 switch (key) {
                     case MSG_NEXT_FRAME:
+                        // Get index of the next available input buffer
+                        do {
+                            try {
+                                bufferIndex = availableInputBuffers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        } while (bufferIndex == null);
+                        ByteBuffer inputBuffer = lowResDecoder.getInputBuffer(bufferIndex);
+                        if (inputBuffer == null) {
+                            Log.e("NextFrame", "Input buffer is null");
+                            break;
+                        }
+                        Log.d("NextFrame", "Received input buffer " + bufferIndex);
+
+                        // Read next packet from media extractor and update state according to settings
+                        int sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
+                        if (sampleSize < 0) {
+                            if (LOOP) {
+                                Log.d("NextFrame", "Looped");
+                                lowResExtractor.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+                                sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
+                                lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0);
+                                lowResExtractor.advance();
+                            }
+                            else {
+                                Log.d("NextFrame", "InputBuffer BUFFER_FLAG_END_OF_STREAM");
+                                lowResDecoder.queueInputBuffer(bufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                            }
+                        }
+                        else {
+                            Log.d("NextFrame", "Queue InputBuffer for time " + lowResExtractor.getSampleTime());
+                            lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0);
+                            lowResExtractor.advance();
+                        }
+
+                        // Get the next available output buffer and release frame data
+                        do {
+                            try {
+                                bufferIndex = availableOutputBuffers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        } while (bufferIndex == null);
+                        lowResDecoder.releaseOutputBuffer(bufferIndex, true);
+                        Log.d("NextFrame", "Releasing to output buffer " + bufferIndex);
                         break;
+
                     case MSG_SEEK_TO_FRAME:
                         break;
+
                     default:
                         Log.e("HandlerActivity", "Unexpected message!");
                 }
