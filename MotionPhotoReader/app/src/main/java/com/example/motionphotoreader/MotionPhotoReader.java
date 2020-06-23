@@ -1,5 +1,7 @@
 package com.example.motionphotoreader;
 
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.util.Log;
 import android.view.Surface;
 
@@ -14,6 +16,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * The MotionPhotoReader API allows developers to read through the video portion of Motion Photos in
@@ -25,6 +29,21 @@ public class MotionPhotoReader {
     private final String filename;
     private final Surface surface;
 
+    /**
+     * Two handlers manage the calls to play through the video. The media worker thread posts
+     * available buffers to the buffer queue. The buffer worker receives messages to process frames
+     * and uses the available buffers posted by the media worker thread.
+     */
+    private HandlerThread mMediaWorker;
+    private Handler mediaHandler;
+    private HandlerThread mBufferWorker;
+    private Handler bufferHandler;
+
+    /** Available buffer queues **/
+    private final BlockingQueue<Integer> availableInputBuffers = new LinkedBlockingQueue<>();
+    private final BlockingQueue<Integer> availableOutputBuffers = new LinkedBlockingQueue<>();
+
+
     private MotionPhotoReader(String filename, Surface surface) {
         this.filename = filename;
         this.surface = surface;
@@ -33,16 +52,32 @@ public class MotionPhotoReader {
     /**
      * Opens and prepares a new MotionPhotoReader for a particular file.
      */
-    public static MotionPhotoReader open(String filename, Surface surface) {
-        return null;
+    public static MotionPhotoReader open(String filename, Surface surface) throws IOException, XMPException {
+        MotionPhotoReader reader = new MotionPhotoReader(filename, surface);
+        reader.prepare();
+        Log.d("ReaderActivity", "Prepared motion photo reader");
+        return reader;
     }
 
     /**
      * Parses the XMP in the file to find the microvideo offset, and sets up the MediaCodec
      * extractors and decoders.
      */
-    private void prepare() {
+    private void prepare() throws IOException, XMPException {
+        startBufferThread();
+        startMediaThread();
+    }
 
+    /**
+     * Sets up and starts a new handler thread for MediaCodec objects (decoder and extractor).
+     */
+    private void startMediaThread() {
+    }
+
+    /**
+     * Sets up and starts a new handler thread for managing frame advancing calls and available buffers.
+     */
+    private void startBufferThread() {
     }
 
     /**
