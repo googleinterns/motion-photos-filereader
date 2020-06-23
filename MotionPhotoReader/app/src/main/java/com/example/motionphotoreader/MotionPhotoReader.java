@@ -1,15 +1,24 @@
 package com.example.motionphotoreader;
 
+import android.media.MediaCodec;
+import android.media.MediaExtractor;
+import android.media.MediaFormat;
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
 import android.view.Surface;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 
 import com.adobe.internal.xmp.XMPException;
 import com.adobe.internal.xmp.XMPMeta;
 import com.adobe.internal.xmp.XMPMetaFactory;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -28,6 +37,12 @@ public class MotionPhotoReader {
 
     private final String filename;
     private final Surface surface;
+
+    private MediaExtractor lowResExtractor;
+    private MediaCodec lowResDecoder;
+    private MediaFormat mediaFormat;
+    private FileInputStream fileInputStream;
+
 
     /**
      * Two handlers manage the calls to play through the video. The media worker thread posts
@@ -52,6 +67,7 @@ public class MotionPhotoReader {
     /**
      * Opens and prepares a new MotionPhotoReader for a particular file.
      */
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public static MotionPhotoReader open(String filename, Surface surface) throws IOException, XMPException {
         MotionPhotoReader reader = new MotionPhotoReader(filename, surface);
         reader.prepare();
@@ -63,6 +79,7 @@ public class MotionPhotoReader {
      * Parses the XMP in the file to find the microvideo offset, and sets up the MediaCodec
      * extractors and decoders.
      */
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private void prepare() throws IOException, XMPException {
         startBufferThread();
         startMediaThread();
@@ -71,7 +88,70 @@ public class MotionPhotoReader {
     /**
      * Sets up and starts a new handler thread for MediaCodec objects (decoder and extractor).
      */
-    private void startMediaThread() {
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    private void startMediaThread() throws IOException, XMPException {
+        mMediaWorker = new HandlerThread("mediaHandler");
+        mMediaWorker.start();
+        mediaHandler = new Handler(mMediaWorker.getLooper());
+
+        int videoOffset = XmpParser.getVideoOffset(filename);
+
+        // Set up input stream from Motion Photo file for media extractor
+        final File f = new File(filename);
+        fileInputStream = new FileInputStream(f);
+        FileDescriptor fd = fileInputStream.getFD();
+
+        lowResExtractor = new MediaExtractor();
+        lowResExtractor.setDataSource(fd, f.length() - videoOffset, videoOffset);
+
+        // Find the video track and create an appropriate media decoder
+        for (int i = 0; i < lowResExtractor.getTrackCount(); i++) {
+            MediaFormat format = lowResExtractor.getTrackFormat(i);
+            String mime = format.getString(MediaFormat.KEY_MIME);
+            assert mime != null;
+            if (mime.startsWith("video/")) {
+                lowResExtractor.selectTrack(i);
+                mediaFormat = format;
+                lowResDecoder = MediaCodec.createDecoderByType(mime);
+                break;
+            }
+        }
+
+        // Make sure the Android version is capable of supporting MediaCodec callbacks
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            Log.e("MotionPhotoReader", "Insufficient Android build version");
+            return;
+        }
+
+        lowResDecoder.setCallback(new MediaCodec.Callback() {
+
+            @Override
+            public void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
+                boolean result = availableInputBuffers.offer(index);
+                Log.d("DecodeActivity", "Sent available input buffer " + index + ": " + result);
+                Log.d("DecodeActivity", "Input buffers: " + availableInputBuffers.toString());
+            }
+
+            @Override
+            public void onOutputBufferAvailable(@NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
+                boolean result = availableOutputBuffers.offer(index);
+                Log.d("DecodeActivity", "Sent available output buffer " + index + ": " + result);
+                Log.d("DecodeActivity", "Output buffers: " + availableOutputBuffers.toString());
+            }
+
+            @Override
+            public void onError(@NonNull MediaCodec codec, @NonNull MediaCodec.CodecException e) {
+
+            }
+
+            @Override
+            public void onOutputFormatChanged(@NonNull MediaCodec codec, @NonNull MediaFormat format) {
+
+            }
+        }, mediaHandler);
+
+        lowResDecoder.configure(mediaFormat, surface, null, 0);
+        lowResDecoder.start();
     }
 
     /**
