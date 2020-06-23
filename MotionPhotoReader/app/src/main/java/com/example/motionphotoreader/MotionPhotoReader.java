@@ -340,7 +340,15 @@ public class MotionPhotoReader {
      * @param mode The sync mode of the extractor.
      */
     public void seekTo(long timeUs, int mode) {
+        Message message = Message.obtain(bufferHandler);
 
+        Bundle messageData = new Bundle();
+        messageData.putInt("MESSAGE_KEY", MSG_SEEK_TO_FRAME);
+        messageData.putLong("TIME_US", timeUs);
+        messageData.putInt("MODE", mode);
+        message.setData(messageData);
+
+        message.sendToTarget();
     }
 
     /**
