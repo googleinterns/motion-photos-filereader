@@ -4,8 +4,10 @@ import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.Message;
 import android.util.Log;
 import android.view.Surface;
 
@@ -24,9 +26,11 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The MotionPhotoReader API allows developers to read through the video portion of Motion Photos in
@@ -43,6 +47,14 @@ public class MotionPhotoReader {
     private MediaFormat mediaFormat;
     private FileInputStream fileInputStream;
 
+    // motion photo player settings
+    private final boolean LOOP = true;
+
+    // message keys
+    private static final int MSG_HAS_MSG_NEXT_FRAME = 0x0001;
+    private static final int MSG_NEXT_FRAME = 0x0010;
+    private static final int MSG_SEEK_TO_FRAME = 0x0100;
+    private static final long TIMEOUT_MS = 1000L;
 
     /**
      * Two handlers manage the calls to play through the video. The media worker thread posts
@@ -158,6 +170,24 @@ public class MotionPhotoReader {
      * Sets up and starts a new handler thread for managing frame advancing calls and available buffers.
      */
     private void startBufferThread() {
+        mBufferWorker = new HandlerThread("bufferHandler");
+        mBufferWorker.start();
+        bufferHandler = new Handler(mBufferWorker.getLooper()) {
+            @Override
+            public void handleMessage(Message inputMessage) {
+                Bundle messageData = inputMessage.getData();
+                int key = messageData.getInt("MESSAGE_KEY");
+                Integer bufferIndex = -1;
+                switch (key) {
+                    case MSG_NEXT_FRAME:
+                        break;
+                    case MSG_SEEK_TO_FRAME:
+                        break;
+                    default:
+                        Log.e("HandlerActivity", "Unexpected message!");
+                }
+            }
+        };
     }
 
     /**
