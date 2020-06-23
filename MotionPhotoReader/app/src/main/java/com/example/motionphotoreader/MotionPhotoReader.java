@@ -273,7 +273,29 @@ public class MotionPhotoReader {
      * Shut down all resources allocated to the MotionPhotoReader instance.
      */
     public void close() {
+        lowResDecoder.release();
+        lowResExtractor.release();
+        Log.d("ReaderActivity", "Closed decoder and extractor");
+        try {
+            fileInputStream.close();
+            Log.d("ReaderActivity", "Close file input stream");
 
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+            bufferHandler.getLooper().quitSafely();
+            mediaHandler.getLooper().quitSafely();
+            Log.d("ReaderActivity", "Safely quit looper");
+
+        }
+        else {
+            bufferHandler.getLooper().quit();
+            mediaHandler.getLooper().quit();
+            Log.d("ReaderActivity", "Quit looper");
+        }
+        mBufferWorker.interrupt();
+        mMediaWorker.interrupt();
     }
 
     /**
