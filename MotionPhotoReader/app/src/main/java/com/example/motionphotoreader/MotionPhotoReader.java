@@ -2,6 +2,9 @@ package com.example.motionphotoreader;
 
 import android.view.Surface;
 
+import java.io.InputStream;
+import java.io.OutputStream;
+
 /**
  * The MotionPhotoReader API allows developers to read through the video portion of Motion Photos in
  * a frame-by-frame manner.
@@ -68,6 +71,36 @@ public class MotionPhotoReader {
      * from the XMP metadata of the given Motion Photo. This class is for internal use only.
      */
     private static class XmpParser {
+
+        private static final byte[] OPEN_ARR = "<x:xmpmeta".getBytes(); /** Start of XMP metadata tag */
+        private static final byte[] CLOSE_ARR = "</x:xmpmeta>".getBytes(); /** End of XMP metadata tag */
+
+        /**
+         * Copies the input stream from a file to an output stream.
+         */
+        private static void copy(String filename, InputStream in, OutputStream out) {
+
+        }
+
+        /**
+         * Returns the index of the first appearance of a given subsequence in a byte array.
+         * @param arr The full byte array
+         * @param seq The subsequence of bytes to find
+         * @param start The index at which to start searching
+         * @return The index of the first appearance of the beginning of the subsequence in the
+         * byte array. If the sequence is not found, return -1.
+         */
+        private static int indexOf(byte[] arr, byte[] seq, int start) {
+            return -1;
+        }
+
+        /**
+         * Returns the video offset of the microvideo in the Motion Photo file, in bytes from the end
+         * of the file.
+         */
+        public static int getVideoOffset(String filename) {
+            return -1;
+        }
 
     }
     
