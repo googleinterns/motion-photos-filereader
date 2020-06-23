@@ -325,7 +325,13 @@ public class MotionPhotoReader {
      * Advances the decoder and extractor by one frame.
      */
     public void nextFrame() {
+        Message message = Message.obtain(bufferHandler);
 
+        Bundle messageData = new Bundle();
+        messageData.putInt("MESSAGE_KEY", MSG_NEXT_FRAME);
+        message.setData(messageData);
+
+        message.sendToTarget();
     }
 
     /**
