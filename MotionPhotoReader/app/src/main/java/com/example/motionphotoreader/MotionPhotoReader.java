@@ -165,6 +165,7 @@ public class MotionPhotoReader {
 
     /**
      * Sets up and starts a new handler thread for managing frame advancing calls and available buffers.
+     * TODO: Refactor for better modularity.
      */
     private void startBufferThread() {
         mBufferWorker = new HandlerThread("bufferHandler");
@@ -180,13 +181,11 @@ public class MotionPhotoReader {
                 switch (key) {
                     case MSG_NEXT_FRAME:
                         // Get index of the next available input buffer
-                        do {
-                            try {
-                                bufferIndex = availableInputBuffers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-                        } while (bufferIndex == null);
+                        try {
+                            bufferIndex = availableInputBuffers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
                         ByteBuffer inputBuffer = lowResDecoder.getInputBuffer(bufferIndex);
                         if (inputBuffer == null) {
                             Log.e("NextFrame", "Input buffer is null");
@@ -228,6 +227,39 @@ public class MotionPhotoReader {
                         break;
 
                     case MSG_SEEK_TO_FRAME:
+                        // Get index of the next available input buffer
+                        try {
+                            bufferIndex = availableInputBuffers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        inputBuffer = lowResDecoder.getInputBuffer(bufferIndex);
+                        if (inputBuffer == null) {
+                            Log.e("SeekToFrame", "Input buffer is null");
+                            break;
+                        }
+                        Log.d("SeekToFrame", "Received input buffer " + bufferIndex);
+
+                        // Set media extractor to specified timestamp
+                        lowResExtractor.seekTo(messageData.getLong("TIME_US"), messageData.getInt("MODE"));
+                        sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
+                        if (sampleSize < 0) {
+                            Log.d("SeekToFrame", "InputBuffer BUFFER_FLAG_END_OF_STREAM");
+                            lowResDecoder.queueInputBuffer(bufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                        }
+                        else {
+                            Log.d("SeekToFrame", "Queue InputBuffer " + lowResExtractor.getSampleTime());
+                            lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0);
+                            lowResExtractor.advance();
+                        }
+
+                        // Get the next available output buffer and release frame data
+                        try {
+                            bufferIndex = availableOutputBuffers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        lowResDecoder.releaseOutputBuffer(bufferIndex, true);
                         break;
 
                     default:
