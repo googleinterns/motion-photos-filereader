@@ -17,6 +17,8 @@ import androidx.annotation.RequiresApi;
 import com.adobe.internal.xmp.XMPException;
 import com.adobe.internal.xmp.XMPMeta;
 import com.adobe.internal.xmp.XMPMetaFactory;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -46,13 +48,9 @@ public class MotionPhotoReader {
     private MediaFormat mediaFormat;
     private FileInputStream fileInputStream;
 
-    // motion photo player settings
-    private final boolean LOOP = true; /** Loop the video **/
-
     // message keys
-    private static final int MSG_HAS_MSG_NEXT_FRAME = 0x0001;
-    private static final int MSG_NEXT_FRAME = 0x0010;
-    private static final int MSG_SEEK_TO_FRAME = 0x0100;
+    private static final int MSG_NEXT_FRAME = 0x0001;
+    private static final int MSG_SEEK_TO_FRAME = 0x0010;
     private static final long TIMEOUT_MS = 1000L;
 
     /**
@@ -196,17 +194,19 @@ public class MotionPhotoReader {
                         // Read next packet from media extractor and update state according to settings
                         int sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
                         if (sampleSize < 0) {
-                            if (LOOP) {
-                                Log.d("NextFrame", "Looped");
-                                lowResExtractor.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
-                                sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
-                                lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0);
-                                lowResExtractor.advance();
-                            }
-                            else {
-                                Log.d("NextFrame", "InputBuffer BUFFER_FLAG_END_OF_STREAM");
-                                lowResDecoder.queueInputBuffer(bufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-                            }
+                            Log.d("NextFrame", "InputBuffer BUFFER_FLAG_END_OF_STREAM");
+                            lowResDecoder.queueInputBuffer(bufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+//                            if (LOOP) {
+//                                Log.d("NextFrame", "Looped");
+//                                lowResExtractor.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+//                                sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
+//                                lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0); // can put buffer end of stream flag here
+//                                lowResExtractor.advance();
+//                            }
+//                            else {
+//                                Log.d("NextFrame", "InputBuffer BUFFER_FLAG_END_OF_STREAM");
+//                                lowResDecoder.queueInputBuffer(bufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+//                            }
                         }
                         else {
                             Log.d("NextFrame", "Queue InputBuffer for time " + lowResExtractor.getSampleTime());
@@ -249,7 +249,7 @@ public class MotionPhotoReader {
                         }
                         else {
                             Log.d("SeekToFrame", "Queue InputBuffer " + lowResExtractor.getSampleTime());
-                            lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0);
+                            lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, 1000 * lowResExtractor.getSampleTime(), 0);
                             lowResExtractor.advance();
                         }
 
@@ -296,29 +296,32 @@ public class MotionPhotoReader {
         }
         mBufferWorker.interrupt();
         mMediaWorker.interrupt();
+        surface.release();
     }
 
     /**
      * Checks whether the Motion Photo video has a succeeding frame.
      * @return 1 if there is no frame, 0 if the next frame exists, and -1 if no buffers are available.
      */
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-    public int hasNextFrame() throws InterruptedException {
-        Integer bufferIndex = availableInputBuffers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
-        if (bufferIndex == null) {
-            return -1;
-        }
-        availableInputBuffers.offer(bufferIndex);  /* Put buffer back in queue */
+    @RequiresApi(api = Build.VERSION_CODES.P)
+    public ListenableFuture<Boolean> hasNextFrame() {
+        Log.d("HasNextFrame", "Running");
 
-        // Read the next packet and check if it shows a full frame
-        ByteBuffer inputBuffer = lowResDecoder.getInputBuffer(bufferIndex);
-        int sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
-        if (sampleSize < 0) {
-            return 1;
-        }
-        else {
-            return 0;
-        }
+        SettableFuture<Boolean> result = SettableFuture.create();
+
+        // Send hasNextFrame task to handler
+        bufferHandler.post(() -> {
+
+            // Read the next packet and check if it shows a full frame
+            long sampleSize = lowResExtractor.getSampleSize();
+            if (sampleSize < 0) {
+                result.set(false);
+            }
+            else {
+                result.set(true);
+            }
+        });
+        return result;
     }
 
     /**
