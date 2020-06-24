@@ -65,7 +65,7 @@ public class MotionPhotoReader {
 
     /** Available buffer queues **/
     private final BlockingQueue<Integer> availableInputBuffers = new LinkedBlockingQueue<>();
-    private final BlockingQueue<Integer> availableOutputBuffers = new LinkedBlockingQueue<>();
+    private final BlockingQueue<Bundle> availableOutputBuffers = new LinkedBlockingQueue<>();
 
 
     private MotionPhotoReader(String filename, Surface surface) {
@@ -142,7 +142,10 @@ public class MotionPhotoReader {
 
             @Override
             public void onOutputBufferAvailable(@NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
-                boolean result = availableOutputBuffers.offer(index);
+                Bundle bufferData = new Bundle();
+                bufferData.putInt("BUFFER_INDEX", index);
+                bufferData.putLong("TIMESTAMP_NS", info.presentationTimeUs);
+                boolean result = availableOutputBuffers.offer(bufferData);
                 Log.d("DecodeActivity", "Output buffers: " + availableOutputBuffers.toString());
             }
 
@@ -175,7 +178,9 @@ public class MotionPhotoReader {
             public void handleMessage(Message inputMessage) {
                 Bundle messageData = inputMessage.getData();
                 int key = messageData.getInt("MESSAGE_KEY");
+                Bundle bufferData = null;
                 Integer bufferIndex = -1;
+                long timestamp;
                 switch (key) {
                     case MSG_NEXT_FRAME:
                         // Get index of the next available input buffer
@@ -185,44 +190,28 @@ public class MotionPhotoReader {
                             e.printStackTrace();
                         }
                         ByteBuffer inputBuffer = lowResDecoder.getInputBuffer(bufferIndex);
-                        if (inputBuffer == null) {
-                            Log.e("NextFrame", "Input buffer is null");
-                            break;
-                        }
-                        Log.d("NextFrame", "Received input buffer " + bufferIndex);
 
                         // Read next packet from media extractor and update state according to settings
                         int sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
                         if (sampleSize < 0) {
                             Log.d("NextFrame", "InputBuffer BUFFER_FLAG_END_OF_STREAM");
                             lowResDecoder.queueInputBuffer(bufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-//                            if (LOOP) {
-//                                Log.d("NextFrame", "Looped");
-//                                lowResExtractor.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
-//                                sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
-//                                lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0); // can put buffer end of stream flag here
-//                                lowResExtractor.advance();
-//                            }
-//                            else {
-//                                Log.d("NextFrame", "InputBuffer BUFFER_FLAG_END_OF_STREAM");
-//                                lowResDecoder.queueInputBuffer(bufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-//                            }
                         }
-                        else {
+                            else {
                             Log.d("NextFrame", "Queue InputBuffer for time " + lowResExtractor.getSampleTime());
                             lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0);
                             lowResExtractor.advance();
                         }
 
                         // Get the next available output buffer and release frame data
-                        do {
-                            try {
-                                bufferIndex = availableOutputBuffers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-                        } while (bufferIndex == null);
-                        lowResDecoder.releaseOutputBuffer(bufferIndex, true);
+                        try {
+                            bufferData = availableOutputBuffers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        bufferIndex = bufferData.getInt("BUFFER_INDEX");
+                        timestamp = bufferData.getLong("TIMESTAMP");
+                        lowResDecoder.releaseOutputBuffer(bufferIndex, timestamp);
                         Log.d("NextFrame", "Releasing to output buffer " + bufferIndex);
                         break;
 
@@ -255,11 +244,14 @@ public class MotionPhotoReader {
 
                         // Get the next available output buffer and release frame data
                         try {
-                            bufferIndex = availableOutputBuffers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                            bufferData = availableOutputBuffers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
-                        lowResDecoder.releaseOutputBuffer(bufferIndex, true);
+                        bufferIndex = bufferData.getInt("BUFFER_INDEX");
+                        timestamp = bufferData.getLong("TIMESTAMP");
+                        lowResDecoder.releaseOutputBuffer(bufferIndex, timestamp);
+                        Log.d("SeekToFrame", "Releasing to output buffer " + bufferIndex);
                         break;
 
                     default:
