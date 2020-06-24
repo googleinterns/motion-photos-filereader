@@ -211,7 +211,7 @@ public class MotionPhotoReader {
                         }
                         bufferIndex = bufferData.getInt("BUFFER_INDEX");
                         timestamp = bufferData.getLong("TIMESTAMP");
-                        lowResDecoder.releaseOutputBuffer(bufferIndex, timestamp);
+                        lowResDecoder.releaseOutputBuffer(bufferIndex, timestamp * 1000L);
                         Log.d("NextFrame", "Releasing to output buffer " + bufferIndex);
                         break;
 
@@ -238,7 +238,7 @@ public class MotionPhotoReader {
                         }
                         else {
                             Log.d("SeekToFrame", "Queue InputBuffer " + lowResExtractor.getSampleTime());
-                            lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, 1000 * lowResExtractor.getSampleTime(), 0);
+                            lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0);
                             lowResExtractor.advance();
                         }
 
@@ -250,7 +250,7 @@ public class MotionPhotoReader {
                         }
                         bufferIndex = bufferData.getInt("BUFFER_INDEX");
                         timestamp = bufferData.getLong("TIMESTAMP");
-                        lowResDecoder.releaseOutputBuffer(bufferIndex, timestamp);
+                        lowResDecoder.releaseOutputBuffer(bufferIndex, timestamp * 1000L);
                         Log.d("SeekToFrame", "Releasing to output buffer " + bufferIndex);
                         break;
 
