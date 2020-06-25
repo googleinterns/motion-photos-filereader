@@ -104,7 +104,8 @@ public class MotionPhotoReader {
         mMediaWorker.start();
         mediaHandler = new Handler(mMediaWorker.getLooper());
 
-        int videoOffset = XmpParser.getVideoOffset(filename);
+        MotionPhotoInfo mpi = getMotionPhotoInfo();
+        int videoOffset = mpi.getVideoOffset();
 
         // Set up input stream from Motion Photo file for media extractor
         final File f = new File(filename);
@@ -345,6 +346,14 @@ public class MotionPhotoReader {
         message.setData(messageData);
 
         message.sendToTarget();
+    }
+
+    /**
+     * Retrieves information about the motion photo and returns a MotionPhotoInfo object.
+     */
+    public MotionPhotoInfo getMotionPhotoInfo() throws IOException, XMPException {
+        MotionPhotoInfo mpi = new MotionPhotoInfo(filename);
+        return mpi;
     }
     
     private class MotionPhotoImage {
