@@ -8,6 +8,7 @@ import com.adobe.internal.xmp.XMPMetaFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -60,10 +61,9 @@ class XmpParser {
     }
 
     /**
-     * Returns the video offset of the microvideo in the Motion Photo file, in bytes from the end
-     * of the file.
+     * Returns the metadata of the Motion Photo file.
      */
-    public static int getVideoOffset(String filename) throws XMPException, IOException {
+    public static XMPMeta getXmpMetadata(String filename) throws IOException, XMPException {
         FileInputStream in = new FileInputStream(filename);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
 
@@ -75,14 +75,8 @@ class XmpParser {
             int closeIdx = indexOf(fileData, CLOSE_ARR, openIdx + 1) + CLOSE_ARR.length;
 
             byte[] segArr = Arrays.copyOfRange(fileData, openIdx, closeIdx);
-            XMPMeta meta = XMPMetaFactory.parseFromBuffer(segArr);
-
-            int videoOffset = meta.getPropertyInteger("http://ns.google.com/photos/1.0/camera/", "MicroVideoOffset");
-            Log.d("XmlParserActivity", "Micro video offset: " + videoOffset);
-            return videoOffset;
+            return XMPMetaFactory.parseFromBuffer(segArr);
         }
-        return 0;
-
+        return null;
     }
-
 }
