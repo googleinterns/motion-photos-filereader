@@ -23,7 +23,14 @@ public class MotionPhotoInfo {
     /**
      * Returns the XMP metadata associated with a given file.
      */
-    public MotionPhotoInfo(String filename) {
+    public MotionPhotoInfo(String filename) throws IOException, XMPException {
+        XMPMeta meta = XmpParser.getXmpMetadata(filename);
+        this.filename = filename;
+        width = meta.getPropertyInteger("http://ns.google.com/photos/1.0/camera/", "ExifImageWidth");
+        height = meta.getPropertyInteger("http://ns.google.com/photos/1.0/camera/", "ExifImageHeight");
+        videoOffset = meta.getPropertyInteger("http://ns.google.com/photos/1.0/camera/", "MicroVideoOffset");
+        xResolution = meta.getPropertyInteger("http://ns.google.com/photos/1.0/camera/", "XResolution");
+        yResolution = meta.getPropertyInteger("http://ns.google.com/photos/1.0/camera/", "YResolution");
     }
 
     public int getWidth() {
