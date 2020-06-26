@@ -349,10 +349,17 @@ public class MotionPhotoReader {
     }
 
     /**
+     * Gets the current video timestamp at which the extractor is set.
+     */
+    public long getCurrentTimestamp() {
+        return lowResExtractor.getSampleTime();
+    }
+
+    /**
      * Retrieves information about the motion photo and returns a MotionPhotoInfo object.
      */
     public MotionPhotoInfo getMotionPhotoInfo() throws IOException, XMPException {
-        MotionPhotoInfo mpi = new MotionPhotoInfo(filename);
+        MotionPhotoInfo mpi = MotionPhotoInfo.newInstance(filename);
         return mpi;
     }
     
