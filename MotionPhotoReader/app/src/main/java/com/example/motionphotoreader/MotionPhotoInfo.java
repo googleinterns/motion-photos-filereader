@@ -25,7 +25,9 @@ public class MotionPhotoInfo {
     private int width;
     private int height;
     private long duration;
+
     private int videoOffset;
+    private long presentationTimestampUs;
 
     private final MediaExtractor extractor;
 
@@ -37,7 +39,11 @@ public class MotionPhotoInfo {
         this.extractor = extractor;
 
         XMPMeta meta = XmpParser.getXmpMetadata(filename);
+//        int length = meta.getPropertyInteger("http://ns.google.com/photos/1.0/container/item/", "Length");
+//        int padding = meta.getPropertyInteger("http://ns.google.com/photos/1.0/container/item/", "Padding");
+//        videoOffset = length + padding;
         videoOffset = meta.getPropertyInteger("http://ns.google.com/photos/1.0/camera/", "MicroVideoOffset");
+        presentationTimestampUs = meta.getPropertyLong("http://ns.google.com/photos/1.0/camera/", "MicroVideoPresentationTimestampUs");
 
         File f = new File(filename);
         FileInputStream fileInputStream = new FileInputStream(f);
@@ -81,5 +87,9 @@ public class MotionPhotoInfo {
 
     public long getDuration() {
         return duration;
+    }
+
+    public long getPresentationTimestampUs() {
+        return presentationTimestampUs;
     }
 }
