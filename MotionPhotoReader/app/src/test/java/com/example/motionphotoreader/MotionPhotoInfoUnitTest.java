@@ -20,9 +20,11 @@ import static junit.framework.TestCase.assertNotNull;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +43,7 @@ public class MotionPhotoInfoUnitTest {
 
     private XMPMeta meta;
     private MediaExtractor extractor;
+    private MediaFormat videoFormat;
     private MotionPhotoInfo mpi;
     private String filename;
 
@@ -50,7 +53,7 @@ public class MotionPhotoInfoUnitTest {
         meta = XmpParser.getXmpMetadata(filename);
 
         // set up a media format to mimic a motion photo
-        MediaFormat videoFormat = mock(MediaFormat.class);
+        videoFormat = mock(MediaFormat.class);
         doAnswer((Answer<Integer>) invocation -> KEY_WIDTH).when(videoFormat).getInteger(eq(MediaFormat.KEY_WIDTH));
         doAnswer((Answer<Integer>) invocation -> KEY_HEIGHT).when(videoFormat).getInteger(eq(MediaFormat.KEY_HEIGHT));
         doAnswer((Answer<Long>) invocation -> KEY_DURATION).when(videoFormat).getLong(eq(MediaFormat.KEY_DURATION));
@@ -62,6 +65,9 @@ public class MotionPhotoInfoUnitTest {
         doAnswer((Answer<MediaFormat>) invocation -> videoFormat).when(extractor).getTrackFormat(eq(0));
 
         mpi = new MotionPhotoInfo(filename, extractor);
+        verify(videoFormat, times(2)).getInteger(anyString());
+        verify(videoFormat, times(1)).getLong(anyString());
+        verify(videoFormat, times(1)).getString(anyString());
     }
 
     @Test
