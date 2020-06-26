@@ -335,6 +335,8 @@ public class MotionPhotoReader {
      * Sets the decoder and extractor to the frame specified by the given timestamp.
      * @param timeUs The desired timestamp of the video.
      * @param mode The sync mode of the extractor.
+     *
+     * TODO: resolve possible jank.
      */
     public void seekTo(long timeUs, int mode) {
         Message message = Message.obtain(bufferHandler);
@@ -349,7 +351,7 @@ public class MotionPhotoReader {
     }
 
     /**
-     * Gets the current video timestamp at which the extractor is set.
+     * Gets the current video timestamp at which the extractor is set (in microseconds).
      */
     public long getCurrentTimestamp() {
         return lowResExtractor.getSampleTime();
