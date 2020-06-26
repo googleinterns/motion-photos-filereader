@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
+import android.os.Trace;
 import android.util.Log;
 import android.view.Surface;
 
@@ -15,20 +16,14 @@ import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 
 import com.adobe.internal.xmp.XMPException;
-import com.adobe.internal.xmp.XMPMeta;
-import com.adobe.internal.xmp.XMPMetaFactory;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -51,9 +46,10 @@ public class MotionPhotoReader {
     // message keys
     private static final int MSG_NEXT_FRAME = 0x0001;
     private static final int MSG_SEEK_TO_FRAME = 0x0010;
-    private static final long TIMEOUT_MS = 1000L;
+    private static final long TIMEOUT_US = 1000L;
 
-    private static final long MS_TO_NS = 1000L;
+    private static final long US_TO_NS = 1000L;
+
     /**
      * Two handlers manage the calls to play through the video. The media worker thread posts
      * available buffers to the buffer queue. The buffer worker receives messages to process frames
@@ -146,7 +142,7 @@ public class MotionPhotoReader {
             public void onOutputBufferAvailable(@NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
                 Bundle bufferData = new Bundle();
                 bufferData.putInt("BUFFER_INDEX", index);
-                bufferData.putLong("TIMESTAMP_NS", info.presentationTimeUs);
+                bufferData.putLong("TIMESTAMP_US", info.presentationTimeUs);
                 boolean result = availableOutputBuffers.offer(bufferData);
                 Log.d("DecodeActivity", "Output buffers: " + availableOutputBuffers.toString());
             }
@@ -185,9 +181,10 @@ public class MotionPhotoReader {
                 long timestamp;
                 switch (key) {
                     case MSG_NEXT_FRAME:
+                        Trace.beginSection("msg-next-frame");
                         // Get index of the next available input buffer
                         try {
-                            bufferIndex = availableInputBuffers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                            bufferIndex = availableInputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
@@ -201,26 +198,29 @@ public class MotionPhotoReader {
                         }
                             else {
                             Log.d("NextFrame", "Queue InputBuffer for time " + lowResExtractor.getSampleTime());
-                            lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime() * MS_TO_NS, 0);
+                            lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0);
                             lowResExtractor.advance();
                         }
 
                         // Get the next available output buffer and release frame data
                         try {
-                            bufferData = availableOutputBuffers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                            bufferData = availableOutputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
+                        timestamp = bufferData.getLong("TIMESTAMP_US");
                         bufferIndex = bufferData.getInt("BUFFER_INDEX");
-                        timestamp = bufferData.getLong("TIMESTAMP");
-                        lowResDecoder.releaseOutputBuffer(bufferIndex, timestamp * MS_TO_NS);
+                        lowResDecoder.releaseOutputBuffer(bufferIndex, timestamp * US_TO_NS);
                         Log.d("NextFrame", "Releasing to output buffer " + bufferIndex);
+
+                        Trace.endSection();
                         break;
 
                     case MSG_SEEK_TO_FRAME:
+                        Trace.beginSection("msg-seek-to-frame");
                         // Get index of the next available input buffer
                         try {
-                            bufferIndex = availableInputBuffers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                            bufferIndex = availableInputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
@@ -240,20 +240,22 @@ public class MotionPhotoReader {
                         }
                         else {
                             Log.d("SeekToFrame", "Queue InputBuffer " + lowResExtractor.getSampleTime());
-                            lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime() * MS_TO_NS, 0);
+                            lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0);
                             lowResExtractor.advance();
                         }
 
                         // Get the next available output buffer and release frame data
                         try {
-                            bufferData = availableOutputBuffers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                            bufferData = availableOutputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
+                        timestamp = bufferData.getLong("TIMESTAMP_US");
+
                         bufferIndex = bufferData.getInt("BUFFER_INDEX");
-                        timestamp = bufferData.getLong("TIMESTAMP");
-                        lowResDecoder.releaseOutputBuffer(bufferIndex, timestamp * MS_TO_NS);
+                        lowResDecoder.releaseOutputBuffer(bufferIndex, timestamp * US_TO_NS);
                         Log.d("SeekToFrame", "Releasing to output buffer " + bufferIndex);
+                        Trace.endSection();
                         break;
 
                     default:
