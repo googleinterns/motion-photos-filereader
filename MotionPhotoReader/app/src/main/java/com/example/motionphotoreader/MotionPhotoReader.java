@@ -14,6 +14,7 @@ import android.view.Surface;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
+import androidx.annotation.VisibleForTesting;
 
 import com.adobe.internal.xmp.XMPException;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -65,9 +66,22 @@ public class MotionPhotoReader {
     private final BlockingQueue<Bundle> availableOutputBuffers = new LinkedBlockingQueue<>();
 
 
+    /**
+     * Standard MotionPhotoReader constructor.
+     */
     private MotionPhotoReader(String filename, Surface surface) {
         this.filename = filename;
         this.surface = surface;
+        this.lowResExtractor = new MediaExtractor();
+    }
+
+    /**
+     * Constructor for testing.
+     */
+    public MotionPhotoReader(String filename, Surface surface, MediaExtractor lowResExtractor) {
+        this.filename = filename;
+        this.surface = surface;
+        this.lowResExtractor = lowResExtractor;
     }
 
     /**
@@ -77,7 +91,6 @@ public class MotionPhotoReader {
     public static MotionPhotoReader open(String filename, Surface surface) throws IOException, XMPException {
         MotionPhotoReader reader = new MotionPhotoReader(filename, surface);
         reader.prepare();
-        Log.d("ReaderActivity", "Prepared motion photo reader");
         return reader;
     }
 
@@ -87,6 +100,20 @@ public class MotionPhotoReader {
      */
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private void prepare() throws IOException, XMPException {
+        mBufferWorker = new HandlerThread("bufferHandler");
+        mMediaWorker = new HandlerThread("mediaHandler");
+        startBufferThread();
+        startMediaThread();
+    }
+
+    /**
+     * Prepares MotionPhotoReader for unit testing.
+     */
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    @VisibleForTesting
+    public void prepare(HandlerThread mMediaWorker, HandlerThread mBufferWorker) throws IOException, XMPException {
+        this.mBufferWorker = mBufferWorker;
+        this.mMediaWorker = mMediaWorker;
         startBufferThread();
         startMediaThread();
     }
@@ -96,7 +123,6 @@ public class MotionPhotoReader {
      */
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private void startMediaThread() throws IOException, XMPException {
-        mMediaWorker = new HandlerThread("mediaHandler");
         mMediaWorker.start();
         mediaHandler = new Handler(mMediaWorker.getLooper());
 
@@ -108,7 +134,6 @@ public class MotionPhotoReader {
         fileInputStream = new FileInputStream(f);
         FileDescriptor fd = fileInputStream.getFD();
 
-        lowResExtractor = new MediaExtractor();
         lowResExtractor.setDataSource(fd, f.length() - videoOffset, videoOffset);
 
         // Find the video track and create an appropriate media decoder
@@ -167,47 +192,61 @@ public class MotionPhotoReader {
      * TODO: Refactor for better modularity.
      */
     private void startBufferThread() {
-        mBufferWorker = new HandlerThread("bufferHandler");
         mBufferWorker.start();
         bufferHandler = new Handler(mBufferWorker.getLooper()) {
 
             @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+            public int getAvailableInputBufferIndex() {
+                int bufferIndex = -1;
+                try {
+                    bufferIndex = availableInputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return bufferIndex;
+            }
+
+            public void readFromExtractor(ByteBuffer inputBuffer, int bufferIndex) {
+                int sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
+                if (sampleSize < 0) {
+                    Log.d("NextFrame", "InputBuffer BUFFER_FLAG_END_OF_STREAM");
+                    lowResDecoder.queueInputBuffer(bufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                }
+                else {
+                    Log.d("NextFrame", "Queue InputBuffer for time " + lowResExtractor.getSampleTime());
+                    lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0);
+                    lowResExtractor.advance();
+                }
+            }
+
+            public Bundle getAvailableOutputBufferData() {
+                Bundle bufferData = null;
+                try {
+                    bufferData = availableOutputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return bufferData;
+            }
+
+            @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
             @Override
-            public void handleMessage(Message inputMessage) {
+            public void handleMessage(@NonNull Message inputMessage) {
                 Bundle messageData = inputMessage.getData();
                 int key = messageData.getInt("MESSAGE_KEY");
-                Bundle bufferData = null;
-                Integer bufferIndex = -1;
+                Bundle bufferData;
+                int bufferIndex;
                 long timestamp;
                 switch (key) {
                     case MSG_NEXT_FRAME:
                         Trace.beginSection("msg-next-frame");
-                        // Get index of the next available input buffer
-                        try {
-                            bufferIndex = availableInputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
+                        // Get the next available input buffer and read frame data
+                        bufferIndex = getAvailableInputBufferIndex();
                         ByteBuffer inputBuffer = lowResDecoder.getInputBuffer(bufferIndex);
-
-                        // Read next packet from media extractor and update state according to settings
-                        int sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
-                        if (sampleSize < 0) {
-                            Log.d("NextFrame", "InputBuffer BUFFER_FLAG_END_OF_STREAM");
-                            lowResDecoder.queueInputBuffer(bufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-                        }
-                            else {
-                            Log.d("NextFrame", "Queue InputBuffer for time " + lowResExtractor.getSampleTime());
-                            lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0);
-                            lowResExtractor.advance();
-                        }
+                        readFromExtractor(inputBuffer, bufferIndex);
 
                         // Get the next available output buffer and release frame data
-                        try {
-                            bufferData = availableOutputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
+                        bufferData = getAvailableOutputBufferData();
                         timestamp = bufferData.getLong("TIMESTAMP_US");
                         bufferIndex = bufferData.getInt("BUFFER_INDEX");
                         lowResDecoder.releaseOutputBuffer(bufferIndex, timestamp * US_TO_NS);
@@ -218,43 +257,20 @@ public class MotionPhotoReader {
 
                     case MSG_SEEK_TO_FRAME:
                         Trace.beginSection("msg-seek-to-frame");
-                        // Get index of the next available input buffer
-                        try {
-                            bufferIndex = availableInputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
+                        // Get the next available input buffer and read frame data
+                        bufferIndex = getAvailableInputBufferIndex();
                         inputBuffer = lowResDecoder.getInputBuffer(bufferIndex);
-                        if (inputBuffer == null) {
-                            Log.e("SeekToFrame", "Input buffer is null");
-                            break;
-                        }
-                        Log.d("SeekToFrame", "Received input buffer " + bufferIndex);
 
-                        // Set media extractor to specified timestamp
                         lowResExtractor.seekTo(messageData.getLong("TIME_US"), messageData.getInt("MODE"));
-                        sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
-                        if (sampleSize < 0) {
-                            Log.d("SeekToFrame", "InputBuffer BUFFER_FLAG_END_OF_STREAM");
-                            lowResDecoder.queueInputBuffer(bufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-                        }
-                        else {
-                            Log.d("SeekToFrame", "Queue InputBuffer " + lowResExtractor.getSampleTime());
-                            lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0);
-                            lowResExtractor.advance();
-                        }
+                        readFromExtractor(inputBuffer, bufferIndex);
 
                         // Get the next available output buffer and release frame data
-                        try {
-                            bufferData = availableOutputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
+                        bufferData = getAvailableOutputBufferData();
                         timestamp = bufferData.getLong("TIMESTAMP_US");
-
                         bufferIndex = bufferData.getInt("BUFFER_INDEX");
                         lowResDecoder.releaseOutputBuffer(bufferIndex, timestamp * US_TO_NS);
-                        Log.d("SeekToFrame", "Releasing to output buffer " + bufferIndex);
+                        Log.d("NextFrame", "Releasing to output buffer " + bufferIndex);
+
                         Trace.endSection();
                         break;
 
@@ -365,9 +381,5 @@ public class MotionPhotoReader {
     public MotionPhotoInfo getMotionPhotoInfo() throws IOException, XMPException {
         MotionPhotoInfo mpi = MotionPhotoInfo.newInstance(filename);
         return mpi;
-    }
-    
-    private class MotionPhotoImage {
-        
     }
 }
