@@ -2,11 +2,6 @@ package com.example.motionphotoreader;
 
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
-import android.media.MediaMetadataRetriever;
-import android.net.Uri;
-import android.util.Log;
-
-import androidx.annotation.VisibleForTesting;
 
 import com.adobe.internal.xmp.XMPException;
 import com.adobe.internal.xmp.XMPMeta;
@@ -14,7 +9,6 @@ import com.adobe.internal.xmp.XMPMeta;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 
 /**
@@ -29,19 +23,53 @@ public class MotionPhotoInfo {
     private final int videoOffset;
     private final long presentationTimestampUs;
 
-    private final MediaExtractor extractor;
+    private MediaExtractor extractor;
 
     /**
-     * Returns the MotionPhotoInfo associated with a given file.
+     * Creates a MotionPhotoInfo object associated with a given file.
      */
-    @VisibleForTesting
-    public MotionPhotoInfo(String filename, MediaExtractor extractor) throws IOException, XMPException {
-        this.extractor = extractor;
+    private MotionPhotoInfo(MediaFormat mediaFormat, int videoOffset, long presentationTimestampUs) {
+        width = mediaFormat.getInteger(MediaFormat.KEY_WIDTH);
+        height = mediaFormat.getInteger(MediaFormat.KEY_HEIGHT);
+        duration = mediaFormat.getLong(MediaFormat.KEY_DURATION);
 
+        this.videoOffset = videoOffset;
+        this.presentationTimestampUs = presentationTimestampUs;
+    }
+
+    /**
+     * Returns a new instance of MotionPhotoInfo for a specified file.
+     */
+    public static MotionPhotoInfo newInstance(String filename) throws IOException, XMPException {
+        return MotionPhotoInfo.newInstance(filename, new MediaExtractor());
+    }
+
+    /**
+     * Returns a new instance of MotionPhotoInfo with a specified file and MediaExtractor. Used for testing.
+     */
+    public static MotionPhotoInfo newInstance(String filename, MediaExtractor extractor) throws IOException, XMPException {
+        XMPMeta meta = getFileXMP(filename);
+        int videoOffset = meta.getPropertyInteger("http://ns.google.com/photos/1.0/camera/", "MicroVideoOffset");
+        long presentationTimestampUs = meta.getPropertyLong("http://ns.google.com/photos/1.0/camera/", "MicroVideoPresentationTimestampUs");
+
+        MediaFormat mediaFormat = getFileMediaFormat(filename, extractor, videoOffset);
+        assert mediaFormat != null;
+        MotionPhotoInfo mpi = new MotionPhotoInfo(mediaFormat, videoOffset, presentationTimestampUs);
+        return mpi;
+    }
+
+    /**
+     * Extract the JPEG XMP metadata from the Motion Photo.
+     */
+    private static XMPMeta getFileXMP(String filename) throws IOException, XMPException {
         XMPMeta meta = XmpParser.getXmpMetadata(filename);
-        videoOffset = meta.getPropertyInteger("http://ns.google.com/photos/1.0/camera/", "MicroVideoOffset");
-        presentationTimestampUs = meta.getPropertyLong("http://ns.google.com/photos/1.0/camera/", "MicroVideoPresentationTimestampUs");
+        return meta;
+    }
 
+    /**
+     * Get the MediaFormat associated with the video track of the Motion Photo MPEG4.
+     */
+    private static MediaFormat getFileMediaFormat(String filename, MediaExtractor extractor, int videoOffset) throws IOException {
         File f = new File(filename);
         FileInputStream fileInputStream = new FileInputStream(f);
         FileDescriptor fd = fileInputStream.getFD();
@@ -53,26 +81,11 @@ public class MotionPhotoInfo {
             String mime = format.getString(MediaFormat.KEY_MIME);
             assert mime != null;
             if (mime.startsWith("video/")) {
-                width = format.getInteger(MediaFormat.KEY_WIDTH);
-                height = format.getInteger(MediaFormat.KEY_HEIGHT);
-                duration = format.getLong(MediaFormat.KEY_DURATION);
-
                 fileInputStream.close();
-                return;
+                return format;
             }
         }
-
-        // Set parameters if video track was not found
-        width = 0;
-        height = 0;
-        duration = 0;
-    }
-
-    /**
-     * Returns a new instance of MotionPhotoInfo for a specified file.
-     */
-    public static MotionPhotoInfo newInstance(String filename) throws IOException, XMPException {
-        return new MotionPhotoInfo(filename, new MediaExtractor());
+        return null;
     }
 
     public int getWidth() {

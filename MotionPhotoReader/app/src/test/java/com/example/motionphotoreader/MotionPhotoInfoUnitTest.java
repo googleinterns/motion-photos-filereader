@@ -60,7 +60,7 @@ public class MotionPhotoInfoUnitTest {
         when (extractor.getTrackCount()).thenReturn(1);
         doAnswer((Answer<MediaFormat>) invocation -> videoFormat).when(extractor).getTrackFormat(eq(0));
 
-        mpi = new MotionPhotoInfo(filename, extractor);
+        mpi = MotionPhotoInfo.newInstance(filename, extractor);
         verify(videoFormat, times(2)).getInteger(anyString());
         verify(videoFormat, times(1)).getLong(anyString());
         verify(videoFormat, times(1)).getString(anyString());
