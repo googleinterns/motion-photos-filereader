@@ -22,12 +22,12 @@ import java.io.IOException;
  */
 public class MotionPhotoInfo {
 
-    private int width;
-    private int height;
-    private long duration;
+    private final int width;
+    private final int height;
+    private final long duration;
 
-    private int videoOffset;
-    private long presentationTimestampUs;
+    private final int videoOffset;
+    private final long presentationTimestampUs;
 
     private final MediaExtractor extractor;
 
@@ -39,9 +39,6 @@ public class MotionPhotoInfo {
         this.extractor = extractor;
 
         XMPMeta meta = XmpParser.getXmpMetadata(filename);
-//        int length = meta.getPropertyInteger("http://ns.google.com/photos/1.0/container/item/", "Length");
-//        int padding = meta.getPropertyInteger("http://ns.google.com/photos/1.0/container/item/", "Padding");
-//        videoOffset = length + padding;
         videoOffset = meta.getPropertyInteger("http://ns.google.com/photos/1.0/camera/", "MicroVideoOffset");
         presentationTimestampUs = meta.getPropertyLong("http://ns.google.com/photos/1.0/camera/", "MicroVideoPresentationTimestampUs");
 
@@ -59,11 +56,16 @@ public class MotionPhotoInfo {
                 width = format.getInteger(MediaFormat.KEY_WIDTH);
                 height = format.getInteger(MediaFormat.KEY_HEIGHT);
                 duration = format.getLong(MediaFormat.KEY_DURATION);
-                break;
+
+                fileInputStream.close();
+                return;
             }
         }
 
-        fileInputStream.close();
+        // Set parameters if video track was not found
+        width = 0;
+        height = 0;
+        duration = 0;
     }
 
     /**
