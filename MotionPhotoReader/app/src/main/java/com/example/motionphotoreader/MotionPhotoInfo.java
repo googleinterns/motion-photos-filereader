@@ -53,7 +53,6 @@ public class MotionPhotoInfo {
         long presentationTimestampUs = meta.getPropertyLong("http://ns.google.com/photos/1.0/camera/", "MicroVideoPresentationTimestampUs");
 
         MediaFormat mediaFormat = getFileMediaFormat(filename, extractor, videoOffset);
-        assert mediaFormat != null;
         MotionPhotoInfo mpi = new MotionPhotoInfo(mediaFormat, videoOffset, presentationTimestampUs);
         return mpi;
     }

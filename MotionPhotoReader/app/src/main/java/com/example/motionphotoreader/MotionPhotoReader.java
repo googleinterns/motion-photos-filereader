@@ -84,15 +84,14 @@ public class MotionPhotoReader {
      */
     @RequiresApi(api = LOLLIPOP)
     @VisibleForTesting
-    MotionPhotoReader(String filename, Surface surface,
-                             MediaExtractor lowResExtractor, MediaCodec lowResDecoder) throws IOException, XMPException {
+    MotionPhotoReader(String filename, Surface surface, MediaExtractor lowResExtractor, MediaCodec lowResDecoder,
+                      HandlerThread mBufferWorker, Handler bufferHandler, MediaCodec.Callback callback) throws IOException, XMPException {
         this.filename = filename;
         this.surface = surface;
         this.lowResExtractor = lowResExtractor;
-        this.lowResDecoder = lowResDecoder;
 
-        startBufferThread();
-        startMediaThread(this.lowResDecoder);
+        startBufferThread(mBufferWorker, bufferHandler);
+        startMediaThread(lowResExtractor, lowResDecoder, callback);
     }
 
     /**
@@ -178,12 +177,13 @@ public class MotionPhotoReader {
     }
 
     @RequiresApi(api = LOLLIPOP)
-    private void startMediaThread(MediaCodec lowResDecoder) throws IOException, XMPException {
+    private void startMediaThread(MediaExtractor lowResExtractor, MediaCodec lowResDecoder, MediaCodec.Callback callback)
+            throws IOException, XMPException {
         mMediaWorker = new HandlerThread("mediaHandler");
         mMediaWorker.start();
         mediaHandler = new Handler(mMediaWorker.getLooper());
 
-        MotionPhotoInfo mpi = getMotionPhotoInfo();
+        MotionPhotoInfo mpi = MotionPhotoInfo.newInstance(filename, lowResExtractor);
         int videoOffset = mpi.getVideoOffset();
 
         // Set up input stream from Motion Photo file for media extractor
@@ -200,41 +200,13 @@ public class MotionPhotoReader {
             return;
         }
 
-        lowResDecoder.setCallback(new MediaCodec.Callback() {
-
-            @Override
-            public void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
-                boolean result = availableInputBuffers.offer(index);
-                Log.d("DecodeActivity", "Input buffers: " + availableInputBuffers.toString());
-            }
-
-            @Override
-            public void onOutputBufferAvailable(@NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
-                Bundle bufferData = new Bundle();
-                bufferData.putInt("BUFFER_INDEX", index);
-                bufferData.putLong("TIMESTAMP_US", info.presentationTimeUs);
-                boolean result = availableOutputBuffers.offer(bufferData);
-                Log.d("DecodeActivity", "Output buffers: " + availableOutputBuffers.toString());
-            }
-
-            @Override
-            public void onError(@NonNull MediaCodec codec, @NonNull MediaCodec.CodecException e) {
-
-            }
-
-            @Override
-            public void onOutputFormatChanged(@NonNull MediaCodec codec, @NonNull MediaFormat format) {
-
-            }
-        }, mediaHandler);
-
+        lowResDecoder.setCallback(callback, mediaHandler);
         lowResDecoder.configure(mediaFormat, surface, null, 0);
         lowResDecoder.start();
     }
 
     /**
      * Sets up and starts a new handler thread for managing frame advancing calls and available buffers.
-     * TODO: Refactor for better modularity.
      */
     private void startBufferThread() {
         mBufferWorker = new HandlerThread("bufferHandler");
@@ -242,7 +214,7 @@ public class MotionPhotoReader {
         bufferHandler = new Handler(mBufferWorker.getLooper()) {
 
             @RequiresApi(api = LOLLIPOP)
-            public int getAvailableInputBufferIndex() {
+            private int getAvailableInputBufferIndex() {
                 int bufferIndex = -1;
                 try {
                     bufferIndex = availableInputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
@@ -252,7 +224,7 @@ public class MotionPhotoReader {
                 return bufferIndex;
             }
 
-            public void readFromExtractor(ByteBuffer inputBuffer, int bufferIndex) {
+            private void readFromExtractor(ByteBuffer inputBuffer, int bufferIndex) {
                 int sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
                 if (sampleSize < 0) {
                     Log.d("NextFrame", "InputBuffer BUFFER_FLAG_END_OF_STREAM");
@@ -265,7 +237,7 @@ public class MotionPhotoReader {
                 }
             }
 
-            public Bundle getAvailableOutputBufferData() {
+            private Bundle getAvailableOutputBufferData() {
                 Bundle bufferData = null;
                 try {
                     bufferData = availableOutputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
@@ -326,6 +298,15 @@ public class MotionPhotoReader {
                 }
             }
         };
+    }
+
+    /**
+     * Sets up and starts a new handler thread for unit testing.
+     */
+    private void startBufferThread(HandlerThread mBufferWorker, Handler bufferHandler) {
+        this.mBufferWorker = mBufferWorker;
+        mBufferWorker.start();
+        this.bufferHandler = bufferHandler;
     }
 
     /**
@@ -428,13 +409,5 @@ public class MotionPhotoReader {
     public MotionPhotoInfo getMotionPhotoInfo() throws IOException, XMPException {
         MotionPhotoInfo mpi = MotionPhotoInfo.newInstance(filename);
         return mpi;
-    }
-
-    public int getNumAvailableInputBuffers() {
-        return availableInputBuffers.size();
-    }
-
-    public int getNumAvailableOutputBuffers() {
-        return availableOutputBuffers.size();
     }
 }
