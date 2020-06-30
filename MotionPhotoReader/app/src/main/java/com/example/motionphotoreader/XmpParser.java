@@ -8,6 +8,7 @@ import com.adobe.internal.xmp.XMPException;
 import com.adobe.internal.xmp.XMPMeta;
 import com.adobe.internal.xmp.XMPMetaFactory;
 import com.google.common.io.ByteStreams;
+import com.google.common.primitives.Bytes;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
@@ -37,29 +38,6 @@ class XmpParser {
 //        }
 //    }
 
-    /**
-     * Returns the index of the first appearance of a given subsequence in a byte array.
-     * @param arr The full byte array
-     * @param seq The subsequence of bytes to find
-     * @param start The index at which to start searching
-     * @return The index of the first appearance of the beginning of the subsequence in the
-     * byte array. If the sequence is not found, return -1.
-     */
-    private static int indexOf(byte[] arr, byte[] seq, int start) {
-        int subIdx = 0;
-        for (int x = start; x < arr.length; x++) {
-            if (arr[x] == seq[subIdx]) {
-                if (subIdx == seq.length - 1) {
-                    return x - subIdx;
-                }
-                subIdx++;
-            }
-            else {
-                subIdx = 0;
-            }
-        }
-        return -1;
-    }
 
     /**
      * Returns the metadata of the Motion Photo file.
@@ -72,9 +50,9 @@ class XmpParser {
 
             byte[] fileData = out.toByteArray();
 
-            int openIdx = indexOf(fileData, OPEN_ARR, 0);
+            int openIdx = Bytes.indexOf(fileData, OPEN_ARR);
             if (openIdx >= 0) {
-                int closeIdx = indexOf(fileData, CLOSE_ARR, openIdx + 1) + CLOSE_ARR.length;
+                int closeIdx = Bytes.indexOf(Arrays.copyOfRange(fileData, openIdx, fileData.length), CLOSE_ARR) + openIdx + CLOSE_ARR.length;
 
                 byte[] segArr = Arrays.copyOfRange(fileData, openIdx, closeIdx);
                 return XMPMetaFactory.parseFromBuffer(segArr);
