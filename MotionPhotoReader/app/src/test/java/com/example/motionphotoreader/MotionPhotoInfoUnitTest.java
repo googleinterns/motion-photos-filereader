@@ -8,8 +8,6 @@ import com.adobe.internal.xmp.XMPMeta;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mockito;
-import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 import java.io.IOException;
@@ -32,6 +30,7 @@ public class MotionPhotoInfoUnitTest {
     private final static int KEY_WIDTH = 4032;
     private final static int KEY_HEIGHT = 3024;
     private final static long KEY_DURATION = 297168;
+    private final static int KEY_ROTATION = 90;
     private final static String KEY_MIME = "video/avc";
 
     private final static int VIDEO_OFFSET = 2648203;
@@ -53,6 +52,7 @@ public class MotionPhotoInfoUnitTest {
         doAnswer((Answer<Integer>) invocation -> KEY_WIDTH).when(videoFormat).getInteger(eq(MediaFormat.KEY_WIDTH));
         doAnswer((Answer<Integer>) invocation -> KEY_HEIGHT).when(videoFormat).getInteger(eq(MediaFormat.KEY_HEIGHT));
         doAnswer((Answer<Long>) invocation -> KEY_DURATION).when(videoFormat).getLong(eq(MediaFormat.KEY_DURATION));
+        doAnswer((Answer<Integer>) invocation -> KEY_ROTATION).when(videoFormat).getInteger(eq(MediaFormat.KEY_ROTATION));
         doAnswer((Answer<String>) invocation -> KEY_MIME).when(videoFormat).getString(eq(MediaFormat.KEY_MIME));
 
         // return a single video track
@@ -90,16 +90,29 @@ public class MotionPhotoInfoUnitTest {
 
     @Test
     public void getWidth_isCorrect() {
-        assertEquals(mpi.getWidth(), KEY_WIDTH);
+        assertEquals(KEY_WIDTH, mpi.getWidth());
     }
 
     @Test
     public void getHeight_isCorrect() {
-        assertEquals(mpi.getHeight(), KEY_HEIGHT);
+        assertEquals(KEY_HEIGHT, mpi.getHeight());
     }
 
     @Test
     public void getDuration_isCorrect() {
-        assertEquals(mpi.getDuration(), KEY_DURATION);
+        assertEquals(KEY_DURATION, mpi.getDuration());
+    }
+
+    @Test
+    public void getRotation_whenKeyExists_isCorrect() throws IOException, XMPException {
+        // set up the media format so that it has a rotation
+        doAnswer((Answer<Boolean>) invocation -> true).when(videoFormat).containsKey(eq(MediaFormat.KEY_ROTATION));
+        mpi = MotionPhotoInfo.newInstance(filename, extractor);
+        assertEquals(KEY_ROTATION, mpi.getRotation());
+    }
+
+    @Test
+    public void getRotation_whenKeyDoesNotExist_isCorrect() {
+        assertEquals(0, mpi.getRotation());
     }
 }

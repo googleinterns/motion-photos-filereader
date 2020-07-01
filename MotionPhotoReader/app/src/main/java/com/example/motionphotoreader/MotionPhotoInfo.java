@@ -51,6 +51,7 @@ public class MotionPhotoInfo {
     /**
      * Returns a new instance of MotionPhotoInfo for a specified file.
      */
+    @RequiresApi(api = Build.VERSION_CODES.M)
     public static MotionPhotoInfo newInstance(String filename) throws IOException, XMPException {
         return MotionPhotoInfo.newInstance(filename, new MediaExtractor());
     }
@@ -58,6 +59,7 @@ public class MotionPhotoInfo {
     /**
      * Returns a new instance of MotionPhotoInfo with a specified file and MediaExtractor. Used for testing.
      */
+    @RequiresApi(api = Build.VERSION_CODES.M)
     public static MotionPhotoInfo newInstance(String filename, MediaExtractor extractor) throws IOException, XMPException {
         XMPMeta meta = getFileXMP(filename);
         int videoOffset = meta.getPropertyInteger("http://ns.google.com/photos/1.0/camera/", "MicroVideoOffset");
