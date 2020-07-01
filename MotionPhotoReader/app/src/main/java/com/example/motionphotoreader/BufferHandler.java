@@ -4,10 +4,8 @@ import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
-import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
@@ -56,11 +54,9 @@ class BufferHandler extends Handler {
     private void readFromExtractor(ByteBuffer inputBuffer, int bufferIndex) {
         int sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
         if (sampleSize < 0) {
-            Log.d("NextFrame", "InputBuffer BUFFER_FLAG_END_OF_STREAM");
             lowResDecoder.queueInputBuffer(bufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
         }
         else {
-            Log.d("NextFrame", "Queue InputBuffer for time " + lowResExtractor.getSampleTime());
             lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0);
             lowResExtractor.advance();
         }
@@ -95,7 +91,6 @@ class BufferHandler extends Handler {
                 timestamp = bufferData.getLong("TIMESTAMP_US");
                 bufferIndex = bufferData.getInt("BUFFER_INDEX");
                 lowResDecoder.releaseOutputBuffer(bufferIndex, timestamp * US_TO_NS);
-                Log.d("NextFrame", "Releasing to output buffer " + bufferIndex);
                 break;
 
             case MotionPhotoReader.MSG_SEEK_TO_FRAME:
@@ -108,15 +103,13 @@ class BufferHandler extends Handler {
 
                 // Get the next available output buffer and release frame data
                 bufferData = getAvailableOutputBufferData();
-                Log.d("SeekToFrame", bufferData.toString());
                 timestamp = bufferData.getLong("TIMESTAMP_US");
                 bufferIndex = bufferData.getInt("BUFFER_INDEX");
                 lowResDecoder.releaseOutputBuffer(bufferIndex, timestamp * US_TO_NS);
-                Log.d("SeekToFrame", "Releasing to output buffer " + bufferIndex);
                 break;
 
             default:
-                Log.e("HandlerActivity", "Unexpected message!");
+                throw new IllegalStateException();
         }
     }
 }
