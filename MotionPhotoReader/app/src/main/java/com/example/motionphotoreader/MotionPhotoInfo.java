@@ -5,6 +5,7 @@ import android.media.MediaFormat;
 import android.os.Build;
 
 import androidx.annotation.RequiresApi;
+import androidx.annotation.VisibleForTesting;
 
 import com.adobe.internal.xmp.XMPException;
 import com.adobe.internal.xmp.XMPMeta;
@@ -51,8 +52,9 @@ public class MotionPhotoInfo {
     /**
      * Returns a new instance of MotionPhotoInfo for a specified file.
      */
+    @VisibleForTesting
     @RequiresApi(api = Build.VERSION_CODES.M)
-    public static MotionPhotoInfo newInstance(String filename) throws IOException, XMPException {
+    static MotionPhotoInfo newInstance(String filename) throws IOException, XMPException {
         return MotionPhotoInfo.newInstance(filename, new MediaExtractor());
     }
 
@@ -61,7 +63,7 @@ public class MotionPhotoInfo {
      */
     @RequiresApi(api = Build.VERSION_CODES.M)
     public static MotionPhotoInfo newInstance(String filename, MediaExtractor extractor) throws IOException, XMPException {
-        XMPMeta meta = getFileXMP(filename);
+        XMPMeta meta = getFileXmp(filename);
         int videoOffset = meta.getPropertyInteger("http://ns.google.com/photos/1.0/camera/", "MicroVideoOffset");
         long presentationTimestampUs = meta.getPropertyLong("http://ns.google.com/photos/1.0/camera/", "MicroVideoPresentationTimestampUs");
 
@@ -72,7 +74,7 @@ public class MotionPhotoInfo {
     /**
      * Extract the JPEG XMP metadata from the Motion Photo.
      */
-    private static XMPMeta getFileXMP(String filename) throws IOException, XMPException {
+    private static XMPMeta getFileXmp(String filename) throws IOException, XMPException {
         return XmpParser.getXmpMetadata(filename);
     }
 
@@ -81,18 +83,18 @@ public class MotionPhotoInfo {
      */
     private static MediaFormat getFileMediaFormat(String filename, MediaExtractor extractor, int videoOffset) throws IOException {
         File f = new File(filename);
-        FileInputStream fileInputStream = new FileInputStream(f);
-        FileDescriptor fd = fileInputStream.getFD();
-        extractor.setDataSource(fd, f.length() - videoOffset, videoOffset);
-
-        // Find the video track and create an appropriate media decoder
-        for (int i = 0; i < extractor.getTrackCount(); i++) {
-            MediaFormat format = extractor.getTrackFormat(i);
-            String mime = format.getString(MediaFormat.KEY_MIME);
-            assert mime != null;
-            if (mime.startsWith("video/")) {
-                fileInputStream.close();
-                return format;
+        try (FileInputStream fileInputStream = new FileInputStream(f)) {
+            FileDescriptor fd = fileInputStream.getFD();
+            extractor.setDataSource(fd, f.length() - videoOffset, videoOffset);
+            // Find the video track and create an appropriate media decoder
+            for (int i = 0; i < extractor.getTrackCount(); i++) {
+                MediaFormat format = extractor.getTrackFormat(i);
+                String mime = format.getString(MediaFormat.KEY_MIME);
+                assert mime != null;
+                if (mime.startsWith("video/")) {
+                    fileInputStream.close();
+                    return format;
+                }
             }
         }
         return null;
