@@ -26,7 +26,7 @@ import static org.mockito.Mockito.when;
  * Example local unit test, which will execute on the development machine (host).
  * @see <a href="http://d.android.com/tools/testing">Testing documentation</a>
  */
-public class MotionPhotoInfoUnitTest {
+public class MotionPhotoInfoTest {
     private final static int KEY_WIDTH = 4032;
     private final static int KEY_HEIGHT = 3024;
     private final static long KEY_DURATION = 297168;
