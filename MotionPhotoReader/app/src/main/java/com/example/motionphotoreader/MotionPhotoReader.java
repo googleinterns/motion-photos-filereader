@@ -1,5 +1,7 @@
 package com.example.motionphotoreader;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
@@ -20,8 +22,6 @@ import com.adobe.internal.xmp.XMPException;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 
-import org.junit.runner.RunWith;
-
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
@@ -32,6 +32,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import static android.os.Build.VERSION_CODES.LOLLIPOP;
+import static android.os.Build.VERSION_CODES.M;
 
 /**
  * The MotionPhotoReader API allows developers to read through the video portion of Motion Photos in
@@ -42,18 +43,16 @@ public class MotionPhotoReader {
 
     private final String filename;
     private final Surface surface;
+    private MotionPhotoInfo mpi;
 
     private MediaExtractor lowResExtractor;
     private MediaCodec lowResDecoder;
-    private MediaFormat mediaFormat;
+    private MediaFormat videoFormat;
     private FileInputStream fileInputStream;
 
     // message keys
-    private static final int MSG_NEXT_FRAME = 0x0001;
-    private static final int MSG_SEEK_TO_FRAME = 0x0010;
-    private static final long TIMEOUT_US = 1000L;
-
-    private static final long US_TO_NS = 1000L;
+    static final int MSG_NEXT_FRAME = 0x0001;
+    static final int MSG_SEEK_TO_FRAME = 0x0010;
 
     /**
      * Two handlers manage the calls to play through the video. The media worker thread posts
@@ -79,43 +78,42 @@ public class MotionPhotoReader {
         this.lowResExtractor = new MediaExtractor();
     }
 
-    /**
-     * Constructor for testing.
-     */
-    @RequiresApi(api = LOLLIPOP)
-    @VisibleForTesting
-    MotionPhotoReader(String filename, Surface surface, MediaExtractor lowResExtractor, MediaCodec lowResDecoder,
-                      HandlerThread mBufferWorker, Handler bufferHandler, MediaCodec.Callback callback) throws IOException, XMPException {
-        this.filename = filename;
-        this.surface = surface;
-        this.lowResExtractor = lowResExtractor;
-
-        startBufferThread(mBufferWorker, bufferHandler);
-        startMediaThread(lowResExtractor, lowResDecoder, callback);
-    }
+//    /**
+//     * Constructor for testing.
+//     */
+//    @RequiresApi(api = M)
+//    @VisibleForTesting
+//    MotionPhotoReader(String filename, Surface surface, MediaExtractor lowResExtractor, MediaCodec lowResDecoder,
+//                      HandlerThread mBufferWorker, Handler bufferHandler, MediaCodec.Callback callback) throws IOException, XMPException {
+//        this.filename = filename;
+//        this.surface = surface;
+//        this.lowResExtractor = lowResExtractor;
+//
+//        startBufferThread(mBufferWorker, bufferHandler);
+//        startMediaThread(lowResExtractor, lowResDecoder, callback);
+//    }
 
     /**
      * Opens and prepares a new MotionPhotoReader for a particular file.
      */
-    @RequiresApi(api = LOLLIPOP)
+    @RequiresApi(api = M)
     public static MotionPhotoReader open(String filename, Surface surface) throws IOException, XMPException {
         MotionPhotoReader reader = new MotionPhotoReader(filename, surface);
         reader.startBufferThread();
         reader.startMediaThread();
-
         return reader;
     }
 
     /**
      * Sets up and starts a new handler thread for MediaCodec objects (decoder and extractor).
      */
-    @RequiresApi(api = LOLLIPOP)
+    @RequiresApi(api = 23)
     private void startMediaThread() throws IOException, XMPException {
         mMediaWorker = new HandlerThread("mediaHandler");
         mMediaWorker.start();
         mediaHandler = new Handler(mMediaWorker.getLooper());
 
-        MotionPhotoInfo mpi = getMotionPhotoInfo();
+        mpi = getMotionPhotoInfo();
         int videoOffset = mpi.getVideoOffset();
 
         // Set up input stream from Motion Photo file for media extractor
@@ -132,14 +130,14 @@ public class MotionPhotoReader {
             assert mime != null;
             if (mime.startsWith("video/")) {
                 lowResExtractor.selectTrack(i);
-                mediaFormat = format;
+                videoFormat = format;
                 lowResDecoder = MediaCodec.createDecoderByType(mime);
                 break;
             }
         }
 
         // Make sure the Android version is capable of supporting MediaCodec callbacks
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+        if (Build.VERSION.SDK_INT < M) {
             Log.e("MotionPhotoReader", "Insufficient Android build version");
             return;
         }
@@ -172,38 +170,38 @@ public class MotionPhotoReader {
             }
         }, mediaHandler);
 
-        lowResDecoder.configure(mediaFormat, surface, null, 0);
+        lowResDecoder.configure(videoFormat, surface, null, 0);
         lowResDecoder.start();
     }
 
-    @RequiresApi(api = LOLLIPOP)
-    private void startMediaThread(MediaExtractor lowResExtractor, MediaCodec lowResDecoder, MediaCodec.Callback callback)
-            throws IOException, XMPException {
-        mMediaWorker = new HandlerThread("mediaHandler");
-        mMediaWorker.start();
-        mediaHandler = new Handler(mMediaWorker.getLooper());
-
-        MotionPhotoInfo mpi = MotionPhotoInfo.newInstance(filename, lowResExtractor);
-        int videoOffset = mpi.getVideoOffset();
-
-        // Set up input stream from Motion Photo file for media extractor
-        final File f = new File(filename);
-        fileInputStream = new FileInputStream(f);
-        FileDescriptor fd = fileInputStream.getFD();
-
-        lowResExtractor.setDataSource(fd, f.length() - videoOffset, videoOffset);
-        this.lowResDecoder = lowResDecoder;
-
-        // Make sure the Android version is capable of supporting MediaCodec callbacks
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-            Log.e("MotionPhotoReader", "Insufficient Android build version");
-            return;
-        }
-
-        lowResDecoder.setCallback(callback, mediaHandler);
-        lowResDecoder.configure(mediaFormat, surface, null, 0);
-        lowResDecoder.start();
-    }
+//    @RequiresApi(api = 23)
+//    private void startMediaThread(MediaExtractor lowResExtractor, MediaCodec lowResDecoder, MediaCodec.Callback callback)
+//            throws IOException, XMPException {
+//        mMediaWorker = new HandlerThread("mediaHandler");
+//        mMediaWorker.start();
+//        mediaHandler = new Handler(mMediaWorker.getLooper());
+//
+//        mpi = MotionPhotoInfo.newInstance(filename, lowResExtractor);
+//        int videoOffset = mpi.getVideoOffset();
+//
+//        // Set up input stream from Motion Photo file for media extractor
+//        final File f = new File(filename);
+//        fileInputStream = new FileInputStream(f);
+//        FileDescriptor fd = fileInputStream.getFD();
+//
+//        lowResExtractor.setDataSource(fd, f.length() - videoOffset, videoOffset);
+//        this.lowResDecoder = lowResDecoder;
+//
+//        // Make sure the Android version is capable of supporting MediaCodec callbacks
+//        if (Build.VERSION.SDK_INT < M) {
+//            Log.e("MotionPhotoReader", "Insufficient Android build version");
+//            return;
+//        }
+//
+//        lowResDecoder.setCallback(callback, mediaHandler);
+//        lowResDecoder.configure(videoFormat, surface, null, 0);
+//        lowResDecoder.start();
+//    }
 
     /**
      * Sets up and starts a new handler thread for managing frame advancing calls and available buffers.
@@ -211,93 +209,8 @@ public class MotionPhotoReader {
     private void startBufferThread() {
         mBufferWorker = new HandlerThread("bufferHandler");
         mBufferWorker.start();
-        bufferHandler = new Handler(mBufferWorker.getLooper()) {
-
-            @RequiresApi(api = LOLLIPOP)
-            private int getAvailableInputBufferIndex() {
-                int bufferIndex = -1;
-                try {
-                    bufferIndex = availableInputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                return bufferIndex;
-            }
-
-            private void readFromExtractor(ByteBuffer inputBuffer, int bufferIndex) {
-                int sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
-                if (sampleSize < 0) {
-                    Log.d("NextFrame", "InputBuffer BUFFER_FLAG_END_OF_STREAM");
-                    lowResDecoder.queueInputBuffer(bufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-                }
-                else {
-                    Log.d("NextFrame", "Queue InputBuffer for time " + lowResExtractor.getSampleTime());
-                    lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0);
-                    lowResExtractor.advance();
-                }
-            }
-
-            private Bundle getAvailableOutputBufferData() {
-                Bundle bufferData = null;
-                try {
-                    bufferData = availableOutputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                return bufferData;
-            }
-
-            @RequiresApi(api = LOLLIPOP)
-            @Override
-            public void handleMessage(@NonNull Message inputMessage) {
-                Bundle messageData = inputMessage.getData();
-                int key = messageData.getInt("MESSAGE_KEY");
-                Bundle bufferData;
-                int bufferIndex;
-                long timestamp;
-                switch (key) {
-                    case MSG_NEXT_FRAME:
-                        Trace.beginSection("msg-next-frame");
-                        // Get the next available input buffer and read frame data
-                        bufferIndex = getAvailableInputBufferIndex();
-                        ByteBuffer inputBuffer = lowResDecoder.getInputBuffer(bufferIndex);
-                        readFromExtractor(inputBuffer, bufferIndex);
-
-                        // Get the next available output buffer and release frame data
-                        bufferData = getAvailableOutputBufferData();
-                        timestamp = bufferData.getLong("TIMESTAMP_US");
-                        bufferIndex = bufferData.getInt("BUFFER_INDEX");
-                        lowResDecoder.releaseOutputBuffer(bufferIndex, timestamp * US_TO_NS);
-                        Log.d("NextFrame", "Releasing to output buffer " + bufferIndex);
-
-                        Trace.endSection();
-                        break;
-
-                    case MSG_SEEK_TO_FRAME:
-                        Trace.beginSection("msg-seek-to-frame");
-                        // Get the next available input buffer and read frame data
-                        lowResExtractor.seekTo(messageData.getLong("TIME_US"), messageData.getInt("MODE"));
-
-                        bufferIndex = getAvailableInputBufferIndex();
-                        inputBuffer = lowResDecoder.getInputBuffer(bufferIndex);
-                        readFromExtractor(inputBuffer, bufferIndex);
-
-                        // Get the next available output buffer and release frame data
-                        bufferData = getAvailableOutputBufferData();
-                        Log.d("SeekToFrame", bufferData.toString());
-                        timestamp = bufferData.getLong("TIMESTAMP_US");
-                        bufferIndex = bufferData.getInt("BUFFER_INDEX");
-                        lowResDecoder.releaseOutputBuffer(bufferIndex, timestamp * US_TO_NS);
-                        Log.d("SeekToFrame", "Releasing to output buffer " + bufferIndex);
-
-                        Trace.endSection();
-                        break;
-
-                    default:
-                        Log.e("HandlerActivity", "Unexpected message!");
-                }
-            }
-        };
+        bufferHandler = new BufferHandler(mBufferWorker.getLooper(), lowResExtractor, lowResDecoder,
+                availableInputBuffers, availableOutputBuffers);
     }
 
     /**
@@ -313,8 +226,6 @@ public class MotionPhotoReader {
      * Shut down all resources allocated to the MotionPhotoReader instance.
      */
     public void close() {
-        lowResDecoder.release();
-        lowResExtractor.release();
         Log.d("ReaderActivity", "Closed decoder and extractor");
         try {
             fileInputStream.close();
@@ -334,9 +245,13 @@ public class MotionPhotoReader {
             mediaHandler.getLooper().quit();
             Log.d("ReaderActivity", "Quit looper");
         }
+        lowResDecoder.release();
+        lowResExtractor.release();
         mBufferWorker.interrupt();
         mMediaWorker.interrupt();
-        surface.release();
+//        if (surface != null) {
+//            surface.release();
+//        }
     }
 
     /**
@@ -406,8 +321,14 @@ public class MotionPhotoReader {
     /**
      * Retrieves information about the motion photo and returns a MotionPhotoInfo object.
      */
+    @RequiresApi(api = M)
     public MotionPhotoInfo getMotionPhotoInfo() throws IOException, XMPException {
-        MotionPhotoInfo mpi = MotionPhotoInfo.newInstance(filename);
-        return mpi;
+        return MotionPhotoInfo.newInstance(filename);
+    }
+
+
+    public Bitmap getMotionPhotoImageBitmap() {
+        Bitmap bmp = BitmapFactory.decodeFile(filename);
+        return bmp;
     }
 }
