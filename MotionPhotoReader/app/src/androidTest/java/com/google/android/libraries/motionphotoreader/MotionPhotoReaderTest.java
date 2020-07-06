@@ -16,8 +16,10 @@ import org.mockito.stubbing.Answer;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -39,7 +41,7 @@ import static org.mockito.Mockito.verify;
 public class MotionPhotoReaderTest {
     private static final String filename = "/sdcard/MVIMG_20200621_200240.jpg";
     private static final int NUM_FRAMES = 44;
-    private static final long SEEK_AMOUNT_US = 10_000L;
+    private static final long SEEK_AMOUNT_US = 100_000L;
 
     // TODO: close motion photo readers
     @Before
@@ -49,15 +51,15 @@ public class MotionPhotoReaderTest {
 
     @Test(expected = IOException.class)
     public void openMotionPhotoReader_invalidFile_throwsIOException() throws IOException, XMPException {
-        MotionPhotoReader.open("/sdcard/MVIMG_20200621_200241.jpg", null);
+        MotionPhotoReader reader = MotionPhotoReader.open("/sdcard/MVIMG_20200621_200241.jpg", null);
     }
 
     @Test
-    public void numberOfFramesPlayed_isCorrect() throws IOException, XMPException {
+    public void numberOfFramesPlayed_isCorrect() throws IOException, XMPException, InterruptedException, ExecutionException, TimeoutException {
         MotionPhotoReader reader = MotionPhotoReader.open(filename, null);
 
         int frameCount = 0;
-        while (reader.hasNextFrame()) {
+        while (reader.hasNextFrame().get(1000L, TimeUnit.MILLISECONDS)) {
             reader.nextFrame();
             frameCount++;
         }
@@ -71,27 +73,13 @@ public class MotionPhotoReaderTest {
     }
 
     @Test
-    public void getCurrentTimestamp_nextFrame_isCorrect() throws IOException, XMPException {
+    public void getCurrentTimestamp_nextFrame_isCorrect() throws IOException, XMPException, InterruptedException, ExecutionException, TimeoutException {
         MotionPhotoReader reader = MotionPhotoReader.open(filename, null);
 
-        long currentTimestampUs = -1L;
-        while (reader.hasNextFrame()) {
-            long newTimestampUs = reader.getCurrentTimestamp();
+        long currentTimestampUs = reader.getCurrentTimestamp();
+        while (reader.hasNextFrame().get(1000L, TimeUnit.MILLISECONDS)) {
             reader.nextFrame();
-            boolean flag = currentTimestampUs < newTimestampUs;
-            assertTrue("Timestamp did not increase: " + currentTimestampUs + " vs. " + newTimestampUs, flag);
-            currentTimestampUs = newTimestampUs;
-        }
-    }
-
-    @Test
-    public void getCurrentTimestamp_seekTo_isCorrect() throws IOException, XMPException {
-        MotionPhotoReader reader = MotionPhotoReader.open(filename, null);
-
-        long currentTimestampUs = -1L;
-        while (reader.hasNextFrame()) {
             long newTimestampUs = reader.getCurrentTimestamp();
-            reader.seekTo(reader.getCurrentTimestamp() + SEEK_AMOUNT_US, MediaExtractor.SEEK_TO_NEXT_SYNC);
             boolean flag = currentTimestampUs < newTimestampUs;
             assertTrue("Timestamp did not increase: " + currentTimestampUs + " vs. " + newTimestampUs, flag);
             currentTimestampUs = newTimestampUs;
@@ -99,19 +87,36 @@ public class MotionPhotoReaderTest {
     }
 
     @Test
-    public void hasNextFrame_atBeginningOfVideo_returnsTrue() throws IOException, XMPException {
+    public void getCurrentTimestamp_seekTo_isCorrect()
+            throws IOException, XMPException, InterruptedException, ExecutionException, TimeoutException {
         MotionPhotoReader reader = MotionPhotoReader.open(filename, null);
-        boolean flag = reader.hasNextFrame();
+
+        long currentTimestampUs = reader.getCurrentTimestamp();
+        while (reader.hasNextFrame().get(1000L, TimeUnit.MILLISECONDS)) {
+            reader.seekTo(reader.getCurrentTimestamp() + 10_000L, MediaExtractor.SEEK_TO_NEXT_SYNC);
+            long newTimestampUs = reader.getCurrentTimestamp();
+            boolean flag = currentTimestampUs < newTimestampUs;
+            assertTrue("Timestamp did not increase: " + currentTimestampUs + " vs. " + newTimestampUs, flag);
+            currentTimestampUs = newTimestampUs;
+        }
+    }
+
+    @Test
+    public void hasNextFrame_atBeginningOfVideo_returnsTrue()
+            throws IOException, XMPException, InterruptedException, ExecutionException, TimeoutException {
+        MotionPhotoReader reader = MotionPhotoReader.open(filename, null);
+        boolean flag = reader.hasNextFrame().get(1000L, TimeUnit.MILLISECONDS);
         assertTrue("No next frame", flag);
     }
 
     @Test
-    public void hasNextFrame_atLastFrame_returnsFalse() throws IOException, XMPException {
+    public void hasNextFrame_atLastFrame_returnsFalse()
+            throws IOException, XMPException, InterruptedException, ExecutionException, TimeoutException {
         MotionPhotoReader reader = MotionPhotoReader.open(filename, null);
 
         long timestampUs = reader.getMotionPhotoInfo().getDuration();
         reader.seekTo(timestampUs, MediaExtractor.SEEK_TO_NEXT_SYNC);
-        boolean flag = reader.hasNextFrame();
+        boolean flag = reader.hasNextFrame().get(1000L, TimeUnit.MILLISECONDS);
         assertFalse("Did not seek to end of video", flag);
     }
 
@@ -128,7 +133,8 @@ public class MotionPhotoReaderTest {
     }
 
     @Test
-    public void availableOutputBufferQueue_isQueried() throws IOException, XMPException, InterruptedException {
+    public void availableOutputBufferQueue_isQueried()
+            throws IOException, XMPException, InterruptedException, TimeoutException, ExecutionException {
         BlockingQueue<Integer> availableInputBuffers = new LinkedBlockingQueue<>();
         BlockingQueue<Bundle> availableOutputBuffers = new LinkedBlockingQueue<>();
 
@@ -163,7 +169,7 @@ public class MotionPhotoReaderTest {
 
         MotionPhotoReader reader = MotionPhotoReader.open(filename, null, fakeAvailableInputBuffers, fakeAvailableOutputBuffers);
 
-        while (reader.hasNextFrame()) {
+        while (reader.hasNextFrame().get(1000L, TimeUnit.MILLISECONDS)) {
             reader.nextFrame();
         }
         verify(fakeAvailableOutputBuffers, times(NUM_FRAMES)).offer(any(Bundle.class));
