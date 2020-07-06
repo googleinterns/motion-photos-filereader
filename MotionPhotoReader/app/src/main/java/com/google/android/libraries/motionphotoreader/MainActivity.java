@@ -47,10 +47,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        // Get a random motion photo
-        int idx = (int) SystemClock.currentThreadTimeMillis() % 3;
-        filename = "/sdcard/MVIMG_" + FILENAMES[idx] + ".jpg";
+        filename = "/sdcard/MVIMG_" + FILENAMES[0] + ".jpg";
 
         // Hide action bar
         try {
