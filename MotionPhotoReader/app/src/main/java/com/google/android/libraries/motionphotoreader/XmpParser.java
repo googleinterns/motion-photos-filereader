@@ -22,18 +22,6 @@ class XmpParser {
     private static final byte[] OPEN_ARR = "<x:xmpmeta".getBytes();  /* Start of XMP metadata tag */
     private static final byte[] CLOSE_ARR = "</x:xmpmeta>".getBytes();  /* End of XMP metadata tag */
 
-//    /**
-//     * Copies the input stream from a file to an output stream.
-//     */
-//    private static void copy(String filename, InputStream in, OutputStream out) throws IOException {
-//        int len;
-//        byte[] buf = new byte[1024];
-//        while((len = in.read(buf)) >= 0) {
-//            out.write(buf, 0, len);
-//        }
-//    }
-
-
     /**
      * Returns the metadata of the Motion Photo file.
      */

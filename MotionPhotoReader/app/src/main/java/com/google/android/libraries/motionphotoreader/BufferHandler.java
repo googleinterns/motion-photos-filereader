@@ -40,6 +40,10 @@ class BufferHandler extends Handler {
         this.availableOutputBuffers = availableOutputBuffers;
     }
 
+    /**
+     * Retrieve the index of the next available input buffer.
+     * @return the index of the next available input buffer, or -1 if the poll call results in a timeout.
+     */
     @RequiresApi(api = LOLLIPOP)
     private int getAvailableInputBufferIndex() {
         int bufferIndex = -1;
@@ -51,6 +55,9 @@ class BufferHandler extends Handler {
         return bufferIndex;
     }
 
+    /**
+     * Read the next data sample from the motion photo to a given input buffer and advance the extractor.
+     */
     private void readFromExtractor(ByteBuffer inputBuffer, int bufferIndex) {
         int sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
         if (sampleSize < 0) {
@@ -62,6 +69,11 @@ class BufferHandler extends Handler {
         }
     }
 
+    /**
+     * Retrieve the information of the next available output buffer.
+     * @return the bundle containing the information of the next available output buffer, or null if
+     * the poll call results in a timeout.
+     */
     private Bundle getAvailableOutputBufferData() {
         Bundle bufferData = null;
         try {
@@ -72,6 +84,9 @@ class BufferHandler extends Handler {
         return bufferData;
     }
 
+    /**
+     * Handle calls to nextFrame() and seekTo() by the MotionPhotoReader.
+     */
     @RequiresApi(api = LOLLIPOP)
     public void handleMessage(@NonNull Message inputMessage) {
         Bundle messageData = inputMessage.getData();

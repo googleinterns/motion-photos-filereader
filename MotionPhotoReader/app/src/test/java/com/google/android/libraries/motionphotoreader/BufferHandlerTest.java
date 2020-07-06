@@ -29,9 +29,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 /**
- * Example local unit test, which will execute on the development machine (host).
- *
- * @see <a href="http://d.android.com/tools/testing">Testing documentation</a>
+ * Local unit test for the BufferHandler class.
  */
 public class BufferHandlerTest {
 

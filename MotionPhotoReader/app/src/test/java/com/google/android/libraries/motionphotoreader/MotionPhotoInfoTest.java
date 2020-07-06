@@ -23,10 +23,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Example local unit test, which will execute on the development machine (host).
- * @see <a href="http://d.android.com/tools/testing">Testing documentation</a>
+ * Local unit test for MotionPhotoInfo class.
  */
 public class MotionPhotoInfoTest {
+    // define a mock media format
     private final static int KEY_WIDTH = 4032;
     private final static int KEY_HEIGHT = 3024;
     private final static long KEY_DURATION = 297168;
@@ -39,7 +39,7 @@ public class MotionPhotoInfoTest {
     private XMPMeta meta;
     private MediaExtractor extractor;
     private MediaFormat videoFormat;
-    private MotionPhotoInfo mpi;
+    private MotionPhotoInfo motionPhotoInfo;
     private String filename;
 
     @Before
@@ -60,7 +60,7 @@ public class MotionPhotoInfoTest {
         when (extractor.getTrackCount()).thenReturn(1);
         doAnswer((Answer<MediaFormat>) invocation -> videoFormat).when(extractor).getTrackFormat(eq(0));
 
-        mpi = MotionPhotoInfo.newInstance(filename, extractor);
+        motionPhotoInfo = MotionPhotoInfo.newInstance(filename, extractor);
         verify(videoFormat, times(2)).getInteger(anyString());
         verify(videoFormat, times(1)).getLong(anyString());
         verify(videoFormat, times(1)).getString(anyString());
@@ -73,46 +73,46 @@ public class MotionPhotoInfoTest {
 
     @Test
     public void motionPhotoInfo_isValid() {
-        assertNotNull(mpi);
+        assertNotNull(motionPhotoInfo);
     }
 
     @Test
     public void getVideoOffset_isCorrect() {
-        int videoOffset = mpi.getVideoOffset();
+        int videoOffset = motionPhotoInfo.getVideoOffset();
         assertEquals(VIDEO_OFFSET, videoOffset);
     }
 
     @Test
     public void getPresentationTimestampUs_isCorrect() {
-        long presentationTimestampUs = mpi.getPresentationTimestampUs();
+        long presentationTimestampUs = motionPhotoInfo.getPresentationTimestampUs();
         assertEquals(PRESENTATION_TIMESTAMP_US, presentationTimestampUs);
     }
 
     @Test
     public void getWidth_isCorrect() {
-        assertEquals(KEY_WIDTH, mpi.getWidth());
+        assertEquals(KEY_WIDTH, motionPhotoInfo.getWidth());
     }
 
     @Test
     public void getHeight_isCorrect() {
-        assertEquals(KEY_HEIGHT, mpi.getHeight());
+        assertEquals(KEY_HEIGHT, motionPhotoInfo.getHeight());
     }
 
     @Test
     public void getDuration_isCorrect() {
-        assertEquals(KEY_DURATION, mpi.getDuration());
+        assertEquals(KEY_DURATION, motionPhotoInfo.getDuration());
     }
 
     @Test
     public void getRotation_whenKeyExists_isCorrect() throws IOException, XMPException {
         // set up the media format so that it has a rotation
         doAnswer((Answer<Boolean>) invocation -> true).when(videoFormat).containsKey(eq(MediaFormat.KEY_ROTATION));
-        mpi = MotionPhotoInfo.newInstance(filename, extractor);
-        assertEquals(KEY_ROTATION, mpi.getRotation());
+        motionPhotoInfo = MotionPhotoInfo.newInstance(filename, extractor);
+        assertEquals(KEY_ROTATION, motionPhotoInfo.getRotation());
     }
 
     @Test
     public void getRotation_whenKeyDoesNotExist_isCorrect() {
-        assertEquals(0, mpi.getRotation());
+        assertEquals(0, motionPhotoInfo.getRotation());
     }
 }
