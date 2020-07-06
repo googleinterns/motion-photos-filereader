@@ -39,7 +39,7 @@ public class MotionPhotoReader {
 
     private final String filename;
     private final Surface surface;
-    private MotionPhotoInfo mpi;
+    private final MotionPhotoInfo motionPhotoInfo;
 
     private MediaExtractor lowResExtractor;
     private MediaCodec lowResDecoder;
@@ -69,13 +69,14 @@ public class MotionPhotoReader {
      * Standard MotionPhotoReader constructor.
      */
     private MotionPhotoReader(String filename, Surface surface,
-                              BlockingQueue<Integer> availableInputBuffers, BlockingQueue<Bundle> availableOutputBuffers) {
+                              BlockingQueue<Integer> availableInputBuffers, BlockingQueue<Bundle> availableOutputBuffers,
+                              MotionPhotoInfo motionPhotoInfo) {
         this.filename = filename;
         this.surface = surface;
-
         this.lowResExtractor = new MediaExtractor();
         this.availableInputBuffers = availableInputBuffers;
         this.availableOutputBuffers = availableOutputBuffers;
+        this.motionPhotoInfo = motionPhotoInfo;
     }
 
     /**
@@ -83,8 +84,9 @@ public class MotionPhotoReader {
      */
     @RequiresApi(api = M)
     public static MotionPhotoReader open(String filename, Surface surface) throws IOException, XMPException {
+        MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(filename);
         MotionPhotoReader reader = new MotionPhotoReader(filename, surface,
-                new LinkedBlockingQueue<>(), new LinkedBlockingQueue<>());
+                new LinkedBlockingQueue<>(), new LinkedBlockingQueue<>(), motionPhotoInfo);
         reader.startMediaThread();
         reader.startBufferThread();
         return reader;
@@ -98,7 +100,8 @@ public class MotionPhotoReader {
     static MotionPhotoReader open(String filename, Surface surface,
                                   BlockingQueue<Integer> availableInputBuffers, BlockingQueue<Bundle> availableOutputBuffers)
             throws IOException, XMPException {
-        MotionPhotoReader reader = new MotionPhotoReader(filename, surface, availableInputBuffers, availableOutputBuffers);
+        MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(filename);
+        MotionPhotoReader reader = new MotionPhotoReader(filename, surface, availableInputBuffers, availableOutputBuffers, motionPhotoInfo);
         reader.startMediaThread();
         reader.startBufferThread();
         return reader;
@@ -108,19 +111,16 @@ public class MotionPhotoReader {
      * Sets up and starts a new handler thread for MediaCodec objects (decoder and extractor).
      */
     @RequiresApi(api = 23)
-    private void startMediaThread() throws IOException, XMPException {
+    private void startMediaThread() throws IOException {
         mMediaWorker = new HandlerThread("mediaHandler");
         mMediaWorker.start();
         mediaHandler = new Handler(mMediaWorker.getLooper());
-
-        mpi = getMotionPhotoInfo();
-        int videoOffset = mpi.getVideoOffset();
 
         // Set up input stream from Motion Photo file for media extractor
         final File f = new File(filename);
         fileInputStream = new FileInputStream(f);
         FileDescriptor fd = fileInputStream.getFD();
-
+        int videoOffset = motionPhotoInfo.getVideoOffset();
         lowResExtractor.setDataSource(fd, f.length() - videoOffset, videoOffset);
 
         // Find the video track and create an appropriate media decoder
@@ -288,8 +288,10 @@ public class MotionPhotoReader {
     }
 
 
+    /**
+     * Gets the bitmap of the JPEG stored by the motion photo.
+     */
     public Bitmap getMotionPhotoImageBitmap() {
-        Bitmap bmp = BitmapFactory.decodeFile(filename);
-        return bmp;
+        return BitmapFactory.decodeFile(filename);
     }
 }
