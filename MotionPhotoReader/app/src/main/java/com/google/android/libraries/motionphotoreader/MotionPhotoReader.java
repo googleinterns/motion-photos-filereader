@@ -55,9 +55,9 @@ public class MotionPhotoReader {
      * available buffers to the buffer queue. The buffer worker receives messages to process frames
      * and uses the available buffers posted by the media worker thread.
      */
-    private HandlerThread mMediaWorker;
+    private HandlerThread mediaWorker;
     private Handler mediaHandler;
-    private HandlerThread mBufferWorker;
+    private HandlerThread bufferWorker;
     private Handler bufferHandler;
 
     /** Available buffer queues **/
@@ -112,9 +112,9 @@ public class MotionPhotoReader {
      */
     @RequiresApi(api = 23)
     private void startMediaThread() throws IOException {
-        mMediaWorker = new HandlerThread("mediaHandler");
-        mMediaWorker.start();
-        mediaHandler = new Handler(mMediaWorker.getLooper());
+        mediaWorker = new HandlerThread("mediaHandler");
+        mediaWorker.start();
+        mediaHandler = new Handler(mediaWorker.getLooper());
 
         // Set up input stream from Motion Photo file for media extractor
         final File f = new File(filename);
@@ -178,9 +178,9 @@ public class MotionPhotoReader {
      * Sets up and starts a new handler thread for managing frame advancing calls and available buffers.
      */
     private void startBufferThread() {
-        mBufferWorker = new HandlerThread("bufferHandler");
-        mBufferWorker.start();
-        bufferHandler = new BufferHandler(mBufferWorker.getLooper(), lowResExtractor, lowResDecoder,
+        bufferWorker = new HandlerThread("bufferHandler");
+        bufferWorker.start();
+        bufferHandler = new BufferHandler(bufferWorker.getLooper(), lowResExtractor, lowResDecoder,
                 availableInputBuffers, availableOutputBuffers);
     }
 
@@ -208,8 +208,8 @@ public class MotionPhotoReader {
         }
         lowResDecoder.release();
         lowResExtractor.release();
-        mBufferWorker.interrupt();
-        mMediaWorker.interrupt();
+        bufferWorker.interrupt();
+        mediaWorker.interrupt();
 //        if (surface != null) {
 //            surface.release();
 //        }
