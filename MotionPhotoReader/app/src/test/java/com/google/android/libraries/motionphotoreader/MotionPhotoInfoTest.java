@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
  * @see <a href="http://d.android.com/tools/testing">Testing documentation</a>
  */
 public class MotionPhotoInfoTest {
+    // Define mock properties
     private final static int KEY_WIDTH = 4032;
     private final static int KEY_HEIGHT = 3024;
     private final static long KEY_DURATION = 297168;
