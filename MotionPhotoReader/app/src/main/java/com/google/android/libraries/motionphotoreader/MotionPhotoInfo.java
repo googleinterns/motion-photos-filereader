@@ -100,6 +100,9 @@ public class MotionPhotoInfo {
         return null;
     }
 
+    /**
+     * Suite of getter methods to retrieve information about the motion photo.
+     */
     public int getWidth() {
         return width;
     }
