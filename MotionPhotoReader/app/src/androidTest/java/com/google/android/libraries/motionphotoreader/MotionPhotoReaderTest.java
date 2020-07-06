@@ -47,6 +47,7 @@ public class MotionPhotoReaderTest {
     private static final int NUM_FRAMES = 44;
     private static final long SEEK_AMOUNT_US = 100_000L;
 
+    // TODO: close motion photo readers
     @Before
     public void setUp() {
 
