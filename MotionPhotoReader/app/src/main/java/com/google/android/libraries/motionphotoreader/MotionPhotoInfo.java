@@ -52,17 +52,17 @@ public class MotionPhotoInfo {
     /**
      * Returns a new instance of MotionPhotoInfo for a specified file.
      */
-    @VisibleForTesting
     @RequiresApi(api = Build.VERSION_CODES.M)
-    static MotionPhotoInfo newInstance(String filename) throws IOException, XMPException {
+    public static MotionPhotoInfo newInstance(String filename) throws IOException, XMPException {
         return MotionPhotoInfo.newInstance(filename, new MediaExtractor());
     }
 
     /**
      * Returns a new instance of MotionPhotoInfo with a specified file and MediaExtractor. Used for testing.
      */
+    @VisibleForTesting
     @RequiresApi(api = Build.VERSION_CODES.M)
-    public static MotionPhotoInfo newInstance(String filename, MediaExtractor extractor) throws IOException, XMPException {
+    static MotionPhotoInfo newInstance(String filename, MediaExtractor extractor) throws IOException, XMPException {
         XMPMeta meta = getFileXmp(filename);
         int videoOffset = meta.getPropertyInteger("http://ns.google.com/photos/1.0/camera/", "MicroVideoOffset");
         long presentationTimestampUs = meta.getPropertyLong("http://ns.google.com/photos/1.0/camera/", "MicroVideoPresentationTimestampUs");
