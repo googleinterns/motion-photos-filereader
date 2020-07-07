@@ -19,7 +19,7 @@ import static android.os.Build.VERSION_CODES.LOLLIPOP;
 /**
  * A handler meant specifically for handling messages received from a motion photo reader.
  */
-class BufferHandler extends Handler {
+class BufferProcessor {
     private static final long TIMEOUT_US = 1000L;
     private static final long US_TO_NS = 1000L;
 
@@ -31,9 +31,8 @@ class BufferHandler extends Handler {
     private final BlockingQueue<Integer> availableInputBuffers;
     private final BlockingQueue<Bundle> availableOutputBuffers;
 
-    public BufferHandler(Looper looper, MediaExtractor lowResExtractor, MediaCodec lowResDecoder,
-                         BlockingQueue<Integer> availableInputBuffers, BlockingQueue<Bundle> availableOutputBuffers) {
-        super(looper);
+    public BufferProcessor(MediaExtractor lowResExtractor, MediaCodec lowResDecoder,
+                           BlockingQueue<Integer> availableInputBuffers, BlockingQueue<Bundle> availableOutputBuffers) {
         this.lowResExtractor = lowResExtractor;
         this.lowResDecoder = lowResDecoder;
         this.availableInputBuffers = availableInputBuffers;
@@ -88,8 +87,7 @@ class BufferHandler extends Handler {
      * Handle calls to nextFrame() and seekTo() by the MotionPhotoReader.
      */
     @RequiresApi(api = LOLLIPOP)
-    public void handleMessage(@NonNull Message inputMessage) {
-        Bundle messageData = inputMessage.getData();
+    public void handleBundle(Bundle messageData) {
         int key = messageData.getInt("MESSAGE_KEY");
         Bundle bufferData;
         int bufferIndex;
