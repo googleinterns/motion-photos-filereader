@@ -30,17 +30,24 @@ public class XmpParserTest {
         assertNotNull(meta);
     }
 
+    private static boolean startsWith(byte[] array, byte[] prefix) {
+        return Bytes.indexOf(array, prefix) == 0;
+    }
+
+    private static boolean endsWith(byte[] array, byte[] suffix) {
+        int correctSuffixIndex = array.length - suffix.length;
+        return Bytes.indexOf(array, suffix) == correctSuffixIndex;
+    }
+
     @Test
     public void getXmpByteArray_hasCorrectHeader() throws IOException {
         byte[] segArr = XmpParser.getXmpByteArray(filename);
-        int index = Bytes.indexOf(segArr, OPEN_ARR);
-        assertEquals(0, index);
+        assertTrue(startsWith(segArr, OPEN_ARR));
     }
 
     @Test
     public void getXmpByteArray_hasCorrectFooter() throws IOException {
         byte[] segArr = XmpParser.getXmpByteArray(filename);
-        int length = Bytes.indexOf(segArr, CLOSE_ARR) + CLOSE_ARR.length;
-        assertEquals(XMP_BYTE_ARR_LENGTH, length);
+        assertTrue(endsWith(segArr, CLOSE_ARR));
     }
 }
