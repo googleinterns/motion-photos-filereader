@@ -37,7 +37,9 @@ public class MotionPhotoInfo {
         width = mediaFormat.getInteger(MediaFormat.KEY_WIDTH);
         height = mediaFormat.getInteger(MediaFormat.KEY_HEIGHT);
         duration = mediaFormat.getLong(MediaFormat.KEY_DURATION);
-        rotation = mediaFormat.containsKey(MediaFormat.KEY_ROTATION) ? mediaFormat.getInteger(MediaFormat.KEY_ROTATION) : 0;
+        rotation = mediaFormat.containsKey(MediaFormat.KEY_ROTATION)
+                ? mediaFormat.getInteger(MediaFormat.KEY_ROTATION)
+                : 0;
 
         this.videoOffset = videoOffset;
         this.presentationTimestampUs = presentationTimestampUs;
@@ -62,11 +64,17 @@ public class MotionPhotoInfo {
      */
     @VisibleForTesting
     @RequiresApi(api = Build.VERSION_CODES.M)
-    static MotionPhotoInfo newInstance(String filename, MediaExtractor extractor) throws IOException, XMPException {
+    static MotionPhotoInfo newInstance(String filename, MediaExtractor extractor)
+            throws IOException, XMPException {
         XMPMeta meta = getFileXmp(filename);
-        int videoOffset = meta.getPropertyInteger("http://ns.google.com/photos/1.0/camera/", "MicroVideoOffset");
-        long presentationTimestampUs = meta.getPropertyLong("http://ns.google.com/photos/1.0/camera/", "MicroVideoPresentationTimestampUs");
-
+        int videoOffset = meta.getPropertyInteger(
+                "http://ns.google.com/photos/1.0/camera/",
+                "MicroVideoOffset"
+        );
+        long presentationTimestampUs = meta.getPropertyLong(
+                "http://ns.google.com/photos/1.0/camera/",
+                "MicroVideoPresentationTimestampUs"
+        );
         MediaFormat mediaFormat = getFileMediaFormat(filename, extractor, videoOffset);
         return new MotionPhotoInfo(mediaFormat, videoOffset, presentationTimestampUs);
     }
