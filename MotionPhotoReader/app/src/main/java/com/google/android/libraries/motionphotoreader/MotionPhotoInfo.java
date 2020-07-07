@@ -1,5 +1,6 @@
 package com.google.android.libraries.motionphotoreader;
 
+import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.os.Build;
@@ -16,7 +17,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 
 /**
- * Holds data about the Motion Photo file.
+ * Contains information relevant to extracting frames in a Motion Photo file.
  */
 public class MotionPhotoInfo {
 
@@ -28,8 +29,6 @@ public class MotionPhotoInfo {
     private final int videoOffset;
     private final long presentationTimestampUs;
 
-    private MediaExtractor extractor;
-
     /**
      * Creates a MotionPhotoInfo object associated with a given file.
      */
@@ -38,12 +37,7 @@ public class MotionPhotoInfo {
         width = mediaFormat.getInteger(MediaFormat.KEY_WIDTH);
         height = mediaFormat.getInteger(MediaFormat.KEY_HEIGHT);
         duration = mediaFormat.getLong(MediaFormat.KEY_DURATION);
-        if (mediaFormat.containsKey(MediaFormat.KEY_ROTATION)) {
-            rotation = mediaFormat.getInteger(MediaFormat.KEY_ROTATION);
-        }
-        else {
-            rotation = 0;
-        }
+        rotation = mediaFormat.containsKey(MediaFormat.KEY_ROTATION) ? mediaFormat.getInteger(MediaFormat.KEY_ROTATION) : 0;
 
         this.videoOffset = videoOffset;
         this.presentationTimestampUs = presentationTimestampUs;
@@ -54,7 +48,13 @@ public class MotionPhotoInfo {
      */
     @RequiresApi(api = Build.VERSION_CODES.M)
     public static MotionPhotoInfo newInstance(String filename) throws IOException, XMPException {
-        return MotionPhotoInfo.newInstance(filename, new MediaExtractor());
+        MediaExtractor extractor = new MediaExtractor();
+        try {
+            return MotionPhotoInfo.newInstance(filename, new MediaExtractor());
+        }
+        finally {
+            extractor.release();
+        }
     }
 
     /**
@@ -100,9 +100,6 @@ public class MotionPhotoInfo {
         return null;
     }
 
-    /**
-     * Suite of getter methods to retrieve information about the motion photo.
-     */
     public int getWidth() {
         return width;
     }
