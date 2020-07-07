@@ -1,9 +1,11 @@
 package com.google.android.libraries.motionphotoreader;
 
+import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.os.Build;
 
+import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.VisibleForTesting;
 
@@ -16,19 +18,18 @@ import java.io.FileInputStream;
 import java.io.IOException;
 
 /**
- * Holds data about the Motion Photo file.
+ * Contains information relevant to extracting frames in a Motion Photo file.
  */
 public class MotionPhotoInfo {
+
+    private static final String CAMERA_XMP_NAMESPACE = "http://ns.google.com/photos/1.0/camera/";
 
     private final int width;
     private final int height;
     private final long duration;
     private final int rotation;
-
     private final int videoOffset;
     private final long presentationTimestampUs;
-
-    private MediaExtractor extractor;
 
     /**
      * Creates a MotionPhotoInfo object associated with a given file.
@@ -38,13 +39,9 @@ public class MotionPhotoInfo {
         width = mediaFormat.getInteger(MediaFormat.KEY_WIDTH);
         height = mediaFormat.getInteger(MediaFormat.KEY_HEIGHT);
         duration = mediaFormat.getLong(MediaFormat.KEY_DURATION);
-        if (mediaFormat.containsKey(MediaFormat.KEY_ROTATION)) {
-            rotation = mediaFormat.getInteger(MediaFormat.KEY_ROTATION);
-        }
-        else {
-            rotation = 0;
-        }
-
+        rotation = mediaFormat.containsKey(MediaFormat.KEY_ROTATION)
+                ? mediaFormat.getInteger(MediaFormat.KEY_ROTATION)
+                : 0;
         this.videoOffset = videoOffset;
         this.presentationTimestampUs = presentationTimestampUs;
     }
@@ -54,7 +51,12 @@ public class MotionPhotoInfo {
      */
     @RequiresApi(api = Build.VERSION_CODES.M)
     public static MotionPhotoInfo newInstance(String filename) throws IOException, XMPException {
-        return MotionPhotoInfo.newInstance(filename, new MediaExtractor());
+        MediaExtractor extractor = new MediaExtractor();
+        try {
+            return MotionPhotoInfo.newInstance(filename, new MediaExtractor());
+        } finally {
+            extractor.release();
+        }
     }
 
     /**
@@ -62,11 +64,17 @@ public class MotionPhotoInfo {
      */
     @VisibleForTesting
     @RequiresApi(api = Build.VERSION_CODES.M)
-    static MotionPhotoInfo newInstance(String filename, MediaExtractor extractor) throws IOException, XMPException {
+    static MotionPhotoInfo newInstance(String filename, MediaExtractor extractor)
+            throws IOException, XMPException {
         XMPMeta meta = getFileXmp(filename);
-        int videoOffset = meta.getPropertyInteger("http://ns.google.com/photos/1.0/camera/", "MicroVideoOffset");
-        long presentationTimestampUs = meta.getPropertyLong("http://ns.google.com/photos/1.0/camera/", "MicroVideoPresentationTimestampUs");
-
+        int videoOffset = meta.getPropertyInteger(
+                CAMERA_XMP_NAMESPACE,
+                "MicroVideoOffset"
+        );
+        long presentationTimestampUs = meta.getPropertyLong(
+                CAMERA_XMP_NAMESPACE,
+                "MicroVideoPresentationTimestampUs"
+        );
         MediaFormat mediaFormat = getFileMediaFormat(filename, extractor, videoOffset);
         return new MotionPhotoInfo(mediaFormat, videoOffset, presentationTimestampUs);
     }
@@ -81,6 +89,7 @@ public class MotionPhotoInfo {
     /**
      * Get the MediaFormat associated with the video track of the Motion Photo MPEG4.
      */
+    @Nullable
     private static MediaFormat getFileMediaFormat(String filename, MediaExtractor extractor, int videoOffset) throws IOException {
         File f = new File(filename);
         try (FileInputStream fileInputStream = new FileInputStream(f)) {
@@ -92,7 +101,6 @@ public class MotionPhotoInfo {
                 String mime = format.getString(MediaFormat.KEY_MIME);
                 assert mime != null;
                 if (mime.startsWith("video/")) {
-                    fileInputStream.close();
                     return format;
                 }
             }
@@ -100,9 +108,6 @@ public class MotionPhotoInfo {
         return null;
     }
 
-    /**
-     * Suite of getter methods to retrieve information about the motion photo.
-     */
     public int getWidth() {
         return width;
     }
