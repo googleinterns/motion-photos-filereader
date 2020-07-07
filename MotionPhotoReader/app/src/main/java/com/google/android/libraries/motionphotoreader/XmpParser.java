@@ -1,6 +1,7 @@
 package com.google.android.libraries.motionphotoreader;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 
 import com.adobe.internal.xmp.XMPException;
 import com.adobe.internal.xmp.XMPMeta;
@@ -27,6 +28,15 @@ class XmpParser {
      */
     @Nullable
     public static XMPMeta getXmpMetadata(String filename) throws IOException, XMPException {
+        byte[] segArr = getXmpByteArray(filename);
+        return XMPMetaFactory.parseFromBuffer(segArr);
+    }
+
+    /**
+     * Returns the byte array containing the xmp metadata.
+     */
+    @VisibleForTesting
+    static byte[] getXmpByteArray(String filename) throws IOException {
         try (FileInputStream in = new FileInputStream(filename)) {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             ByteStreams.copy(in, out);
@@ -38,9 +48,9 @@ class XmpParser {
                 int closeIdx = Bytes.indexOf(Arrays.copyOfRange(fileData, openIdx, fileData.length), CLOSE_ARR) + openIdx + CLOSE_ARR.length;
 
                 byte[] segArr = Arrays.copyOfRange(fileData, openIdx, closeIdx);
-                return XMPMetaFactory.parseFromBuffer(segArr);
+                return segArr;
             }
         }
-        return null;
+        return new byte[0];
     }
 }
