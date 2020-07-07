@@ -16,7 +16,7 @@ import java.util.Arrays;
 
 /**
  * The XmpParser class is a package-private class intended to help extract the microvideo offset
- * information from the XMP metadata of the given Motion Photo. This class is for internal use only.
+ * information from the XMP metadata of the given Motion Photo.
  */
 class XmpParser {
 
@@ -25,6 +25,10 @@ class XmpParser {
 
     /**
      * Returns the metadata of the Motion Photo file.
+     * @param filename a string containing the path of the motion photo file to extract.
+     * @return an XMPMeta object containing the xmp metadata of the file.
+     * @throws IOException if an error occurs while trying to read the file.
+     * @throws XMPException if invalid XMP syntax is parsed.
      */
     @Nullable
     public static XMPMeta getXmpMetadata(String filename) throws IOException, XMPException {
@@ -34,6 +38,9 @@ class XmpParser {
 
     /**
      * Returns the byte array containing the xmp metadata.
+     * @param filename a string containing the path of the motion photo file to extract.
+     * @return a byte array containing the information of the xmp metadata for the file.
+     * @throws IOException if an error occurs while trying to read the file.
      */
     @VisibleForTesting
     static byte[] getXmpByteArray(String filename) throws IOException {
