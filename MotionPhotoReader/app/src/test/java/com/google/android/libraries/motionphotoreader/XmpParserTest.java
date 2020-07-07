@@ -35,7 +35,8 @@ public class XmpParserTest {
     }
 
     private static boolean endsWith(byte[] array, byte[] suffix) {
-        return Bytes.indexOf(array, suffix) == XMP_BYTE_ARR_LENGTH;
+        int correctSuffixIndex = XMP_BYTE_ARR_LENGTH - CLOSE_ARR.length;
+        return Bytes.indexOf(array, suffix) == correctSuffixIndex;
     }
 
     @Test
