@@ -56,7 +56,8 @@ class XmpParser {
 
             int openIdx = Bytes.indexOf(fileData, OPEN_ARR);
             if (openIdx >= 0) {
-                int closeIdx = Bytes.indexOf(Arrays.copyOfRange(fileData, openIdx, fileData.length), CLOSE_ARR) + openIdx + CLOSE_ARR.length;
+                int closeIdx = Bytes.indexOf(Arrays.copyOfRange(fileData, openIdx, fileData.length),
+                        CLOSE_ARR) + openIdx + CLOSE_ARR.length;
 
                 byte[] segArr = Arrays.copyOfRange(fileData, openIdx, closeIdx);
                 return segArr;
