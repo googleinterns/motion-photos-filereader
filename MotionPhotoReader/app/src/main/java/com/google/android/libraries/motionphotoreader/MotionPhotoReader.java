@@ -9,7 +9,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.Message;
 import android.util.Log;
 import android.view.Surface;
 
@@ -18,8 +17,6 @@ import androidx.annotation.RequiresApi;
 import androidx.annotation.VisibleForTesting;
 
 import com.adobe.internal.xmp.XMPException;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.SettableFuture;
 
 import java.io.File;
 import java.io.FileDescriptor;
@@ -58,7 +55,7 @@ public class MotionPhotoReader {
     private HandlerThread mediaWorker;
     private Handler mediaHandler;
     private HandlerThread bufferWorker;
-    private Handler bufferHandler;
+    private BufferProcessor bufferProcessor;
 
     /** Available buffer queues **/
     private final BlockingQueue<Integer> availableInputBuffers;
@@ -180,8 +177,7 @@ public class MotionPhotoReader {
     private void startBufferThread() {
         bufferWorker = new HandlerThread("bufferHandler");
         bufferWorker.start();
-        bufferHandler = new BufferHandler(bufferWorker.getLooper(), lowResExtractor, lowResDecoder,
-                availableInputBuffers, availableOutputBuffers);
+        bufferProcessor = new BufferProcessor(lowResExtractor, lowResDecoder, availableInputBuffers, availableOutputBuffers);
     }
 
     /**
@@ -197,12 +193,10 @@ public class MotionPhotoReader {
             e.printStackTrace();
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-            bufferHandler.getLooper().quitSafely();
             mediaHandler.getLooper().quitSafely();
             Log.d("ReaderActivity", "Safely quit looper");
         }
         else {
-            bufferHandler.getLooper().quit();
             mediaHandler.getLooper().quit();
             Log.d("ReaderActivity", "Quit looper");
         }
@@ -220,37 +214,24 @@ public class MotionPhotoReader {
      * @return 1 if there is no frame, 0 if the next frame exists, and -1 if no buffers are available.
      */
     @RequiresApi(api = Build.VERSION_CODES.P)
-    public ListenableFuture<Boolean> hasNextFrame() {
+    public boolean hasNextFrame() {
         Log.d("HasNextFrame", "Running");
-
-        SettableFuture<Boolean> result = SettableFuture.create();
-
-        // Send hasNextFrame task to handler
-        bufferHandler.post(() -> {
-
-            // Read the next packet and check if it shows a full frame
-            long sampleSize = lowResExtractor.getSampleSize();
-            if (sampleSize < 0) {
-                result.set(false);
-            }
-            else {
-                result.set(true);
-            }
-        });
-        return result;
+        // Read the next packet and check if it shows a full frame
+        long sampleSize = lowResExtractor.getSampleSize();
+        if (sampleSize < 0) {
+            return false;
+        }
+        return true;
     }
 
     /**
      * Advances the decoder and extractor by one frame.
      */
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public void nextFrame() {
-        Message message = Message.obtain(bufferHandler);
-
         Bundle messageData = new Bundle();
         messageData.putInt("MESSAGE_KEY", MSG_NEXT_FRAME);
-        message.setData(messageData);
-
-        message.sendToTarget();
+        bufferProcessor.handleBundle(messageData);
     }
 
     /**
@@ -260,16 +241,13 @@ public class MotionPhotoReader {
      *
      * TODO: resolve possible jank.
      */
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public void seekTo(long timeUs, int mode) {
-        Message message = Message.obtain(bufferHandler);
-
         Bundle messageData = new Bundle();
         messageData.putInt("MESSAGE_KEY", MSG_SEEK_TO_FRAME);
         messageData.putLong("TIME_US", timeUs);
         messageData.putInt("MODE", mode);
-        message.setData(messageData);
-
-        message.sendToTarget();
+        bufferProcessor.handleBundle(messageData);
     }
 
     /**
