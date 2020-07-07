@@ -5,6 +5,7 @@ import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.os.Build;
 
+import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.VisibleForTesting;
 
@@ -89,6 +90,7 @@ public class MotionPhotoInfo {
     /**
      * Get the MediaFormat associated with the video track of the Motion Photo MPEG4.
      */
+    @Nullable
     private static MediaFormat getFileMediaFormat(String filename, MediaExtractor extractor, int videoOffset) throws IOException {
         File f = new File(filename);
         try (FileInputStream fileInputStream = new FileInputStream(f)) {
@@ -100,7 +102,6 @@ public class MotionPhotoInfo {
                 String mime = format.getString(MediaFormat.KEY_MIME);
                 assert mime != null;
                 if (mime.startsWith("video/")) {
-                    fileInputStream.close();
                     return format;
                 }
             }

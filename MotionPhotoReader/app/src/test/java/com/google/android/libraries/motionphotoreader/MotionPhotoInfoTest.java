@@ -60,7 +60,7 @@ public class MotionPhotoInfoTest {
         // return a single video track
         extractor = mock(MediaExtractor.class);
         when (extractor.getTrackCount()).thenReturn(1);
-        doAnswer((Answer<MediaFormat>) invocation -> videoFormat).when(extractor).getTrackFormat(eq(0));
+        doReturn(videoFormat).when(extractor).getTrackFormat(eq(0));
 
         motionPhotoInfo = MotionPhotoInfo.newInstance(filename, extractor);
         assertNotNull(motionPhotoInfo);
