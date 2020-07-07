@@ -15,6 +15,8 @@ public class XmpParserTest {
     private static final byte[] OPEN_ARR = "<x:xmpmeta".getBytes();  /* Start of XMP metadata tag */
     private static final byte[] CLOSE_ARR = "</x:xmpmeta>".getBytes();  /* End of XMP metadata tag */
 
+    private static final int XMP_BYTE_ARR_LENGTH = 425;
+
     private String filename;
 
     @Before
@@ -38,7 +40,7 @@ public class XmpParserTest {
     @Test
     public void getXmpByteArray_hasCorrectFooter() throws IOException {
         byte[] segArr = XmpParser.getXmpByteArray(filename);
-        int index = Bytes.indexOf(segArr, CLOSE_ARR);
-        assertEquals(segArr.length, index + CLOSE_ARR.length);
+        int length = Bytes.indexOf(segArr, CLOSE_ARR) + CLOSE_ARR.length;
+        assertEquals(XMP_BYTE_ARR_LENGTH, length);
     }
 }

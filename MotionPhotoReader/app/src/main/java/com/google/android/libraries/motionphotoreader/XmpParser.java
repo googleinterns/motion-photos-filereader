@@ -1,5 +1,7 @@
 package com.google.android.libraries.motionphotoreader;
 
+import android.util.Log;
+
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
@@ -10,8 +12,10 @@ import com.google.common.io.ByteStreams;
 import com.google.common.primitives.Bytes;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 
 /**
