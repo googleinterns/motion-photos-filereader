@@ -36,6 +36,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             "20200621_184700"
     };
 
+    // TODO: remove 'm' prefix
     private String filename;
     private SurfaceView videoSurfaceView;
     private SurfaceHolder surfaceHolder;
@@ -130,13 +131,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             ImageView imageView;
             switch (i) {
                 case 1:
-                    imageView = findViewById(R.id.imageViewB);
+                    imageView = findViewById(R.id.image_view_b);
                     break;
                 case 2:
-                    imageView = findViewById(R.id.imageViewC);
+                    imageView = findViewById(R.id.image_view_c);
                     break;
                 default:
-                    imageView = findViewById(R.id.imageViewA);
+                    imageView = findViewById(R.id.image_view_a);
             }
             // Apply a rotation to the image view if necessary
             imageView.setRotation(smallMpi.getRotation());
