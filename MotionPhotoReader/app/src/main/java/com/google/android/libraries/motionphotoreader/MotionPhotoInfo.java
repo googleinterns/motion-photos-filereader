@@ -22,11 +22,12 @@ import java.io.IOException;
  */
 public class MotionPhotoInfo {
 
+    private static final String CAMERA_XMP_NAMESPACE = "http://ns.google.com/photos/1.0/camera/";
+
     private final int width;
     private final int height;
     private final long duration;
     private final int rotation;
-
     private final int videoOffset;
     private final long presentationTimestampUs;
 
@@ -41,7 +42,6 @@ public class MotionPhotoInfo {
         rotation = mediaFormat.containsKey(MediaFormat.KEY_ROTATION)
                 ? mediaFormat.getInteger(MediaFormat.KEY_ROTATION)
                 : 0;
-
         this.videoOffset = videoOffset;
         this.presentationTimestampUs = presentationTimestampUs;
     }
@@ -54,8 +54,7 @@ public class MotionPhotoInfo {
         MediaExtractor extractor = new MediaExtractor();
         try {
             return MotionPhotoInfo.newInstance(filename, new MediaExtractor());
-        }
-        finally {
+        } finally {
             extractor.release();
         }
     }
@@ -69,11 +68,11 @@ public class MotionPhotoInfo {
             throws IOException, XMPException {
         XMPMeta meta = getFileXmp(filename);
         int videoOffset = meta.getPropertyInteger(
-                "http://ns.google.com/photos/1.0/camera/",
+                CAMERA_XMP_NAMESPACE,
                 "MicroVideoOffset"
         );
         long presentationTimestampUs = meta.getPropertyLong(
-                "http://ns.google.com/photos/1.0/camera/",
+                CAMERA_XMP_NAMESPACE,
                 "MicroVideoPresentationTimestampUs"
         );
         MediaFormat mediaFormat = getFileMediaFormat(filename, extractor, videoOffset);
