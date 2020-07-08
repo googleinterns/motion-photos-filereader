@@ -4,13 +4,12 @@ import android.graphics.Bitmap;
 import android.media.MediaExtractor;
 import android.os.Bundle;
 
-import androidx.test.InstrumentationRegistry;
+import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import com.adobe.internal.xmp.XMPException;
 
 import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.stubbing.Answer;
@@ -48,6 +47,7 @@ public class MotionPhotoReaderTest {
     private static final int NUM_FRAMES = 44;
     private static final long SEEK_AMOUNT_US = 10_000L;
 
+    /** A list of opened motion photo readers to close afterwards. */
     private final List<Runnable> cleanup = new ArrayList<>();
 
     @After
@@ -62,7 +62,7 @@ public class MotionPhotoReaderTest {
         InputStream input = InstrumentationRegistry.getInstrumentation().getContext().getResources().getAssets().open(filename);
 
         // Convert Asset to File by copying such file to our cache directory
-        File f = new File(InstrumentationRegistry.getTargetContext().getCacheDir() +"/" + filename);
+        File f = new File(InstrumentationRegistry.getInstrumentation().getContext().getCacheDir() +"/" + filename);
         writeBytesToFile(input, f);
 
         return f.getAbsolutePath();

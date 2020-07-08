@@ -3,6 +3,7 @@ package com.google.android.libraries.motionphotoreader;
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.os.Bundle;
+import android.util.Log;
 
 import androidx.annotation.RequiresApi;
 
@@ -16,6 +17,7 @@ import static android.os.Build.VERSION_CODES.LOLLIPOP;
  * A handler meant specifically for handling messages received from a motion photo reader.
  */
 class BufferProcessor {
+    private static final String TAG = "BufferProcessor";
     private static final long TIMEOUT_US = 1000L;
     private static final long US_TO_NS = 1000L;
 
@@ -54,7 +56,7 @@ class BufferProcessor {
         try {
             bufferIndex = availableInputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            Log.e(TAG, "No input buffer available", e);
         }
         return bufferIndex;
     }
@@ -84,7 +86,7 @@ class BufferProcessor {
         try {
             bufferData = availableOutputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            Log.e(TAG, "No output buffer available", e);
         }
         return bufferData;
     }
@@ -141,7 +143,7 @@ class BufferProcessor {
                 break;
 
             default:
-                throw new IllegalStateException();
+                throw new IllegalStateException("Invalid message key provided: " + key);
         }
     }
 }
