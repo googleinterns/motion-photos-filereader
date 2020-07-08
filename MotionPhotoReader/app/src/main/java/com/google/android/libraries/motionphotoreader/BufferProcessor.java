@@ -3,11 +3,7 @@ package com.google.android.libraries.motionphotoreader;
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.os.Message;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 
 import java.nio.ByteBuffer;
@@ -38,8 +34,10 @@ class BufferProcessor {
      * @param availableInputBuffers The queue of available input buffers.
      * @param availableOutputBuffers The queue of available output buffers.
      */
-    public BufferProcessor(MediaExtractor lowResExtractor, MediaCodec lowResDecoder,
-                           BlockingQueue<Integer> availableInputBuffers, BlockingQueue<Bundle> availableOutputBuffers) {
+    public BufferProcessor(MediaExtractor lowResExtractor,
+                           MediaCodec lowResDecoder,
+                           BlockingQueue<Integer> availableInputBuffers,
+                           BlockingQueue<Bundle> availableOutputBuffers) {
         this.lowResExtractor = lowResExtractor;
         this.lowResDecoder = lowResDecoder;
         this.availableInputBuffers = availableInputBuffers;
@@ -70,8 +68,7 @@ class BufferProcessor {
         int sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
         if (sampleSize < 0) {
             lowResDecoder.queueInputBuffer(bufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-        }
-        else {
+        } else {
             lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0);
             lowResExtractor.advance();
         }
