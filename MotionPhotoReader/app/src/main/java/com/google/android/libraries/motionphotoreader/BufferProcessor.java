@@ -3,11 +3,7 @@ package com.google.android.libraries.motionphotoreader;
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.os.Message;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 
 import java.nio.ByteBuffer;
@@ -31,8 +27,17 @@ class BufferProcessor {
     private final BlockingQueue<Integer> availableInputBuffers;
     private final BlockingQueue<Bundle> availableOutputBuffers;
 
-    public BufferProcessor(MediaExtractor lowResExtractor, MediaCodec lowResDecoder,
-                           BlockingQueue<Integer> availableInputBuffers, BlockingQueue<Bundle> availableOutputBuffers) {
+    /**
+     * Constructor for setting up a buffer processor from a motion photo reader.
+     * @param lowResExtractor The low resolution channel MediaExtractor from the motion photo reader.
+     * @param lowResDecoder The low resolution MediaCodec from the motion photo reader.
+     * @param availableInputBuffers The queue of available input buffers.
+     * @param availableOutputBuffers The queue of available output buffers.
+     */
+    public BufferProcessor(MediaExtractor lowResExtractor,
+                           MediaCodec lowResDecoder,
+                           BlockingQueue<Integer> availableInputBuffers,
+                           BlockingQueue<Bundle> availableOutputBuffers) {
         this.lowResExtractor = lowResExtractor;
         this.lowResDecoder = lowResDecoder;
         this.availableInputBuffers = availableInputBuffers;
@@ -56,13 +61,14 @@ class BufferProcessor {
 
     /**
      * Read the next data sample from the motion photo to a given input buffer and advance the extractor.
+     * @param inputBuffer The input buffer to read samples to and queue to the MediaCodec.
+     * @param bufferIndex The index of the input buffer.
      */
     private void readFromExtractor(ByteBuffer inputBuffer, int bufferIndex) {
         int sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
         if (sampleSize < 0) {
             lowResDecoder.queueInputBuffer(bufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-        }
-        else {
+        } else {
             lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0);
             lowResExtractor.advance();
         }
@@ -85,6 +91,19 @@ class BufferProcessor {
 
     /**
      * Handle calls to nextFrame() and seekTo() by the MotionPhotoReader.
+     * @param messageData A Bundle containing relevant fields from a call to nextFrame() or seekTo().
+     *
+     *                    The fields in the message bundle are:
+     *                    - MESSAGE_KEY: an int indicating which method call this message comes from.
+     *                    - TIME_US: a long containing the timestamp to seek to (seekTo() calls only)
+     *                             in microseconds.
+     *                    - MODE: an int containing the seeking mode.
+     *
+     *                    The fields in the output buffer data bundle are:
+     *                    - TIMESTAMP_US: a long containing the timestamp assigned to the output
+     *                                  buffer, in microseconds.
+     *                    - BUFFER_INDEX: an int containing the index of the output buffer.
+     *
      */
     @RequiresApi(api = LOLLIPOP)
     public void process(Bundle messageData) {
