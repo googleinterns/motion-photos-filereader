@@ -76,7 +76,6 @@ public class MotionPhotoReaderTest {
                         + filename
         );
         writeBytesToFile(input, f);
-
         return f.getAbsolutePath();
     }
 
