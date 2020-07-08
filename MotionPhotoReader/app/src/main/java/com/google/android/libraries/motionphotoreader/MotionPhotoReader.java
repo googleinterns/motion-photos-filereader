@@ -34,6 +34,7 @@ import static android.os.Build.VERSION_CODES.M;
 
 public class MotionPhotoReader {
 
+    private static final String TAG = "MotionPhotoReader";
     private final String filename;
     private final Surface surface;
     private final MotionPhotoInfo motionPhotoInfo;
@@ -144,7 +145,7 @@ public class MotionPhotoReader {
             @Override
             public void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
                 boolean result = availableInputBuffers.offer(index);
-                Log.d("DecodeActivity", "Input buffers: " + availableInputBuffers.toString());
+                Log.d(TAG, "Input buffers: " + availableInputBuffers.toString());
             }
 
             @Override
@@ -153,12 +154,12 @@ public class MotionPhotoReader {
                 bufferData.putInt("BUFFER_INDEX", index);
                 bufferData.putLong("TIMESTAMP_US", info.presentationTimeUs);
                 boolean result = availableOutputBuffers.offer(bufferData);
-                Log.d("DecodeActivity", "Output buffers: " + availableOutputBuffers.toString());
+                Log.d(TAG, "Output buffers: " + availableOutputBuffers.toString());
             }
 
             @Override
             public void onError(@NonNull MediaCodec codec, @NonNull MediaCodec.CodecException e) {
-
+                Log.e(TAG, "Error while decoding", e);
             }
 
             @Override
@@ -204,9 +205,6 @@ public class MotionPhotoReader {
         lowResExtractor.release();
         bufferWorker.interrupt();
         mediaWorker.interrupt();
-//        if (surface != null) {
-//            surface.release();
-//        }
     }
 
     /**
