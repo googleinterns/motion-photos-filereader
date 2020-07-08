@@ -4,6 +4,7 @@ import android.graphics.Bitmap;
 import android.media.MediaExtractor;
 import android.os.Bundle;
 
+import androidx.test.InstrumentationRegistry;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import com.adobe.internal.xmp.XMPException;
@@ -13,7 +14,10 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.stubbing.Answer;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -37,7 +41,7 @@ import static org.mockito.Mockito.verify;
  */
 @RunWith(AndroidJUnit4.class)
 public class MotionPhotoReaderTest {
-    private static final String filename = "/sdcard/MVIMG_20200621_200240.jpg";
+    private static final String filename = "MVIMG_20200621_200240.jpg";
     private static final int NUM_FRAMES = 44;
     private static final long SEEK_AMOUNT_US = 10_000L;
 
@@ -47,14 +51,42 @@ public class MotionPhotoReaderTest {
 
     }
 
+    private String selectFile(String filename) throws IOException {
+        InputStream input = InstrumentationRegistry.getInstrumentation().getTargetContext().getResources().getAssets().open(filename);
+
+        // Convert Asset to File by copying such file to our cache directory
+        File f = new File(InstrumentationRegistry.getTargetContext().getCacheDir() +"/" + filename);
+        writeBytesToFile(input, f);
+
+        return f.getAbsolutePath();
+    }
+
+    private static void writeBytesToFile(InputStream input, File file) throws IOException {
+        FileOutputStream fos = null;
+        try {
+            byte[] data = new byte[2048];
+            int byteRead;
+
+            fos = new FileOutputStream(file);
+
+            while((byteRead = input.read(data)) > -1){
+                fos.write(data, 0, byteRead);
+            }
+        } finally {
+            if (fos != null){
+                fos.close();
+            }
+        }
+    }
+
     @Test(expected = IOException.class)
     public void openMotionPhotoReader_invalidFile_throwsIOException() throws IOException, XMPException {
-        MotionPhotoReader.open("/sdcard/MVIMG_20200621_200241.jpg", null);
+        MotionPhotoReader.open("test_photo.jpg", null);
     }
 
     @Test
     public void numberOfFramesPlayed_isCorrect() throws IOException, XMPException {
-        MotionPhotoReader reader = MotionPhotoReader.open(filename, null);
+        MotionPhotoReader reader = MotionPhotoReader.open(selectFile(filename), null);
 
         int frameCount = 0;
         while (reader.hasNextFrame()) {
@@ -66,13 +98,13 @@ public class MotionPhotoReaderTest {
 
     @Test
     public void getCurrentTimestamp_onStart_isCorrect() throws IOException, XMPException {
-        MotionPhotoReader reader = MotionPhotoReader.open(filename, null);
+        MotionPhotoReader reader = MotionPhotoReader.open(selectFile(filename), null);
         assertEquals(0, reader.getCurrentTimestamp());
     }
 
     @Test
     public void getCurrentTimestamp_nextFrame_isCorrect() throws IOException, XMPException {
-        MotionPhotoReader reader = MotionPhotoReader.open(filename, null);
+        MotionPhotoReader reader = MotionPhotoReader.open(selectFile(filename), null);
 
         long currentTimestampUs = -1L;
         while (reader.hasNextFrame()) {
@@ -86,7 +118,7 @@ public class MotionPhotoReaderTest {
 
     @Test
     public void getCurrentTimestamp_seekTo_isCorrect() throws IOException, XMPException {
-        MotionPhotoReader reader = MotionPhotoReader.open(filename, null);
+        MotionPhotoReader reader = MotionPhotoReader.open(selectFile(filename), null);
 
         long currentTimestampUs = -1L;
         while (reader.hasNextFrame()) {
@@ -100,14 +132,14 @@ public class MotionPhotoReaderTest {
 
     @Test
     public void hasNextFrame_atBeginningOfVideo_returnsTrue() throws IOException, XMPException {
-        MotionPhotoReader reader = MotionPhotoReader.open(filename, null);
+        MotionPhotoReader reader = MotionPhotoReader.open(selectFile(filename), null);
         boolean flag = reader.hasNextFrame();
         assertTrue("No next frame", flag);
     }
 
     @Test
     public void hasNextFrame_atLastFrame_returnsFalse() throws IOException, XMPException {
-        MotionPhotoReader reader = MotionPhotoReader.open(filename, null);
+        MotionPhotoReader reader = MotionPhotoReader.open(selectFile(filename), null);
 
         long timestampUs = reader.getMotionPhotoInfo().getDuration();
         reader.seekTo(timestampUs, MediaExtractor.SEEK_TO_NEXT_SYNC);
@@ -118,11 +150,12 @@ public class MotionPhotoReaderTest {
     @Test
     public void availableInputBufferQueue_isNotEmpty()
             throws IOException, XMPException, NoSuchFieldException, IllegalAccessException {
-        MotionPhotoReader reader = MotionPhotoReader.open(filename, null);
+        MotionPhotoReader reader = MotionPhotoReader.open(selectFile(filename), null);
         Field inputBufferQueueField = reader.getClass().getDeclaredField("availableInputBuffers");
         inputBufferQueueField.setAccessible(true);
         BlockingQueue<Integer> availableInputBufferQueue = (BlockingQueue<Integer>) inputBufferQueueField.get(reader);
 
+        assertNotNull(availableInputBufferQueue);
         boolean flag = availableInputBufferQueue.size() > 0;
         assertTrue("Available input buffer queue is empty", flag);
     }
@@ -161,7 +194,7 @@ public class MotionPhotoReaderTest {
             return bufferData;
         }).when(fakeAvailableOutputBuffers).poll(anyLong(), any(TimeUnit.class));
 
-        MotionPhotoReader reader = MotionPhotoReader.open(filename, null, fakeAvailableInputBuffers, fakeAvailableOutputBuffers);
+        MotionPhotoReader reader = MotionPhotoReader.open(selectFile(filename), null, fakeAvailableInputBuffers, fakeAvailableOutputBuffers);
 
         while (reader.hasNextFrame()) {
             reader.nextFrame();
@@ -172,7 +205,7 @@ public class MotionPhotoReaderTest {
 
     @Test
     public void getMotionPhotoImage_isNotNull() throws IOException, XMPException {
-        MotionPhotoReader reader = MotionPhotoReader.open(filename, null);
+        MotionPhotoReader reader = MotionPhotoReader.open(selectFile(filename), null);
         Bitmap bmp = reader.getMotionPhotoImageBitmap();
         assertNotNull(bmp);
     }
