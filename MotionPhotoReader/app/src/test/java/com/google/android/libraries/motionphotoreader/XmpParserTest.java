@@ -7,6 +7,7 @@ import com.google.common.primitives.Bytes;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.File;
 import java.io.IOException;
 
 import static org.junit.Assert.*;
@@ -25,8 +26,14 @@ public class XmpParserTest {
     }
 
     @Test
-    public void getXmpMetadata_isNotNull() throws IOException, XMPException {
+    public void getXmpMetadata_string_isNotNull() throws IOException, XMPException {
         XMPMeta meta = XmpParser.getXmpMetadata(filename);
+        assertNotNull(meta);
+    }
+
+    @Test
+    public void geXmpMetadata_file_isNotNull() throws IOException, XMPException {
+        XMPMeta meta = XmpParser.getXmpMetadata(new File(filename));
         assertNotNull(meta);
     }
 
@@ -41,13 +48,13 @@ public class XmpParserTest {
 
     @Test
     public void getXmpByteArray_hasCorrectHeader() throws IOException {
-        byte[] segArr = XmpParser.getXmpByteArray(filename);
+        byte[] segArr = XmpParser.getXmpByteArray(new File(filename));
         assertTrue(startsWith(segArr, OPEN_ARR));
     }
 
     @Test
     public void getXmpByteArray_hasCorrectFooter() throws IOException {
-        byte[] segArr = XmpParser.getXmpByteArray(filename);
+        byte[] segArr = XmpParser.getXmpByteArray(new File(filename));
         assertTrue(endsWith(segArr, CLOSE_ARR));
     }
 }

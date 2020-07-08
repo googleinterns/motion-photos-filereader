@@ -10,6 +10,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.stubbing.Answer;
 
+import java.io.File;
 import java.io.IOException;
 
 import static junit.framework.TestCase.assertNotNull;
@@ -40,7 +41,8 @@ public class MotionPhotoInfoTest {
     private XMPMeta meta;
     private MediaExtractor extractor;
     private MediaFormat videoFormat;
-    private MotionPhotoInfo motionPhotoInfo;
+    private MotionPhotoInfo motionPhotoInfoString;
+    private MotionPhotoInfo motionPhotoInfoFile;
     private String filename;
 
     @Before
@@ -62,48 +64,58 @@ public class MotionPhotoInfoTest {
         when (extractor.getTrackCount()).thenReturn(1);
         doReturn(videoFormat).when(extractor).getTrackFormat(eq(0));
 
-        motionPhotoInfo = MotionPhotoInfo.newInstance(filename, extractor);
-        assertNotNull(motionPhotoInfo);
-        verify(videoFormat, times(2)).getInteger(anyString());
-        verify(videoFormat, times(1)).getLong(anyString());
-        verify(videoFormat, times(1)).getString(anyString());
+        motionPhotoInfoString = MotionPhotoInfo.newInstance(filename, extractor);
+        assertNotNull(motionPhotoInfoString);
+        motionPhotoInfoFile = MotionPhotoInfo.newInstance(new File(filename), extractor);
+        assertNotNull(motionPhotoInfoFile);
+        verify(videoFormat, times(4)).getInteger(anyString());
+        verify(videoFormat, times(2)).getLong(anyString());
+        verify(videoFormat, times(2)).getString(anyString());
     }
 
     @Test
     public void getVideoOffset_isCorrect() {
-        assertEquals(VIDEO_OFFSET, motionPhotoInfo.getVideoOffset());
+        assertEquals(VIDEO_OFFSET, motionPhotoInfoString.getVideoOffset());
+        assertEquals(VIDEO_OFFSET, motionPhotoInfoFile.getVideoOffset());
     }
 
     @Test
     public void getPresentationTimestampUs_isCorrect() {
-        assertEquals(PRESENTATION_TIMESTAMP_US, motionPhotoInfo.getPresentationTimestampUs());
+        assertEquals(PRESENTATION_TIMESTAMP_US, motionPhotoInfoString.getPresentationTimestampUs());
+        assertEquals(PRESENTATION_TIMESTAMP_US, motionPhotoInfoFile.getPresentationTimestampUs());
     }
 
     @Test
     public void getWidth_isCorrect() {
-        assertEquals(KEY_WIDTH, motionPhotoInfo.getWidth());
+        assertEquals(KEY_WIDTH, motionPhotoInfoString.getWidth());
+        assertEquals(KEY_WIDTH, motionPhotoInfoFile.getWidth());
     }
 
     @Test
     public void getHeight_isCorrect() {
-        assertEquals(KEY_HEIGHT, motionPhotoInfo.getHeight());
+        assertEquals(KEY_HEIGHT, motionPhotoInfoString.getHeight());
+        assertEquals(KEY_HEIGHT, motionPhotoInfoFile.getHeight());
     }
 
     @Test
     public void getDuration_isCorrect() {
-        assertEquals(KEY_DURATION, motionPhotoInfo.getDuration());
+        assertEquals(KEY_DURATION, motionPhotoInfoString.getDuration());
+        assertEquals(KEY_DURATION, motionPhotoInfoFile.getDuration());
     }
 
     @Test
     public void getRotation_whenKeyExists_isCorrect() throws IOException, XMPException {
         // set up the media format so that it has a rotation
         doReturn(true).when(videoFormat).containsKey(eq(MediaFormat.KEY_ROTATION));
-        motionPhotoInfo = MotionPhotoInfo.newInstance(filename, extractor);
-        assertEquals(KEY_ROTATION, motionPhotoInfo.getRotation());
+        motionPhotoInfoString = MotionPhotoInfo.newInstance(filename, extractor);
+        motionPhotoInfoFile = MotionPhotoInfo.newInstance(new File(filename), extractor);
+        assertEquals(KEY_ROTATION, motionPhotoInfoString.getRotation());
+        assertEquals(KEY_ROTATION, motionPhotoInfoFile.getRotation());
     }
 
     @Test
     public void getRotation_whenKeyDoesNotExist_isCorrect() {
-        assertEquals(0, motionPhotoInfo.getRotation());
+        assertEquals(0, motionPhotoInfoString.getRotation());
+        assertEquals(0, motionPhotoInfoFile.getRotation());
     }
 }

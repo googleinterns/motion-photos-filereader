@@ -51,9 +51,14 @@ public class MotionPhotoInfo {
      */
     @RequiresApi(api = Build.VERSION_CODES.M)
     public static MotionPhotoInfo newInstance(String filename) throws IOException, XMPException {
+        return MotionPhotoInfo.newInstance(new File(filename));
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.M)
+    public static MotionPhotoInfo newInstance(File file) throws IOException, XMPException {
         MediaExtractor extractor = new MediaExtractor();
         try {
-            return MotionPhotoInfo.newInstance(filename, new MediaExtractor());
+            return MotionPhotoInfo.newInstance(file, new MediaExtractor());
         } finally {
             extractor.release();
         }
@@ -66,7 +71,14 @@ public class MotionPhotoInfo {
     @RequiresApi(api = Build.VERSION_CODES.M)
     static MotionPhotoInfo newInstance(String filename, MediaExtractor extractor)
             throws IOException, XMPException {
-        XMPMeta meta = getFileXmp(filename);
+        return MotionPhotoInfo.newInstance(new File(filename), extractor);
+    }
+
+    @VisibleForTesting
+    @RequiresApi(api = Build.VERSION_CODES.M)
+    static MotionPhotoInfo newInstance(File file, MediaExtractor extractor)
+            throws IOException, XMPException {
+        XMPMeta meta = getFileXmp(file);
         int videoOffset = meta.getPropertyInteger(
                 CAMERA_XMP_NAMESPACE,
                 "MicroVideoOffset"
@@ -75,26 +87,25 @@ public class MotionPhotoInfo {
                 CAMERA_XMP_NAMESPACE,
                 "MicroVideoPresentationTimestampUs"
         );
-        MediaFormat mediaFormat = getFileMediaFormat(filename, extractor, videoOffset);
+        MediaFormat mediaFormat = getFileMediaFormat(file, extractor, videoOffset);
         return new MotionPhotoInfo(mediaFormat, videoOffset, presentationTimestampUs);
     }
 
     /**
      * Extract the JPEG XMP metadata from the Motion Photo.
      */
-    private static XMPMeta getFileXmp(String filename) throws IOException, XMPException {
-        return XmpParser.getXmpMetadata(filename);
+    private static XMPMeta getFileXmp(File file) throws IOException, XMPException {
+        return XmpParser.getXmpMetadata(file);
     }
 
     /**
      * Get the MediaFormat associated with the video track of the Motion Photo MPEG4.
      */
     @Nullable
-    private static MediaFormat getFileMediaFormat(String filename, MediaExtractor extractor, int videoOffset) throws IOException {
-        File f = new File(filename);
-        try (FileInputStream fileInputStream = new FileInputStream(f)) {
+    private static MediaFormat getFileMediaFormat(File file, MediaExtractor extractor, int videoOffset) throws IOException {
+        try (FileInputStream fileInputStream = new FileInputStream(file)) {
             FileDescriptor fd = fileInputStream.getFD();
-            extractor.setDataSource(fd, f.length() - videoOffset, videoOffset);
+            extractor.setDataSource(fd, file.length() - videoOffset, videoOffset);
             // Find the video track and create an appropriate media decoder
             for (int i = 0; i < extractor.getTrackCount(); i++) {
                 MediaFormat format = extractor.getTrackFormat(i);
