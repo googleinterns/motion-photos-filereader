@@ -52,7 +52,7 @@ public class MotionPhotoReaderTest {
     }
 
     private String selectFile(String filename) throws IOException {
-        InputStream input = InstrumentationRegistry.getInstrumentation().getTargetContext().getResources().getAssets().open(filename);
+        InputStream input = InstrumentationRegistry.getInstrumentation().getContext().getResources().getAssets().open(filename);
 
         // Convert Asset to File by copying such file to our cache directory
         File f = new File(InstrumentationRegistry.getTargetContext().getCacheDir() +"/" + filename);
