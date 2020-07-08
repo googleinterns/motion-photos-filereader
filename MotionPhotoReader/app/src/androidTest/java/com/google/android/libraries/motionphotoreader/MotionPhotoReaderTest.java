@@ -1,18 +1,16 @@
 package com.google.android.libraries.motionphotoreader;
 
-import android.Manifest;
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.media.MediaExtractor;
 import android.os.Bundle;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import androidx.test.rule.GrantPermissionRule;
 
 import com.adobe.internal.xmp.XMPException;
 import com.google.common.io.ByteStreams;
 
-import org.junit.Rule;
 import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -70,14 +68,11 @@ public class MotionPhotoReaderTest {
                 .open(filename);
 
         // Convert Asset to File by copying such file to our cache directory
-        File f = new File(
-                InstrumentationRegistry
-                        .getInstrumentation()
-                        .getContext()
-                        .getCacheDir()
-                        +"/"
-                        + filename
-        );
+        File f = new File(InstrumentationRegistry
+                .getInstrumentation()
+                .getContext()
+                .getCacheDir(),
+                filename);
         writeBytesToFile(input, f);
         return f;
     }
