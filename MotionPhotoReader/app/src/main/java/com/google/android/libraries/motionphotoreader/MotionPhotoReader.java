@@ -231,7 +231,7 @@ public class MotionPhotoReader {
     public void nextFrame() {
         Bundle messageData = new Bundle();
         messageData.putInt("MESSAGE_KEY", MSG_NEXT_FRAME);
-        bufferProcessor.handleBundle(messageData);
+        bufferProcessor.process(messageData);
     }
 
     /**
@@ -247,7 +247,7 @@ public class MotionPhotoReader {
         messageData.putInt("MESSAGE_KEY", MSG_SEEK_TO_FRAME);
         messageData.putLong("TIME_US", timeUs);
         messageData.putInt("MODE", mode);
-        bufferProcessor.handleBundle(messageData);
+        bufferProcessor.process(messageData);
     }
 
     /**

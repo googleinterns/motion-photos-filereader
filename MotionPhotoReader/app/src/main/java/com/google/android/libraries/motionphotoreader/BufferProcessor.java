@@ -87,7 +87,7 @@ class BufferProcessor {
      * Handle calls to nextFrame() and seekTo() by the MotionPhotoReader.
      */
     @RequiresApi(api = LOLLIPOP)
-    public void handleBundle(Bundle messageData) {
+    public void process(Bundle messageData) {
         int key = messageData.getInt("MESSAGE_KEY");
         Bundle bufferData;
         int bufferIndex;

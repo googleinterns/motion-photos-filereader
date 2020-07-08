@@ -3,8 +3,6 @@ package com.google.android.libraries.motionphotoreader;
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.os.Bundle;
-import android.os.Looper;
-import android.os.Message;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -66,7 +64,7 @@ public class BufferProcessorTest {
 
         Bundle messageData = mock(Bundle.class);
         doAnswer((Answer<Integer>) invocation -> MotionPhotoReader.MSG_NEXT_FRAME).when(messageData).getInt(anyString());
-        bufferProcessor.handleBundle(messageData);
+        bufferProcessor.process(messageData);
 
         verify(lowResExtractor).readSampleData(any(ByteBuffer.class), eq(0));
         verify(lowResDecoder, times(1)).queueInputBuffer(eq(1), eq(0), anyInt(), anyLong(), eq(0));
@@ -86,7 +84,7 @@ public class BufferProcessorTest {
 
         Bundle messageData = mock(Bundle.class);
         doAnswer((Answer<Integer>) invocation -> MotionPhotoReader.MSG_NEXT_FRAME).when(messageData).getInt(anyString());
-        bufferProcessor.handleBundle(messageData);
+        bufferProcessor.process(messageData);
 
         verify(lowResExtractor).readSampleData(any(ByteBuffer.class), anyInt());
         verify(lowResDecoder, times(1)).queueInputBuffer(eq(1), eq(0), eq(0), eq(0L), eq(MediaCodec.BUFFER_FLAG_END_OF_STREAM));
@@ -102,7 +100,7 @@ public class BufferProcessorTest {
 
         Bundle messageData = mock(Bundle.class);
         doAnswer((Answer<Integer>) invocation -> MotionPhotoReader.MSG_SEEK_TO_FRAME).when(messageData).getInt(anyString());
-        bufferProcessor.handleBundle(messageData);
+        bufferProcessor.process(messageData);
 
         verify(lowResExtractor, times(1)).seekTo(anyLong(), anyInt());
         verify(lowResDecoder).releaseOutputBuffer(anyInt(), anyLong());
@@ -116,7 +114,7 @@ public class BufferProcessorTest {
 
         Bundle messageData = mock(Bundle.class);
         doAnswer((Answer<Integer>) invocation -> 0x0100).when(messageData).getInt(anyString());
-        bufferProcessor.handleBundle(messageData);
+        bufferProcessor.process(messageData);
 
         verify(lowResExtractor, never()).seekTo(anyLong(), anyInt());
         verify(lowResDecoder, never()).releaseOutputBuffer(anyInt(), anyLong());
