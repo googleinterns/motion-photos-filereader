@@ -36,19 +36,24 @@ class XmpParser {
      */
     @Nullable
     public static XMPMeta getXmpMetadata(String filename) throws IOException, XMPException {
-        byte[] segArr = getXmpByteArray(filename);
+        return getXmpMetadata(new File(filename));
+    }
+
+    @Nullable
+    public static XMPMeta getXmpMetadata(File file) throws IOException, XMPException {
+        byte[] segArr = getXmpByteArray(file);
         return XMPMetaFactory.parseFromBuffer(segArr);
     }
 
     /**
      * Returns the byte array containing the xmp metadata.
-     * @param filename a string containing the path of the motion photo file to extract.
+     * @param file a file containing the path of the motion photo file to extract.
      * @return a byte array containing the information of the xmp metadata for the file.
      * @throws IOException if an error occurs while trying to read the file.
      */
     @VisibleForTesting
-    static byte[] getXmpByteArray(String filename) throws IOException {
-        try (FileInputStream in = new FileInputStream(filename)) {
+    static byte[] getXmpByteArray(File file) throws IOException {
+        try (FileInputStream in = new FileInputStream(file)) {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             ByteStreams.copy(in, out);
 
