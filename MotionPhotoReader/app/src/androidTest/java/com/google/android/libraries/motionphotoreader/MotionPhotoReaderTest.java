@@ -1,15 +1,18 @@
 package com.google.android.libraries.motionphotoreader;
 
+import android.Manifest;
 import android.graphics.Bitmap;
 import android.media.MediaExtractor;
 import android.os.Bundle;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.rule.GrantPermissionRule;
 
 import com.adobe.internal.xmp.XMPException;
 import com.google.common.io.ByteStreams;
 
+import org.junit.Rule;
 import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -59,7 +62,7 @@ public class MotionPhotoReaderTest {
         cleanup.clear();
     }
 
-    private static String fetchAssetFile(String filename) throws IOException {
+    private static File fetchAssetFile(String filename) throws IOException {
         InputStream input = InstrumentationRegistry.getInstrumentation()
                 .getContext()
                 .getResources()
@@ -76,7 +79,7 @@ public class MotionPhotoReaderTest {
                         + filename
         );
         writeBytesToFile(input, f);
-        return f.getAbsolutePath();
+        return f;
     }
 
     private static void writeBytesToFile(InputStream input, File file) throws IOException {
