@@ -13,6 +13,7 @@ import android.util.Log;
 import android.view.Surface;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.VisibleForTesting;
 
@@ -21,6 +22,7 @@ import com.adobe.internal.xmp.XMPException;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -271,7 +273,10 @@ public class MotionPhotoReader {
     /**
      * Gets the bitmap of the JPEG stored by the motion photo.
      */
-    public Bitmap getMotionPhotoImageBitmap() {
-        return BitmapFactory.decodeFile(file.getName());
+    public Bitmap getMotionPhotoImageBitmap() throws IOException {
+        try (FileInputStream input = new FileInputStream(file)) {
+//            return BitmapFactory.decodeFile(file.getAbsolutePath());
+            return BitmapFactory.decodeFileDescriptor(input.getFD());
+        }
     }
 }
