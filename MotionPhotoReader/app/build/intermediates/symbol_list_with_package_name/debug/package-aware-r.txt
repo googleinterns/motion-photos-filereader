@@ -72,11 +72,13 @@ attr autoSizeMinTextSize
 attr autoSizePresetSizes
 attr autoSizeStepGranularity
 attr autoSizeTextType
+attr autoloop
 attr background
 attr backgroundSplit
 attr backgroundStacked
 attr backgroundTint
 attr backgroundTintMode
+attr background_color
 attr barLength
 attr barrierAllowsGoneWidgets
 attr barrierDirection
@@ -325,6 +327,8 @@ attr thumbTintMode
 attr tickMark
 attr tickMarkTint
 attr tickMarkTintMode
+attr timeline_base_color
+attr timeline_fill_color
 attr tint
 attr tintMode
 attr title
@@ -782,6 +786,7 @@ id listMode
 id list_item
 id message
 id middle
+id motion_photo_widget
 id multiply
 id never
 id none
@@ -1324,6 +1329,7 @@ styleable ListPopupWindow android_dropDownHorizontalOffset android_dropDownVerti
 styleable MenuGroup android_enabled android_id android_visible android_menuCategory android_orderInCategory android_checkableBehavior
 styleable MenuItem android_icon android_enabled android_id android_checked android_visible android_menuCategory android_orderInCategory android_title android_titleCondensed android_alphabeticShortcut android_numericShortcut android_checkable android_onClick actionLayout actionProviderClass actionViewClass alphabeticModifiers contentDescription iconTint iconTintMode numericModifiers showAsAction tooltipText
 styleable MenuView android_windowAnimationStyle android_itemTextAppearance android_horizontalDivider android_verticalDivider android_headerBackground android_itemBackground android_itemIconDisabledAlpha preserveIconSpacing subMenuArrow
+styleable MotionPhotoWidget autoloop background_color timeline_base_color timeline_fill_color
 styleable PopupWindow android_popupBackground android_popupAnimationStyle overlapAnchor
 styleable PopupWindowBackgroundState state_above_anchor
 styleable RecycleListView paddingBottomNoButtons paddingTopNoTitle

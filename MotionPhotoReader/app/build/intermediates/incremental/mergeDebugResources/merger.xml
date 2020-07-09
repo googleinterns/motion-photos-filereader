@@ -2685,7 +2685,12 @@
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
-    </style></file><file name="ic_launcher_round" path="/home/zsharonx/internship-proj/motion-photos-filereader/MotionPhotoReader/app/src/main/res/mipmap-hdpi/ic_launcher_round.png" qualifiers="hdpi-v4" type="mipmap"/><file name="ic_launcher_round" path="/home/zsharonx/internship-proj/motion-photos-filereader/MotionPhotoReader/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml" qualifiers="anydpi-v26" type="mipmap"/><file name="ic_launcher_round" path="/home/zsharonx/internship-proj/motion-photos-filereader/MotionPhotoReader/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png" qualifiers="xhdpi-v4" type="mipmap"/></source><source path="/home/zsharonx/internship-proj/motion-photos-filereader/MotionPhotoReader/app/build/generated/res/rs/debug"/><source path="/home/zsharonx/internship-proj/motion-photos-filereader/MotionPhotoReader/app/build/generated/res/resValues/debug"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/home/zsharonx/internship-proj/motion-photos-filereader/MotionPhotoReader/app/src/debug/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug" generated-set="debug$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/home/zsharonx/internship-proj/motion-photos-filereader/MotionPhotoReader/app/src/debug/res"/></dataSet><mergedItems><configuration qualifiers=""><declare-styleable name="AlertDialog">
+    </style></file><file name="ic_launcher_round" path="/home/zsharonx/internship-proj/motion-photos-filereader/MotionPhotoReader/app/src/main/res/mipmap-hdpi/ic_launcher_round.png" qualifiers="hdpi-v4" type="mipmap"/><file name="ic_launcher_round" path="/home/zsharonx/internship-proj/motion-photos-filereader/MotionPhotoReader/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml" qualifiers="anydpi-v26" type="mipmap"/><file name="ic_launcher_round" path="/home/zsharonx/internship-proj/motion-photos-filereader/MotionPhotoReader/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png" qualifiers="xhdpi-v4" type="mipmap"/><file path="/home/zsharonx/internship-proj/motion-photos-filereader/MotionPhotoReader/app/src/main/res/values/attrs.xml" qualifiers=""><declare-styleable name="MotionPhotoWidget">
+        <attr format="color" name="background_color"/>
+        <attr format="color" name="timeline_base_color"/>
+        <attr format="color" name="timeline_fill_color"/>
+        <attr format="boolean" name="autoloop"/>
+    </declare-styleable></file></source><source path="/home/zsharonx/internship-proj/motion-photos-filereader/MotionPhotoReader/app/build/generated/res/rs/debug"/><source path="/home/zsharonx/internship-proj/motion-photos-filereader/MotionPhotoReader/app/build/generated/res/resValues/debug"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/home/zsharonx/internship-proj/motion-photos-filereader/MotionPhotoReader/app/src/debug/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug" generated-set="debug$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/home/zsharonx/internship-proj/motion-photos-filereader/MotionPhotoReader/app/src/debug/res"/></dataSet><mergedItems><configuration qualifiers=""><declare-styleable name="AlertDialog">
         <attr name="android:layout"/>
         <attr format="reference" name="buttonPanelSideLayout"/>
         <attr format="reference" name="listLayout"/>
@@ -2715,6 +2720,11 @@
             
             <enum name="add" value="16"/>
         </attr>
+    </declare-styleable><declare-styleable name="MotionPhotoWidget">
+        <attr format="color" name="background_color"/>
+        <attr format="color" name="timeline_base_color"/>
+        <attr format="color" name="timeline_fill_color"/>
+        <attr format="boolean" name="autoloop"/>
     </declare-styleable><declare-styleable name="GradientColor">
         
         <attr name="android:startColor"/>
