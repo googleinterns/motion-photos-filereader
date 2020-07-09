@@ -3,6 +3,7 @@ package com.google.android.libraries.motionphotoreader;
 import android.app.Activity;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Surface;
 import android.view.View;
 
@@ -31,11 +32,12 @@ public class MainActivity extends Activity {
         filename = "/sdcard/MVIMG_" + FILENAMES[0] + ".jpg";
         MotionPhotoWidget motionPhotoWidget = findViewById(R.id.motion_photo_widget);
         motionPhotoWidget.setOnClickListener(new MyOnWidgetClickListener(motionPhotoWidget));
-        try {
-            motionPhotoWidget.setFile(filename);
-        } catch (IOException | XMPException e) {
-            e.printStackTrace();
-        }
+//        try {
+//            motionPhotoWidget.setFile(filename);
+//            Log.d("MainActivity", "Set file to " + filename);
+//        } catch (IOException | XMPException e) {
+//            Log.e("MainActivity", "Could not set file", e);
+//        }
     }
 
     private class MyOnWidgetClickListener implements View.OnClickListener {

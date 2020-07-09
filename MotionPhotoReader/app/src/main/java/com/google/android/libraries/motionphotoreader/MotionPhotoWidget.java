@@ -16,9 +16,12 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 import com.adobe.internal.xmp.XMPException;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -40,8 +43,6 @@ public class MotionPhotoWidget extends SurfaceView implements SurfaceHolder.Call
 
         surfaceHolder = this.getHolder();
         surfaceHolder.addCallback(this);
-
-        playerWorker = new PlayerThread(surfaceHolder.getSurface());
     }
 
     @RequiresApi(api = Build.VERSION_CODES.O)
@@ -64,8 +65,6 @@ public class MotionPhotoWidget extends SurfaceView implements SurfaceHolder.Call
 
         surfaceHolder = this.getHolder();
         surfaceHolder.addCallback(this);
-
-        playerWorker = new PlayerThread(surfaceHolder.getSurface());
     }
 
 
@@ -124,6 +123,7 @@ public class MotionPhotoWidget extends SurfaceView implements SurfaceHolder.Call
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
+        Log.d("PlayerThreadActivity", "Surface destroyed");
         if (playerWorker != null) {
             playerWorker.interrupt();
         }
@@ -156,7 +156,7 @@ public class MotionPhotoWidget extends SurfaceView implements SurfaceHolder.Call
         @RequiresApi(api = Build.VERSION_CODES.P)
         @Override
         public void run() {
-            while (reader != null) {
+            while (reader() != null) {
                 if (!isPaused()) {
                     boolean hasNextFrame = reader.hasNextFrame();
                     if (hasNextFrame) {
