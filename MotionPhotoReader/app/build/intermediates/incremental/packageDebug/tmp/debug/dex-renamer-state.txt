@@ -1,4 +1,0 @@
-#Thu Jul 09 11:15:56 EDT 2020
-base.0=/home/zsharonx/internship-proj/motion-photos-filereader/MotionPhotoReader/app/build/intermediates/dex/debug/mergeDexDebug/classes.dex
-path.0=classes.dex
-renamed.0=classes.dex
