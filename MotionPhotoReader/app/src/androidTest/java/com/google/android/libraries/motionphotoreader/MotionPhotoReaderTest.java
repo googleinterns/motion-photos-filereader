@@ -1,5 +1,6 @@
 package com.google.android.libraries.motionphotoreader;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.media.MediaExtractor;
 import android.os.Bundle;
@@ -11,7 +12,9 @@ import com.adobe.internal.xmp.XMPException;
 import com.google.common.io.ByteStreams;
 
 import org.junit.After;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.mockito.stubbing.Answer;
 
@@ -51,6 +54,9 @@ public class MotionPhotoReaderTest {
     /** A list of opened motion photo readers to close afterwards. */
     private final List<Runnable> cleanup = new ArrayList<>();
 
+    @Rule
+    public TemporaryFolder temporaryFolder = new TemporaryFolder();
+
     @After
     public void tearDown() {
         for (Runnable r : cleanup) {
@@ -59,7 +65,7 @@ public class MotionPhotoReaderTest {
         cleanup.clear();
     }
 
-    private static String fetchAssetFile(String filename) throws IOException {
+    private File fetchAssetFile(String filename) throws IOException {
         InputStream input = InstrumentationRegistry.getInstrumentation()
                 .getContext()
                 .getResources()
@@ -67,16 +73,14 @@ public class MotionPhotoReaderTest {
                 .open(filename);
 
         // Convert Asset to File by copying such file to our cache directory
-        File f = new File(
-                InstrumentationRegistry
-                        .getInstrumentation()
-                        .getContext()
-                        .getCacheDir()
-                        +"/"
-                        + filename
-        );
+//        File f = new File(InstrumentationRegistry
+//                .getInstrumentation()
+//                .getContext()
+//                .getCacheDir(),
+//                filename);
+        File f = temporaryFolder.newFile(filename);
         writeBytesToFile(input, f);
-        return f.getAbsolutePath();
+        return f;
     }
 
     private static void writeBytesToFile(InputStream input, File file) throws IOException {
