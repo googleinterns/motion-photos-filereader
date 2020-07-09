@@ -17,6 +17,7 @@ import androidx.annotation.RequiresApi;
 
 import com.adobe.internal.xmp.XMPException;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 
 import java.io.IOException;
@@ -28,12 +29,17 @@ import java.util.concurrent.TimeoutException;
 /**
  * An Android app widget to set up a video player for a motion photo file.
  */
-public class MotionPhotoWidget extends SurfaceView implements SurfaceHolder.Callback {
+public class MotionPhotoWidget extends SurfaceView {
 
+    private static final String TAG = "MotionPhotoWidget";
+    private static final String filename = "/sdcard/MVIMG_20200621_200240.jpg";
+
+    SettableFuture<Surface> surfaceFuture;
     private SurfaceHolder surfaceHolder;
     private PlayerThread playerWorker;
     private MotionPhotoReader reader;
-    private String filename;
+
+    private Object lock = new Object();
 
     private final boolean autoloop;
 
@@ -41,8 +47,7 @@ public class MotionPhotoWidget extends SurfaceView implements SurfaceHolder.Call
         super(context);
         autoloop = false;
 
-        surfaceHolder = this.getHolder();
-        surfaceHolder.addCallback(this);
+        setup();
     }
 
     @RequiresApi(api = Build.VERSION_CODES.O)
@@ -63,10 +68,45 @@ public class MotionPhotoWidget extends SurfaceView implements SurfaceHolder.Call
         autoloop = ta.getBoolean(R.styleable.MotionPhotoWidget_autoloop, true);
         ta.recycle();
 
-        surfaceHolder = this.getHolder();
-        surfaceHolder.addCallback(this);
+        setup();
     }
 
+    private void setup() {
+        surfaceFuture = SettableFuture.create();
+        surfaceHolder = this.getHolder();
+        surfaceHolder.addCallback(new SurfaceHolder.Callback() {
+            @Override
+            public void surfaceCreated(SurfaceHolder holder) {
+                Log.d(TAG, "Surface created");
+                surfaceFuture.set(holder.getSurface());
+            }
+
+            @Override
+            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+                Log.d(TAG, "Surface changed");
+                surfaceFuture.addListener(() -> {
+                    if (playerWorker == null) {
+                        try {
+                            playerWorker = new PlayerThread(surfaceFuture.get(1000L, TimeUnit.MILLISECONDS));
+                        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+                            e.printStackTrace();
+                        }
+                        playerWorker.start();
+                    }
+                }, MoreExecutors.directExecutor());
+            }
+
+            @Override
+            public void surfaceDestroyed(SurfaceHolder holder) {
+                Log.d("PlayerThreadActivity", "Surface destroyed");
+                if (playerWorker != null) {
+                    playerWorker.interrupt();
+                }
+                holder.getSurface().release();
+            }
+        });
+
+    }
 
     public void play() {
         playerWorker.play();
@@ -97,37 +137,12 @@ public class MotionPhotoWidget extends SurfaceView implements SurfaceHolder.Call
      * @param filename is a string pointing to the motion photo file to play.
      */
     @RequiresApi(api = Build.VERSION_CODES.M)
-    public void setFile(String filename) throws IOException, XMPException {
+    public void setFile(String filename) throws IOException, XMPException, ExecutionException, InterruptedException {
         playerWorker.prepare(filename);
     }
 
     public boolean isPaused() {
         return playerWorker.isPaused();
-    }
-
-    @Override
-    public void surfaceCreated(SurfaceHolder holder) {
-        Log.d("PlayerThreadActivity", "Surface created");
-    }
-
-    @Override
-    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        Log.d("PlayerThreadActivity", "Surface changed");
-        if (playerWorker == null) {
-            playerWorker = new PlayerThread(holder.getSurface());
-            Log.d("PlayerThreadActivity", "Player configured");
-        }
-        playerWorker.start();
-        Log.d("PlayerThreadActivity", "Player started");
-    }
-
-    @Override
-    public void surfaceDestroyed(SurfaceHolder holder) {
-        Log.d("PlayerThreadActivity", "Surface destroyed");
-        if (playerWorker != null) {
-            playerWorker.interrupt();
-        }
-        holder.getSurface().release();
     }
 
     /**
@@ -137,9 +152,10 @@ public class MotionPhotoWidget extends SurfaceView implements SurfaceHolder.Call
         private MotionPhotoReader reader;
         private MotionPhotoInfo motionPhotoInfo;
         private Surface surface;
-        private volatile boolean paused = true;
+        private volatile boolean paused;
 
         public PlayerThread(Surface surface) {
+            Log.d(TAG, "PlayerThread created");
             this.surface = surface;
         }
 

@@ -12,6 +12,7 @@ import androidx.annotation.RequiresApi;
 import com.adobe.internal.xmp.XMPException;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
 
 public class MainActivity extends Activity {
 
@@ -32,12 +33,12 @@ public class MainActivity extends Activity {
         filename = "/sdcard/MVIMG_" + FILENAMES[0] + ".jpg";
         MotionPhotoWidget motionPhotoWidget = findViewById(R.id.motion_photo_widget);
         motionPhotoWidget.setOnClickListener(new MyOnWidgetClickListener(motionPhotoWidget));
-//        try {
-//            motionPhotoWidget.setFile(filename);
-//            Log.d("MainActivity", "Set file to " + filename);
-//        } catch (IOException | XMPException e) {
-//            Log.e("MainActivity", "Could not set file", e);
-//        }
+        try {
+            motionPhotoWidget.setFile(filename);
+            Log.d("MainActivity", "Set file to " + filename);
+        } catch (IOException | XMPException | ExecutionException | InterruptedException e) {
+            Log.e("MainActivity", "Could not set file " + filename, e);
+        }
     }
 
     private class MyOnWidgetClickListener implements View.OnClickListener {
