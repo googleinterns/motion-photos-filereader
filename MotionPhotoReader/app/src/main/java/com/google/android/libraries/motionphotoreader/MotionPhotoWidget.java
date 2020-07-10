@@ -102,7 +102,7 @@ public class MotionPhotoWidget extends SurfaceView {
     }
 
     private void initProgressBar() {
-        
+
     }
 
     public void play() {
