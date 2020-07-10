@@ -57,7 +57,6 @@ public class MotionPhotoReader {
      */
     private HandlerThread mediaWorker;
     private Handler mediaHandler;
-    private HandlerThread bufferWorker;
     private BufferProcessor bufferProcessor;
 
     /** Available buffer queues **/
@@ -201,8 +200,6 @@ public class MotionPhotoReader {
      * Sets up and starts a new handler thread for managing frame advancing calls and available buffers.
      */
     private void startBufferThread() {
-        bufferWorker = new HandlerThread("bufferHandler");
-        bufferWorker.start();
         bufferProcessor = new BufferProcessor(
                 lowResExtractor,
                 lowResDecoder,
@@ -226,15 +223,12 @@ public class MotionPhotoReader {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
             mediaHandler.getLooper().quitSafely();
             Log.d("ReaderActivity", "Safely quit looper");
-        }
-        else {
+        } else {
             mediaHandler.getLooper().quit();
             Log.d("ReaderActivity", "Quit looper");
         }
         lowResDecoder.release();
         lowResExtractor.release();
-        bufferWorker.interrupt();
-        mediaWorker.interrupt();
     }
 
     /**

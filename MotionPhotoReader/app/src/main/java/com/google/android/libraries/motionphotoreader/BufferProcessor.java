@@ -73,18 +73,18 @@ class BufferProcessor {
         if (sampleSize < 0) {
             lowResDecoder.queueInputBuffer(
                     bufferIndex,
-                    0,
-                    0,
-                    0,
+                    /* offset = */ 0,
+                    /* size = */ 0,
+                    /* presentationTimeUs = */ 0,
                     MediaCodec.BUFFER_FLAG_END_OF_STREAM
             );
         } else {
             lowResDecoder.queueInputBuffer(
                     bufferIndex,
-                    0,
+                    /* offset = */ 0,
                     sampleSize,
-                    lowResExtractor.getSampleTime(),
-                    0
+                    /* presentationTimeUs = */ lowResExtractor.getSampleTime(),
+                    /* flags = */ 0
             );
             lowResExtractor.advance();
         }
@@ -107,20 +107,16 @@ class BufferProcessor {
 
     /**
      * Handle calls to nextFrame() and seekTo() by the MotionPhotoReader.
-     * @param messageData A Bundle containing relevant fields from a call to nextFrame() or
-     *                    seekTo().
-     *
-     *                    The fields in the message bundle are:
-     *                    - MESSAGE_KEY: an int indicating which method call this message comes from.
-     *                    - TIME_US: a long containing the timestamp to seek to (seekTo() calls only)
-     *                             in microseconds.
-     *                    - MODE: an int containing the seeking mode.
-     *
-     *                    The fields in the output buffer data bundle are:
-     *                    - TIMESTAMP_US: a long containing the timestamp assigned to the output
-     *                                  buffer, in microseconds.
-     *                    - BUFFER_INDEX: an int containing the index of the output buffer.
-     *
+     * The fields in the message bundle are:
+     *     - MESSAGE_KEY: an int indicating which method call this message comes from.
+     *     - TIME_US: a long containing the timestamp to seek to (seekTo() calls only)
+     *     in microseconds.
+     *     - MODE: an int containing the seeking mode.
+     * The fields in the output buffer data bundle are:
+     *     - TIMESTAMP_US: a long containing the timestamp assigned to the output buffer,
+     *     in microseconds.
+     *     - BUFFER_INDEX: an int containing the index of the output buffer.
+     * @param messageData A Bundle containing relevant fields from a call to nextFrame(), seekTo().
      */
     @RequiresApi(api = LOLLIPOP)
     public void process(Bundle messageData) {
@@ -131,11 +127,14 @@ class BufferProcessor {
         switch (key) {
             case MotionPhotoReader.MSG_NEXT_FRAME:
                 // Get the next available input buffer and read frame data
+                // TODO: Consider the case when this call times out and returns -1
                 bufferIndex = getAvailableInputBufferIndex();
+                // TODO: Consider the case when this call returns null
                 ByteBuffer inputBuffer = lowResDecoder.getInputBuffer(bufferIndex);
                 readFromExtractor(inputBuffer, bufferIndex);
 
                 // Get the next available output buffer and release frame data
+                // TODO: Consider the case when this call times out and returns null
                 bufferData = getAvailableOutputBufferData();
                 timestamp = bufferData.getLong("TIMESTAMP_US");
                 bufferIndex = bufferData.getInt("BUFFER_INDEX");
@@ -143,6 +142,7 @@ class BufferProcessor {
                 break;
 
             case MotionPhotoReader.MSG_SEEK_TO_FRAME:
+                // TODO: Same considerations as MSG_NEXT_FRAME
                 // Get the next available input buffer and read frame data
                 lowResExtractor.seekTo(messageData.getLong("TIME_US"), messageData.getInt("MODE"));
 
