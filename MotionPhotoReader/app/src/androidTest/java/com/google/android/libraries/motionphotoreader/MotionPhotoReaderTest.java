@@ -72,12 +72,7 @@ public class MotionPhotoReaderTest {
                 .getAssets()
                 .open(filename);
 
-        // Convert Asset to File by copying such file to our cache directory
-//        File f = new File(InstrumentationRegistry
-//                .getInstrumentation()
-//                .getContext()
-//                .getCacheDir(),
-//                filename);
+        // Write file to temporary folder for instrumentation test access
         File f = temporaryFolder.newFile(filename);
         writeBytesToFile(input, f);
         return f;
@@ -90,7 +85,8 @@ public class MotionPhotoReaderTest {
     }
 
     @Test(expected = IOException.class)
-    public void openMotionPhotoReader_invalidFile_throwsIOException() throws IOException, XMPException {
+    public void openMotionPhotoReader_invalidFile_throwsIOException()
+            throws IOException, XMPException {
         MotionPhotoReader reader = MotionPhotoReader.open("test_photo.jpg", null);
         cleanup.add(reader::close);
     }
@@ -125,7 +121,9 @@ public class MotionPhotoReaderTest {
             long newTimestampUs = reader.getCurrentTimestamp();
             reader.nextFrame();
             boolean flag = currentTimestampUs < newTimestampUs;
-            assertTrue("Timestamp did not increase: " + currentTimestampUs + " vs. " + newTimestampUs, flag);
+            assertTrue("Timestamp did not increase: "
+                    + currentTimestampUs + " vs. " + newTimestampUs,
+                    flag);
             currentTimestampUs = newTimestampUs;
         }
     }
@@ -138,9 +136,12 @@ public class MotionPhotoReaderTest {
         long currentTimestampUs = -1L;
         while (reader.hasNextFrame()) {
             long newTimestampUs = reader.getCurrentTimestamp();
-            reader.seekTo(reader.getCurrentTimestamp() + SEEK_AMOUNT_US, MediaExtractor.SEEK_TO_NEXT_SYNC);
+            reader.seekTo(reader.getCurrentTimestamp() + SEEK_AMOUNT_US,
+                    MediaExtractor.SEEK_TO_NEXT_SYNC);
             boolean flag = currentTimestampUs < newTimestampUs;
-            assertTrue("Timestamp did not increase: " + currentTimestampUs + " vs. " + newTimestampUs, flag);
+            assertTrue("Timestamp did not increase: "
+                    + currentTimestampUs + " vs. " + newTimestampUs,
+                    flag);
             currentTimestampUs = newTimestampUs;
         }
     }
@@ -172,7 +173,8 @@ public class MotionPhotoReaderTest {
 
         Field inputBufferQueueField = reader.getClass().getDeclaredField("availableInputBuffers");
         inputBufferQueueField.setAccessible(true);
-        BlockingQueue<Integer> availableInputBufferQueue = (BlockingQueue<Integer>) inputBufferQueueField.get(reader);
+        BlockingQueue<Integer> availableInputBufferQueue =
+                (BlockingQueue<Integer>) inputBufferQueueField.get(reader);
 
         assertNotNull(availableInputBufferQueue);
         boolean flag = availableInputBufferQueue.size() > 0;
@@ -180,7 +182,8 @@ public class MotionPhotoReaderTest {
     }
 
     @Test
-    public void availableOutputBufferQueue_isQueried() throws IOException, XMPException, InterruptedException {
+    public void availableOutputBufferQueue_isQueried()
+            throws IOException, XMPException, InterruptedException {
         BlockingQueue<Integer> availableInputBuffers = new LinkedBlockingQueue<>();
         BlockingQueue<Bundle> availableOutputBuffers = new LinkedBlockingQueue<>();
 
@@ -225,7 +228,8 @@ public class MotionPhotoReaderTest {
             reader.nextFrame();
         }
         verify(fakeAvailableOutputBuffers, times(NUM_FRAMES)).offer(any(Bundle.class));
-        verify(fakeAvailableOutputBuffers, times(NUM_FRAMES)).poll(anyLong(), eq(TimeUnit.MILLISECONDS));
+        verify(fakeAvailableOutputBuffers, times(NUM_FRAMES))
+                .poll(anyLong(), eq(TimeUnit.MILLISECONDS));
     }
 
     @Test

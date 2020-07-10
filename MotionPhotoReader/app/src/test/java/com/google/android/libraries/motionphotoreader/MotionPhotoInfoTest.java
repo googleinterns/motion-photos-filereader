@@ -47,17 +47,31 @@ public class MotionPhotoInfoTest {
 
     @Before
     public void setUp() throws IOException, XMPException {
-        this.filename = this.getClass().getClassLoader().getResource("test_photo.jpg").getFile();
+        this.filename = this
+                .getClass()
+                .getClassLoader()
+                .getResource("test_photo.jpg")
+                .getFile();
         meta = XmpParser.getXmpMetadata(filename);
         assertNotNull(meta);
 
         // set up a media format to mimic a motion photo
         videoFormat = mock(MediaFormat.class);
-        doAnswer((Answer<Integer>) invocation -> KEY_WIDTH).when(videoFormat).getInteger(eq(MediaFormat.KEY_WIDTH));
-        doAnswer((Answer<Integer>) invocation -> KEY_HEIGHT).when(videoFormat).getInteger(eq(MediaFormat.KEY_HEIGHT));
-        doAnswer((Answer<Long>) invocation -> KEY_DURATION).when(videoFormat).getLong(eq(MediaFormat.KEY_DURATION));
-        doAnswer((Answer<Integer>) invocation -> KEY_ROTATION).when(videoFormat).getInteger(eq(MediaFormat.KEY_ROTATION));
-        doAnswer((Answer<String>) invocation -> KEY_MIME).when(videoFormat).getString(eq(MediaFormat.KEY_MIME));
+        doAnswer((Answer<Integer>) invocation -> KEY_WIDTH)
+                .when(videoFormat)
+                .getInteger(eq(MediaFormat.KEY_WIDTH));
+        doAnswer((Answer<Integer>) invocation -> KEY_HEIGHT)
+                .when(videoFormat)
+                .getInteger(eq(MediaFormat.KEY_HEIGHT));
+        doAnswer((Answer<Long>) invocation -> KEY_DURATION)
+                .when(videoFormat)
+                .getLong(eq(MediaFormat.KEY_DURATION));
+        doAnswer((Answer<Integer>) invocation -> KEY_ROTATION)
+                .when(videoFormat)
+                .getInteger(eq(MediaFormat.KEY_ROTATION));
+        doAnswer((Answer<String>) invocation -> KEY_MIME)
+                .when(videoFormat)
+                .getString(eq(MediaFormat.KEY_MIME));
 
         // return a single video track
         extractor = mock(MediaExtractor.class);

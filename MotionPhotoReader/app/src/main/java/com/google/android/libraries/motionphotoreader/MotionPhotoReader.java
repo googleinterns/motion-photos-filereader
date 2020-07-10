@@ -69,7 +69,8 @@ public class MotionPhotoReader {
      * Standard MotionPhotoReader constructor.
      */
     private MotionPhotoReader(File file, Surface surface,
-                              BlockingQueue<Integer> availableInputBuffers, BlockingQueue<Bundle> availableOutputBuffers,
+                              BlockingQueue<Integer> availableInputBuffers,
+                              BlockingQueue<Bundle> availableOutputBuffers,
                               MotionPhotoInfo motionPhotoInfo) {
         this.file = file;
         this.surface = surface;
@@ -83,12 +84,14 @@ public class MotionPhotoReader {
      * Opens and prepares a new MotionPhotoReader for a particular file.
      */
     @RequiresApi(api = M)
-    public static MotionPhotoReader open(String filename, Surface surface) throws IOException, XMPException {
+    public static MotionPhotoReader open(String filename, Surface surface)
+            throws IOException, XMPException {
         return open(new File(filename), surface);
     }
 
     @RequiresApi(api = M)
-    public static MotionPhotoReader open(File file, Surface surface) throws IOException, XMPException {
+    public static MotionPhotoReader open(File file, Surface surface)
+            throws IOException, XMPException {
         MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(file);
         MotionPhotoReader reader = new MotionPhotoReader(file, surface,
                 new LinkedBlockingQueue<>(), new LinkedBlockingQueue<>(), motionPhotoInfo);
@@ -102,11 +105,19 @@ public class MotionPhotoReader {
      */
     @RequiresApi(api = M)
     @VisibleForTesting
-    static MotionPhotoReader open(File file, Surface surface,
-                                  BlockingQueue<Integer> availableInputBuffers, BlockingQueue<Bundle> availableOutputBuffers)
+    static MotionPhotoReader open(File file,
+                                  Surface surface,
+                                  BlockingQueue<Integer> availableInputBuffers,
+                                  BlockingQueue<Bundle> availableOutputBuffers)
             throws IOException, XMPException {
         MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(file);
-        MotionPhotoReader reader = new MotionPhotoReader(file, surface, availableInputBuffers, availableOutputBuffers, motionPhotoInfo);
+        MotionPhotoReader reader = new MotionPhotoReader(
+                file,
+                surface,
+                availableInputBuffers,
+                availableOutputBuffers,
+                motionPhotoInfo
+        );
         reader.startMediaThread();
         reader.startBufferThread();
         return reader;
@@ -155,7 +166,9 @@ public class MotionPhotoReader {
             }
 
             @Override
-            public void onOutputBufferAvailable(@NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
+            public void onOutputBufferAvailable(@NonNull MediaCodec codec,
+                                                int index,
+                                                @NonNull MediaCodec.BufferInfo info) {
                 Bundle bufferData = new Bundle();
                 bufferData.putInt("BUFFER_INDEX", index);
                 bufferData.putLong("TIMESTAMP_US", info.presentationTimeUs);
@@ -169,7 +182,8 @@ public class MotionPhotoReader {
             }
 
             @Override
-            public void onOutputFormatChanged(@NonNull MediaCodec codec, @NonNull MediaFormat format) {
+            public void onOutputFormatChanged(@NonNull MediaCodec codec,
+                                              @NonNull MediaFormat format) {
 
             }
         }, mediaHandler);
@@ -184,7 +198,12 @@ public class MotionPhotoReader {
     private void startBufferThread() {
         bufferWorker = new HandlerThread("bufferHandler");
         bufferWorker.start();
-        bufferProcessor = new BufferProcessor(lowResExtractor, lowResDecoder, availableInputBuffers, availableOutputBuffers);
+        bufferProcessor = new BufferProcessor(
+                lowResExtractor,
+                lowResDecoder,
+                availableInputBuffers,
+                availableOutputBuffers
+        );
     }
 
     /**
@@ -215,7 +234,8 @@ public class MotionPhotoReader {
 
     /**
      * Checks whether the Motion Photo video has a succeeding frame.
-     * @return 1 if there is no frame, 0 if the next frame exists, and -1 if no buffers are available.
+     * @return 1 if there is no frame, 0 if the next frame exists, and -1 if no buffers are
+     * available.
      */
     @RequiresApi(api = Build.VERSION_CODES.P)
     public boolean hasNextFrame() {

@@ -22,7 +22,11 @@ public class XmpParserTest {
 
     @Before
     public void setUp() {
-        this.filename = this.getClass().getClassLoader().getResource("test_photo.jpg").getFile();
+        this.filename = this
+                .getClass()
+                .getClassLoader()
+                .getResource("test_photo.jpg")
+                .getFile();
     }
 
     @Test
