@@ -69,7 +69,8 @@ public class MotionPhotoReader {
      * Standard MotionPhotoReader constructor.
      */
     private MotionPhotoReader(File file, Surface surface,
-                              BlockingQueue<Integer> availableInputBuffers, BlockingQueue<Bundle> availableOutputBuffers,
+                              BlockingQueue<Integer> availableInputBuffers,
+                              BlockingQueue<Bundle> availableOutputBuffers,
                               MotionPhotoInfo motionPhotoInfo) {
         this.file = file;
         this.surface = surface;
@@ -81,14 +82,15 @@ public class MotionPhotoReader {
 
     /**
      * Opens and prepares a new MotionPhotoReader for a particular file.
+     * @param file The motion photo file to open.
+     * @param surface The surface for the motion photo reader to decode.
+     * @return a MotionPhotoReader object for the specified file.
+     * @throws IOException when the file cannot be found.
+     * @throws XMPException when parsing invalid XML syntax.
      */
     @RequiresApi(api = M)
-    public static MotionPhotoReader open(String filename, Surface surface) throws IOException, XMPException {
-        return open(new File(filename), surface);
-    }
-
-    @RequiresApi(api = M)
-    public static MotionPhotoReader open(File file, Surface surface) throws IOException, XMPException {
+    public static MotionPhotoReader open(File file, Surface surface)
+            throws IOException, XMPException {
         MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(file);
         MotionPhotoReader reader = new MotionPhotoReader(file, surface,
                 new LinkedBlockingQueue<>(), new LinkedBlockingQueue<>(), motionPhotoInfo);
@@ -97,16 +99,30 @@ public class MotionPhotoReader {
         return reader;
     }
 
+    @RequiresApi(api = M)
+    public static MotionPhotoReader open(String filename, Surface surface)
+            throws IOException, XMPException {
+        return open(new File(filename), surface);
+    }
+
     /**
      * Opens and prepares a new MotionPhotoReader for testing.
      */
     @RequiresApi(api = M)
     @VisibleForTesting
-    static MotionPhotoReader open(File file, Surface surface,
-                                  BlockingQueue<Integer> availableInputBuffers, BlockingQueue<Bundle> availableOutputBuffers)
+    static MotionPhotoReader open(File file,
+                                  Surface surface,
+                                  BlockingQueue<Integer> availableInputBuffers,
+                                  BlockingQueue<Bundle> availableOutputBuffers)
             throws IOException, XMPException {
         MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(file);
-        MotionPhotoReader reader = new MotionPhotoReader(file, surface, availableInputBuffers, availableOutputBuffers, motionPhotoInfo);
+        MotionPhotoReader reader = new MotionPhotoReader(
+                file,
+                surface,
+                availableInputBuffers,
+                availableOutputBuffers,
+                motionPhotoInfo
+        );
         reader.startMediaThread();
         reader.startBufferThread();
         return reader;
@@ -155,7 +171,9 @@ public class MotionPhotoReader {
             }
 
             @Override
-            public void onOutputBufferAvailable(@NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
+            public void onOutputBufferAvailable(@NonNull MediaCodec codec,
+                                                int index,
+                                                @NonNull MediaCodec.BufferInfo info) {
                 Bundle bufferData = new Bundle();
                 bufferData.putInt("BUFFER_INDEX", index);
                 bufferData.putLong("TIMESTAMP_US", info.presentationTimeUs);
@@ -169,7 +187,8 @@ public class MotionPhotoReader {
             }
 
             @Override
-            public void onOutputFormatChanged(@NonNull MediaCodec codec, @NonNull MediaFormat format) {
+            public void onOutputFormatChanged(@NonNull MediaCodec codec,
+                                              @NonNull MediaFormat format) {
 
             }
         }, mediaHandler);
@@ -184,7 +203,12 @@ public class MotionPhotoReader {
     private void startBufferThread() {
         bufferWorker = new HandlerThread("bufferHandler");
         bufferWorker.start();
-        bufferProcessor = new BufferProcessor(lowResExtractor, lowResDecoder, availableInputBuffers, availableOutputBuffers);
+        bufferProcessor = new BufferProcessor(
+                lowResExtractor,
+                lowResDecoder,
+                availableInputBuffers,
+                availableOutputBuffers
+        );
     }
 
     /**
@@ -215,17 +239,15 @@ public class MotionPhotoReader {
 
     /**
      * Checks whether the Motion Photo video has a succeeding frame.
-     * @return 1 if there is no frame, 0 if the next frame exists, and -1 if no buffers are available.
+     * @return 1 if there is no frame, 0 if the next frame exists, and -1 if no buffers are
+     * available.
      */
     @RequiresApi(api = Build.VERSION_CODES.P)
     public boolean hasNextFrame() {
         Log.d("HasNextFrame", "Running");
         // Read the next packet and check if it shows a full frame
         long sampleSize = lowResExtractor.getSampleSize();
-        if (sampleSize < 0) {
-            return false;
-        }
-        return true;
+        return (sampleSize >= 0);
     }
 
     /**
@@ -242,8 +264,6 @@ public class MotionPhotoReader {
      * Sets the decoder and extractor to the frame specified by the given timestamp.
      * @param timeUs The desired timestamp of the video.
      * @param mode The sync mode of the extractor.
-     *
-     * TODO: resolve possible jank.
      */
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public void seekTo(long timeUs, int mode) {
@@ -256,13 +276,14 @@ public class MotionPhotoReader {
 
     /**
      * Gets the current video timestamp at which the extractor is set (in microseconds).
+     * @return a long representing the current timestamp of the video that the reader is at.
      */
     public long getCurrentTimestamp() {
         return lowResExtractor.getSampleTime();
     }
 
     /**
-     * Retrieves information about the motion photo and returns a MotionPhotoInfo object.
+     * @return a MotionPhotoInfo object containing motion photo metadata.
      */
     @RequiresApi(api = M)
     public MotionPhotoInfo getMotionPhotoInfo() throws IOException, XMPException {
@@ -271,11 +292,10 @@ public class MotionPhotoReader {
 
 
     /**
-     * Gets the bitmap of the JPEG stored by the motion photo.
+     * @return a bitmap of the JPEG stored by the motion photo.
      */
     public Bitmap getMotionPhotoImageBitmap() throws IOException {
         try (FileInputStream input = new FileInputStream(file)) {
-//            return BitmapFactory.decodeFile(file.getAbsolutePath());
             return BitmapFactory.decodeFileDescriptor(input.getFD());
         }
     }

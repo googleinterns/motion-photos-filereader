@@ -48,7 +48,8 @@ class BufferProcessor {
 
     /**
      * Retrieve the index of the next available input buffer.
-     * @return the index of the next available input buffer, or -1 if the poll call results in a timeout.
+     * @return the index of the next available input buffer, or -1 if the poll call results in a
+     * timeout.
      */
     @RequiresApi(api = LOLLIPOP)
     private int getAvailableInputBufferIndex() {
@@ -62,16 +63,29 @@ class BufferProcessor {
     }
 
     /**
-     * Read the next data sample from the motion photo to a given input buffer and advance the extractor.
+     * Read the next data sample from the motion photo to a given input buffer and advance the
+     * extractor.
      * @param inputBuffer The input buffer to read samples to and queue to the MediaCodec.
      * @param bufferIndex The index of the input buffer.
      */
     private void readFromExtractor(ByteBuffer inputBuffer, int bufferIndex) {
         int sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
         if (sampleSize < 0) {
-            lowResDecoder.queueInputBuffer(bufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+            lowResDecoder.queueInputBuffer(
+                    bufferIndex,
+                    0,
+                    0,
+                    0,
+                    MediaCodec.BUFFER_FLAG_END_OF_STREAM
+            );
         } else {
-            lowResDecoder.queueInputBuffer(bufferIndex, 0, sampleSize, lowResExtractor.getSampleTime(), 0);
+            lowResDecoder.queueInputBuffer(
+                    bufferIndex,
+                    0,
+                    sampleSize,
+                    lowResExtractor.getSampleTime(),
+                    0
+            );
             lowResExtractor.advance();
         }
     }
@@ -93,7 +107,8 @@ class BufferProcessor {
 
     /**
      * Handle calls to nextFrame() and seekTo() by the MotionPhotoReader.
-     * @param messageData A Bundle containing relevant fields from a call to nextFrame() or seekTo().
+     * @param messageData A Bundle containing relevant fields from a call to nextFrame() or
+     *                    seekTo().
      *
      *                    The fields in the message bundle are:
      *                    - MESSAGE_KEY: an int indicating which method call this message comes from.

@@ -59,15 +59,22 @@ public class BufferProcessorTest {
                 lowResExtractor, lowResDecoder, availableInputBuffers, availableOutputBuffers
         ));
 
-        doAnswer((Answer<Integer>) invocation -> 16).when(lowResExtractor).readSampleData(any(ByteBuffer.class), anyInt());
-        doAnswer((Answer<ByteBuffer>) invocation -> mock(ByteBuffer.class)).when(lowResDecoder).getInputBuffer(anyInt());
+        doAnswer((Answer<Integer>) invocation -> 16)
+                .when(lowResExtractor)
+                .readSampleData(any(ByteBuffer.class), anyInt());
+        doAnswer((Answer<ByteBuffer>) invocation -> mock(ByteBuffer.class))
+                .when(lowResDecoder)
+                .getInputBuffer(anyInt());
 
         Bundle messageData = mock(Bundle.class);
-        doAnswer((Answer<Integer>) invocation -> MotionPhotoReader.MSG_NEXT_FRAME).when(messageData).getInt(anyString());
+        doAnswer((Answer<Integer>) invocation -> MotionPhotoReader.MSG_NEXT_FRAME)
+                .when(messageData)
+                .getInt(anyString());
         bufferProcessor.process(messageData);
 
         verify(lowResExtractor).readSampleData(any(ByteBuffer.class), eq(0));
-        verify(lowResDecoder, times(1)).queueInputBuffer(eq(1), eq(0), anyInt(), anyLong(), eq(0));
+        verify(lowResDecoder, times(1))
+                .queueInputBuffer(eq(1), eq(0), anyInt(), anyLong(), eq(0));
         verify(lowResExtractor, times(1)).advance();
         verify(lowResExtractor, never()).seekTo(anyLong(), anyInt());
         verify(lowResDecoder).releaseOutputBuffer(anyInt(), anyLong());
@@ -79,15 +86,26 @@ public class BufferProcessorTest {
                 lowResExtractor, lowResDecoder, availableInputBuffers, availableOutputBuffers
         ));
 
-        doAnswer((Answer<Integer>) invocation -> -1).when(lowResExtractor).readSampleData(any(ByteBuffer.class), anyInt());
-        doAnswer((Answer<ByteBuffer>) invocation -> mock(ByteBuffer.class)).when(lowResDecoder).getInputBuffer(anyInt());
+        doAnswer((Answer<Integer>) invocation -> -1)
+                .when(lowResExtractor)
+                .readSampleData(any(ByteBuffer.class), anyInt());
+        doAnswer((Answer<ByteBuffer>) invocation -> mock(ByteBuffer.class))
+                .when(lowResDecoder)
+                .getInputBuffer(anyInt());
 
         Bundle messageData = mock(Bundle.class);
-        doAnswer((Answer<Integer>) invocation -> MotionPhotoReader.MSG_NEXT_FRAME).when(messageData).getInt(anyString());
+        doAnswer((Answer<Integer>) invocation -> MotionPhotoReader.MSG_NEXT_FRAME)
+                .when(messageData).getInt(anyString());
         bufferProcessor.process(messageData);
 
         verify(lowResExtractor).readSampleData(any(ByteBuffer.class), anyInt());
-        verify(lowResDecoder, times(1)).queueInputBuffer(eq(1), eq(0), eq(0), eq(0L), eq(MediaCodec.BUFFER_FLAG_END_OF_STREAM));
+        verify(lowResDecoder, times(1)).queueInputBuffer(
+                eq(1),
+                eq(0),
+                eq(0),
+                eq(0L),
+                eq(MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+        );
         verify(lowResExtractor, never()).seekTo(anyLong(), anyInt());
         verify(lowResDecoder).releaseOutputBuffer(anyInt(), anyLong());
     }
@@ -99,7 +117,9 @@ public class BufferProcessorTest {
         ));
 
         Bundle messageData = mock(Bundle.class);
-        doAnswer((Answer<Integer>) invocation -> MotionPhotoReader.MSG_SEEK_TO_FRAME).when(messageData).getInt(anyString());
+        doAnswer((Answer<Integer>) invocation -> MotionPhotoReader.MSG_SEEK_TO_FRAME)
+                .when(messageData)
+                .getInt(anyString());
         bufferProcessor.process(messageData);
 
         verify(lowResExtractor, times(1)).seekTo(anyLong(), anyInt());

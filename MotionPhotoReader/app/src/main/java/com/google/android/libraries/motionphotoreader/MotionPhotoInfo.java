@@ -35,7 +35,9 @@ public class MotionPhotoInfo {
      * Creates a MotionPhotoInfo object associated with a given file.
      */
     @RequiresApi(api = Build.VERSION_CODES.M)
-    private MotionPhotoInfo(MediaFormat mediaFormat, int videoOffset, long presentationTimestampUs) {
+    private MotionPhotoInfo(MediaFormat mediaFormat,
+                            int videoOffset,
+                            long presentationTimestampUs) {
         width = mediaFormat.getInteger(MediaFormat.KEY_WIDTH);
         height = mediaFormat.getInteger(MediaFormat.KEY_HEIGHT);
         duration = mediaFormat.getLong(MediaFormat.KEY_DURATION);
@@ -65,7 +67,8 @@ public class MotionPhotoInfo {
     }
 
     /**
-     * Returns a new instance of MotionPhotoInfo with a specified file and MediaExtractor. Used for testing.
+     * Returns a new instance of MotionPhotoInfo with a specified file and MediaExtractor.
+     * Used for testing.
      */
     @VisibleForTesting
     @RequiresApi(api = Build.VERSION_CODES.M)
@@ -102,7 +105,9 @@ public class MotionPhotoInfo {
      * Get the MediaFormat associated with the video track of the Motion Photo MPEG4.
      */
     @Nullable
-    private static MediaFormat getFileMediaFormat(File file, MediaExtractor extractor, int videoOffset) throws IOException {
+    private static MediaFormat getFileMediaFormat(File file,
+                                                  MediaExtractor extractor,
+                                                  int videoOffset) throws IOException {
         try (FileInputStream fileInputStream = new FileInputStream(file)) {
             FileDescriptor fd = fileInputStream.getFD();
             extractor.setDataSource(fd, file.length() - videoOffset, videoOffset);
