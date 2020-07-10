@@ -16,7 +16,8 @@ import java.util.concurrent.ExecutionException;
 
 public class MainActivity extends Activity {
 
-    private final static String[] FILENAMES = { // replace these with appropriate names from sdcard
+    private static final String TAG = "MainActivity";
+    private static final String[] FILENAMES = { // replace these with appropriate names from sdcard
             "20200621_200240",
             "20200616_124008",
             "20200621_184700"
@@ -32,13 +33,14 @@ public class MainActivity extends Activity {
 
         filename = "/sdcard/MVIMG_" + FILENAMES[0] + ".jpg";
         MotionPhotoWidget motionPhotoWidget = findViewById(R.id.motion_photo_widget);
-        motionPhotoWidget.setOnClickListener(new MyOnWidgetClickListener(motionPhotoWidget));
+        Log.d(TAG, "Motion photo widget set up");
         try {
             motionPhotoWidget.setFile(filename);
-            Log.d("MainActivity", "Set file to " + filename);
+            Log.d(TAG, "Set file to " + filename);
         } catch (IOException | XMPException | ExecutionException | InterruptedException e) {
-            Log.e("MainActivity", "Could not set file " + filename, e);
+            Log.e(TAG, "Could not set file " + filename, e);
         }
+        motionPhotoWidget.setOnClickListener(new MyOnWidgetClickListener(motionPhotoWidget));
     }
 
     private class MyOnWidgetClickListener implements View.OnClickListener {

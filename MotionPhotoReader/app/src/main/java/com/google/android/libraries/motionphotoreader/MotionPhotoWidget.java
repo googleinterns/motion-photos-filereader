@@ -5,6 +5,7 @@ import android.content.res.TypedArray;
 import android.graphics.Color;
 import android.media.MediaExtractor;
 import android.os.Build;
+import android.provider.MediaStore;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Surface;
@@ -32,20 +33,16 @@ import java.util.concurrent.TimeoutException;
 public class MotionPhotoWidget extends SurfaceView {
 
     private static final String TAG = "MotionPhotoWidget";
-    private static final String filename = "/sdcard/MVIMG_20200621_200240.jpg";
 
-    SettableFuture<Surface> surfaceFuture;
     private SurfaceHolder surfaceHolder;
     private PlayerThread playerWorker;
-    private MotionPhotoReader reader;
-
-    private Object lock = new Object();
+    private String filename;
 
     private final boolean autoloop;
 
     public MotionPhotoWidget(Context context) {
         super(context);
-        autoloop = false;
+        autoloop = true;
 
         setup();
     }
@@ -67,33 +64,24 @@ public class MotionPhotoWidget extends SurfaceView {
         // Fetch value of “custom:autoloop”
         autoloop = ta.getBoolean(R.styleable.MotionPhotoWidget_autoloop, true);
         ta.recycle();
-
         setup();
     }
 
     private void setup() {
-        surfaceFuture = SettableFuture.create();
         surfaceHolder = this.getHolder();
         surfaceHolder.addCallback(new SurfaceHolder.Callback() {
             @Override
             public void surfaceCreated(SurfaceHolder holder) {
                 Log.d(TAG, "Surface created");
-                surfaceFuture.set(holder.getSurface());
             }
 
             @Override
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
                 Log.d(TAG, "Surface changed");
-                surfaceFuture.addListener(() -> {
-                    if (playerWorker == null) {
-                        try {
-                            playerWorker = new PlayerThread(surfaceFuture.get(1000L, TimeUnit.MILLISECONDS));
-                        } catch (InterruptedException | ExecutionException | TimeoutException e) {
-                            e.printStackTrace();
-                        }
-                        playerWorker.start();
-                    }
-                }, MoreExecutors.directExecutor());
+                if (playerWorker == null) {
+                    playerWorker = new PlayerThread();
+                }
+                playerWorker.start();
             }
 
             @Override
@@ -105,7 +93,6 @@ public class MotionPhotoWidget extends SurfaceView {
                 holder.getSurface().release();
             }
         });
-
     }
 
     public void play() {
@@ -138,7 +125,8 @@ public class MotionPhotoWidget extends SurfaceView {
      */
     @RequiresApi(api = Build.VERSION_CODES.M)
     public void setFile(String filename) throws IOException, XMPException, ExecutionException, InterruptedException {
-        playerWorker.prepare(filename);
+//        playerWorker.prepare(filename);
+        this.filename = filename;
     }
 
     public boolean isPaused() {
@@ -151,32 +139,41 @@ public class MotionPhotoWidget extends SurfaceView {
     private class PlayerThread extends Thread {
         private MotionPhotoReader reader;
         private MotionPhotoInfo motionPhotoInfo;
-        private Surface surface;
         private volatile boolean paused;
 
-        public PlayerThread(Surface surface) {
+        public PlayerThread() {
             Log.d(TAG, "PlayerThread created");
-            this.surface = surface;
         }
 
         @RequiresApi(api = Build.VERSION_CODES.M)
         private void prepare(String filename) throws IOException, XMPException {
+            Log.d(TAG, "Preparing thread");
             pause();
             if (reader != null) {
                 reader.close();
             }
-            reader = MotionPhotoReader.open(filename, surface);
+            reader = MotionPhotoReader.open(filename, surfaceHolder.getSurface());
             motionPhotoInfo = reader.getMotionPhotoInfo();
+            reader.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
         }
 
         @RequiresApi(api = Build.VERSION_CODES.P)
         @Override
         public void run() {
+            try {
+                prepare(filename);
+            } catch (IOException | XMPException e) {
+                e.printStackTrace();
+            }
             while (reader() != null) {
                 if (!isPaused()) {
                     boolean hasNextFrame = reader.hasNextFrame();
                     if (hasNextFrame) {
                         reader.nextFrame();
+                    } else {
+                        if (autoloop) {
+                            reader.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+                        }
                     }
                 }
             }
