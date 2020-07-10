@@ -53,13 +53,19 @@ public class MotionPhotoWidget extends SurfaceView {
         TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.MotionPhotoWidget, 0, 0);
 
         // Fetch value of “custom:background_color”
-        Color backgroundColor = Color.valueOf(ta.getColor(R.styleable.MotionPhotoWidget_background_color, Color.RED));
+        Color backgroundColor = Color.valueOf(
+                ta.getColor(R.styleable.MotionPhotoWidget_background_color, Color.RED)
+        );
 
         // Fetch value of “custom:timeline_base_color”
-        Color timelineBaseColor = Color.valueOf(ta.getColor(R.styleable.MotionPhotoWidget_timeline_base_color, Color.RED));
+        Color timelineBaseColor = Color.valueOf(
+                ta.getColor(R.styleable.MotionPhotoWidget_timeline_base_color, Color.RED)
+        );
 
         // Fetch value of “custom:timeline_fill_color”
-        Color timelineFillColor = Color.valueOf(ta.getColor(R.styleable.MotionPhotoWidget_timeline_fill_color, Color.RED));
+        Color timelineFillColor = Color.valueOf(
+                ta.getColor(R.styleable.MotionPhotoWidget_timeline_fill_color, Color.RED)
+        );
 
         // Fetch value of “custom:autoloop”
         autoloop = ta.getBoolean(R.styleable.MotionPhotoWidget_autoloop, true);
@@ -95,6 +101,10 @@ public class MotionPhotoWidget extends SurfaceView {
         });
     }
 
+    private void initProgressBar() {
+        
+    }
+
     public void play() {
         playerWorker.play();
     }
@@ -124,8 +134,7 @@ public class MotionPhotoWidget extends SurfaceView {
      * @param filename is a string pointing to the motion photo file to play.
      */
     @RequiresApi(api = Build.VERSION_CODES.M)
-    public void setFile(String filename) throws IOException, XMPException, ExecutionException, InterruptedException {
-//        playerWorker.prepare(filename);
+    public void setFile(String filename) {
         this.filename = filename;
     }
 

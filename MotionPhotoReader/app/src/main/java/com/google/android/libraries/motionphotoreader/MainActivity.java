@@ -4,20 +4,14 @@ import android.app.Activity;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.Surface;
 import android.view.View;
 
 import androidx.annotation.RequiresApi;
 
-import com.adobe.internal.xmp.XMPException;
-
-import java.io.IOException;
-import java.util.concurrent.ExecutionException;
-
 public class MainActivity extends Activity {
 
     private static final String TAG = "MainActivity";
-    private static final String[] FILENAMES = { // replace these with appropriate names from sdcard
+    private static final String[] FILENAMES = { // replace these with appropriate file access
             "20200621_200240",
             "20200616_124008",
             "20200621_184700"
@@ -34,12 +28,8 @@ public class MainActivity extends Activity {
         filename = "/sdcard/MVIMG_" + FILENAMES[0] + ".jpg";
         MotionPhotoWidget motionPhotoWidget = findViewById(R.id.motion_photo_widget);
         Log.d(TAG, "Motion photo widget set up");
-        try {
-            motionPhotoWidget.setFile(filename);
-            Log.d(TAG, "Set file to " + filename);
-        } catch (IOException | XMPException | ExecutionException | InterruptedException e) {
-            Log.e(TAG, "Could not set file " + filename, e);
-        }
+        motionPhotoWidget.setFile(filename);
+        Log.d(TAG, "Set file to " + filename);
         motionPhotoWidget.setOnClickListener(new MyOnWidgetClickListener(motionPhotoWidget));
     }
 
