@@ -295,7 +295,6 @@ public class MotionPhotoReader {
      */
     public Bitmap getMotionPhotoImageBitmap() throws IOException {
         try (FileInputStream input = new FileInputStream(file)) {
-//            return BitmapFactory.decodeFile(file.getAbsolutePath());
             return BitmapFactory.decodeFileDescriptor(input.getFD());
         }
     }

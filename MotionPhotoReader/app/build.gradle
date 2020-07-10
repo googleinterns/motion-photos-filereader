@@ -38,7 +38,6 @@ dependencies {
     androidTestImplementation 'org.mockito:mockito-android:2.+'
     androidTestImplementation 'com.android.support.test:rules:1.0.2'
 
-    // https://mvnrepository.com/artifact/com.google.guava/guava
     implementation group: 'com.google.guava', name: 'guava', version: '19.0'
 
     testImplementation "com.google.truth:truth:1.0.1"
