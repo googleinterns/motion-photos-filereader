@@ -82,13 +82,12 @@ public class MotionPhotoReader {
 
     /**
      * Opens and prepares a new MotionPhotoReader for a particular file.
+     * @param file The motion photo file to open.
+     * @param surface The surface for the motion photo reader to decode.
+     * @return a MotionPhotoReader object for the specified file.
+     * @throws IOException when the file cannot be found.
+     * @throws XMPException when parsing invalid XML syntax.
      */
-    @RequiresApi(api = M)
-    public static MotionPhotoReader open(String filename, Surface surface)
-            throws IOException, XMPException {
-        return open(new File(filename), surface);
-    }
-
     @RequiresApi(api = M)
     public static MotionPhotoReader open(File file, Surface surface)
             throws IOException, XMPException {
@@ -98,6 +97,12 @@ public class MotionPhotoReader {
         reader.startMediaThread();
         reader.startBufferThread();
         return reader;
+    }
+
+    @RequiresApi(api = M)
+    public static MotionPhotoReader open(String filename, Surface surface)
+            throws IOException, XMPException {
+        return open(new File(filename), surface);
     }
 
     /**
@@ -242,10 +247,7 @@ public class MotionPhotoReader {
         Log.d("HasNextFrame", "Running");
         // Read the next packet and check if it shows a full frame
         long sampleSize = lowResExtractor.getSampleSize();
-        if (sampleSize < 0) {
-            return false;
-        }
-        return true;
+        return (sampleSize >= 0);
     }
 
     /**
@@ -262,8 +264,6 @@ public class MotionPhotoReader {
      * Sets the decoder and extractor to the frame specified by the given timestamp.
      * @param timeUs The desired timestamp of the video.
      * @param mode The sync mode of the extractor.
-     *
-     * TODO: resolve possible jank.
      */
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public void seekTo(long timeUs, int mode) {
@@ -276,13 +276,14 @@ public class MotionPhotoReader {
 
     /**
      * Gets the current video timestamp at which the extractor is set (in microseconds).
+     * @return a long representing the current timestamp of the video that the reader is at.
      */
     public long getCurrentTimestamp() {
         return lowResExtractor.getSampleTime();
     }
 
     /**
-     * Retrieves information about the motion photo and returns a MotionPhotoInfo object.
+     * @return a MotionPhotoInfo object containing motion photo metadata.
      */
     @RequiresApi(api = M)
     public MotionPhotoInfo getMotionPhotoInfo() throws IOException, XMPException {
@@ -291,7 +292,7 @@ public class MotionPhotoReader {
 
 
     /**
-     * Gets the bitmap of the JPEG stored by the motion photo.
+     * @return a bitmap of the JPEG stored by the motion photo.
      */
     public Bitmap getMotionPhotoImageBitmap() throws IOException {
         try (FileInputStream input = new FileInputStream(file)) {
