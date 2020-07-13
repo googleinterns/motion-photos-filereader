@@ -6,18 +6,27 @@ import android.graphics.Color;
 import android.graphics.SurfaceTexture;
 import android.media.MediaExtractor;
 import android.os.Build;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Message;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.TextureView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 import com.adobe.internal.xmp.XMPException;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * An Android app widget to set up a video player for a motion photo file.
@@ -25,13 +34,19 @@ import java.io.IOException;
 public class MotionPhotoWidget extends TextureView {
 
     private static final String TAG = "MotionPhotoWidget";
+    private static final Object lock = new Object();
 
+    private ExecutorService executor;
+
+    private MotionPhotoReader reader;
+    private boolean isPaused = true;
     private SurfaceTexture surfaceTexture;
-    private PlayerThread playerWorker;
     private String filename;
 
     private final boolean autoloop;
     private SurfaceTexture savedSurfaceTexture;
+    private long savedTimestampUs;
+    private PlayProcess playProcess;
 
     public MotionPhotoWidget(Context context) {
         super(context);
@@ -67,22 +82,52 @@ public class MotionPhotoWidget extends TextureView {
     }
 
     private void setup() {
+        playProcess = new PlayProcess();
+        executor = Executors.newSingleThreadExecutor(new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+                return new Thread(r) {
+                    @Override
+                    public void interrupt() {
+                        super.interrupt();
+                        playProcess.cancel();
+                    }
+                };
+            }
+        });
+        
         this.setSurfaceTextureListener(new SurfaceTextureListener() {
+            @RequiresApi(api = Build.VERSION_CODES.M)
             @Override
             public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
                 if (savedSurfaceTexture == null) {
                     savedSurfaceTexture = surface;
-                    playerWorker = new PlayerThread(new Surface(surface));
+                    if (reader == null) {
+                        Log.d(TAG, "Opening new motion photo reader");
+                        try {
+                            reader = MotionPhotoReader.open(filename, new Surface(surface));
+                        } catch (IOException | XMPException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    // set reader to last saved state
+                    Log.d(TAG, "Seeking to: " + savedTimestampUs + " us");
+                    reader.seekTo(savedTimestampUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+                    if (!isPaused) {
+                        executor.submit(playProcess);
+                    }
                 }
             }
 
             @Override
             public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-                
+                Log.d(TAG, "Surface texture size changed");
             }
 
             @Override
             public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+                Log.d(TAG, "Surface texture destroyed");
+                savedTimestampUs = getCurrentTimestampUs();
                 return (savedSurfaceTexture == null);
             }
 
@@ -96,11 +141,13 @@ public class MotionPhotoWidget extends TextureView {
     }
 
     public void play() {
-        playerWorker.play();
+        executor.submit(playProcess);
+        isPaused = false;
     }
 
     public void pause() {
-        playerWorker.pause();
+        playProcess.cancel();
+        isPaused = true;
     }
 
     /**
@@ -108,7 +155,7 @@ public class MotionPhotoWidget extends TextureView {
      */
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public void restart() {
-        playerWorker.reader().seekTo(0L, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+        reader.seekTo(0L, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
     }
 
     /**
@@ -116,7 +163,7 @@ public class MotionPhotoWidget extends TextureView {
      * @return the current timestamp of tthe motion photo reader, in microseconds.
      */
     public long getCurrentTimestampUs() {
-        return playerWorker.reader().getCurrentTimestamp();
+        return reader.getCurrentTimestamp();
     }
 
     /**
@@ -137,77 +184,34 @@ public class MotionPhotoWidget extends TextureView {
     }
 
     public boolean isPaused() {
-        return playerWorker.isPaused();
+        return isPaused;
     }
 
     /**
-     * A thread reserved for running the Motion Photo Reader.
+     * A Runnable for starting up the player.
      */
-    private class PlayerThread extends Thread {
-        private MotionPhotoReader reader;
-        private MotionPhotoInfo motionPhotoInfo;
-        private Surface surface;
-        private volatile boolean paused;
 
-        public PlayerThread(Surface surface) {
-            Log.d(TAG, "PlayerThread created");
-            this.surface = surface;
-            start();
-        }
-
-        @RequiresApi(api = Build.VERSION_CODES.M)
-        private void prepare(String filename) throws IOException, XMPException {
-            Log.d(TAG, "Preparing thread");
-            pause();
-            if (reader != null) {
-                reader.close();
-            }
-            reader = MotionPhotoReader.open(filename, surface);
-            motionPhotoInfo = reader.getMotionPhotoInfo();
-            reader.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
-        }
+    private class PlayProcess implements Runnable {
+        private volatile boolean exit;
 
         @RequiresApi(api = Build.VERSION_CODES.P)
         @Override
         public void run() {
-            try {
-                prepare(filename);
-            } catch (IOException | XMPException e) {
-                e.printStackTrace();
-            }
-            while (reader() != null) {
-                if (!isPaused()) {
-                    boolean hasNextFrame = reader.hasNextFrame();
-                    if (hasNextFrame) {
-                        reader.nextFrame();
-                    } else {
-                        if (autoloop) {
-                            reader.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
-                        }
+            // start playing video
+            while (!exit) {
+                boolean hasNextFrame = reader.hasNextFrame();
+                if (hasNextFrame) {
+                    reader.nextFrame();
+                } else {
+                    if (autoloop) {
+                        reader.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
                     }
                 }
             }
         }
 
-        @Override
-        public void interrupt() {
-            reader.close();
-        }
-
-        public boolean isPaused() {
-            return paused;
-        }
-
-        public MotionPhotoReader reader() {
-            return reader;
-        }
-
-        public void pause() {
-            paused = true;
-        }
-
-        public void play() {
-            paused = false;
+        public void cancel() {
+            exit = true;
         }
     }
 }
