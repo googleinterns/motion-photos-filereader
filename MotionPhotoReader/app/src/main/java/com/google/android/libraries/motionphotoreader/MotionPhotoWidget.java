@@ -2,13 +2,8 @@ package com.google.android.libraries.motionphotoreader;
 
 import android.content.Context;
 import android.content.res.TypedArray;
-import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.ColorFilter;
-import android.graphics.Paint;
-import android.graphics.PixelFormat;
 import android.graphics.SurfaceTexture;
-import android.graphics.drawable.Drawable;
 import android.media.MediaExtractor;
 import android.os.Build;
 import android.os.Bundle;
@@ -17,15 +12,12 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
 
-import android.os.Parcel;
-import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.TextureView;
 
-import androidx.annotation.GuardedBy;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
@@ -43,27 +35,23 @@ import java.util.concurrent.ThreadFactory;
  */
 public class MotionPhotoWidget extends TextureView {
 
-    private Color backgroundColor;
-    private final boolean autoloop;
-
     private static final String TAG = "MotionPhotoWidget";
     private static final Object lock = new Object();
 
     private ExecutorService executor;
 
-    @GuardedBy("lock")
     private MotionPhotoReader reader;
     private boolean isPaused = true;
     private SurfaceTexture surfaceTexture;
     private String filename;
 
+    private final boolean autoloop;
     private SurfaceTexture savedSurfaceTexture;
     private long savedTimestampUs;
     private PlayProcess playProcess;
 
     public MotionPhotoWidget(Context context) {
         super(context);
-        setSaveEnabled(true);
         autoloop = true;
 
         setup();
@@ -72,11 +60,12 @@ public class MotionPhotoWidget extends TextureView {
     @RequiresApi(api = Build.VERSION_CODES.O)
     public MotionPhotoWidget(Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
-        setSaveEnabled(true);
-        TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.MotionPhotoWidget, 0, 0);
+        TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.MotionPhotoWidget,
+                /* defStyleAttr = */ 0,
+                /* defStyleRes = */ 0);
 
         // Fetch value of “custom:background_color”
-        backgroundColor = Color.valueOf(
+        Color backgroundColor = Color.valueOf(
                 ta.getColor(R.styleable.MotionPhotoWidget_background_color, Color.RED)
         );
 
@@ -110,7 +99,7 @@ public class MotionPhotoWidget extends TextureView {
                 };
             }
         });
-        
+
         this.setSurfaceTextureListener(new SurfaceTextureListener() {
             @RequiresApi(api = Build.VERSION_CODES.M)
             @Override
@@ -143,8 +132,8 @@ public class MotionPhotoWidget extends TextureView {
             @Override
             public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
                 Log.d(TAG, "Surface texture destroyed");
-                reader.close();
-                return savedSurfaceTexture == null;
+                savedTimestampUs = getCurrentTimestampUs();
+                return (savedSurfaceTexture == null);
             }
 
             @Override
@@ -153,41 +142,10 @@ public class MotionPhotoWidget extends TextureView {
             }
         });
         surfaceTexture = this.getSurfaceTexture();
-    }
 
-    @Override
-    public Parcelable onSaveInstanceState() {
-        // Obtain any state that our super class wants to save.
-        Parcelable superState = super.onSaveInstanceState();
-
-        // Wrap our super class's state with our own.
-        SavedState myState = new SavedState(superState);
-        myState.savedTimestampUs = reader.getCurrentTimestamp();
-        myState.isPaused = this.isPaused;
-
-        // Return our state along with our super class's state.
-        return myState;
-    }
-
-    @RequiresApi(api = Build.VERSION_CODES.M)
-    @Override
-    public void onRestoreInstanceState(Parcelable state) {
-        // Cast the incoming Parcelable to our custom SavedState. We produced
-        // this Parcelable before, so we know what type it is.
-        SavedState savedState = (SavedState) state;
-
-        // Let our super class process state before we do because we should
-        // depend on our super class, we shouldn't imply that our super class
-        // might need to depend on us.
-        super.onRestoreInstanceState(savedState.getSuperState());
-
-        // Grab our properties out of our SavedState.
-        this.savedTimestampUs = savedState.savedTimestampUs;
-        this.isPaused = savedState.isPaused;
     }
 
     public void play() {
-        playProcess = new PlayProcess();
         executor.submit(playProcess);
         isPaused = false;
     }
@@ -258,41 +216,6 @@ public class MotionPhotoWidget extends TextureView {
 
         public void cancel() {
             exit = true;
-        }
-    }
-
-    private static class SavedState extends BaseSavedState {
-        long savedTimestampUs;
-        boolean isPaused;
-
-        public static final Parcelable.Creator<SavedState> CREATOR
-                = new Parcelable.Creator<SavedState>() {
-            public SavedState createFromParcel(Parcel in) {
-                return new SavedState(in);
-            }
-
-            public SavedState[] newArray(int size) {
-                return new SavedState[size];
-            }
-        };
-
-        SavedState(Parcelable superState) {
-            super(superState);
-        }
-
-        @RequiresApi(api = Build.VERSION_CODES.Q)
-        private SavedState(Parcel in) {
-            super(in);
-            savedTimestampUs = in.readLong();
-            isPaused = in.readBoolean();
-        }
-
-        @RequiresApi(api = Build.VERSION_CODES.Q)
-        @Override
-        public void writeToParcel(Parcel out, int flags) {
-            super.writeToParcel(out, flags);
-            out.writeLong(savedTimestampUs);
-            out.writeBoolean(isPaused);
         }
     }
 }
