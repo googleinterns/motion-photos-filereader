@@ -3,42 +3,35 @@ package com.google.android.libraries.motionphotoreader;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Color;
+import android.graphics.SurfaceTexture;
 import android.media.MediaExtractor;
 import android.os.Build;
-import android.provider.MediaStore;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
-import android.view.SurfaceView;
-import android.view.View;
+import android.view.TextureView;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 import com.adobe.internal.xmp.XMPException;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.MoreExecutors;
-import com.google.common.util.concurrent.SettableFuture;
 
 import java.io.IOException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * An Android app widget to set up a video player for a motion photo file.
  */
-public class MotionPhotoWidget extends SurfaceView {
+public class MotionPhotoWidget extends TextureView {
 
     private static final String TAG = "MotionPhotoWidget";
 
-    private SurfaceHolder surfaceHolder;
+    private SurfaceTexture surfaceTexture;
     private PlayerThread playerWorker;
     private String filename;
 
     private final boolean autoloop;
+    private SurfaceTexture savedSurfaceTexture;
 
     public MotionPhotoWidget(Context context) {
         super(context);
@@ -74,34 +67,31 @@ public class MotionPhotoWidget extends SurfaceView {
     }
 
     private void setup() {
-        surfaceHolder = this.getHolder();
-        surfaceHolder.addCallback(new SurfaceHolder.Callback() {
+        this.setSurfaceTextureListener(new SurfaceTextureListener() {
             @Override
-            public void surfaceCreated(SurfaceHolder holder) {
-                Log.d(TAG, "Surface created");
+            public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+                if (savedSurfaceTexture == null) {
+                    savedSurfaceTexture = surface;
+                    playerWorker = new PlayerThread(new Surface(surface));
+                }
             }
 
             @Override
-            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-                Log.d(TAG, "Surface changed");
-                if (playerWorker == null) {
-                    playerWorker = new PlayerThread();
-                }
-                playerWorker.start();
+            public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+                
             }
 
             @Override
-            public void surfaceDestroyed(SurfaceHolder holder) {
-                Log.d("PlayerThreadActivity", "Surface destroyed");
-                if (playerWorker != null) {
-                    playerWorker.interrupt();
-                }
-                holder.getSurface().release();
+            public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+                return (savedSurfaceTexture == null);
+            }
+
+            @Override
+            public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+
             }
         });
-    }
-
-    private void initProgressBar() {
+        surfaceTexture = this.getSurfaceTexture();
 
     }
 
@@ -156,10 +146,13 @@ public class MotionPhotoWidget extends SurfaceView {
     private class PlayerThread extends Thread {
         private MotionPhotoReader reader;
         private MotionPhotoInfo motionPhotoInfo;
+        private Surface surface;
         private volatile boolean paused;
 
-        public PlayerThread() {
+        public PlayerThread(Surface surface) {
             Log.d(TAG, "PlayerThread created");
+            this.surface = surface;
+            start();
         }
 
         @RequiresApi(api = Build.VERSION_CODES.M)
@@ -169,7 +162,7 @@ public class MotionPhotoWidget extends SurfaceView {
             if (reader != null) {
                 reader.close();
             }
-            reader = MotionPhotoReader.open(filename, surfaceHolder.getSurface());
+            reader = MotionPhotoReader.open(filename, surface);
             motionPhotoInfo = reader.getMotionPhotoInfo();
             reader.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
         }
