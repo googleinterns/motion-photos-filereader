@@ -12,6 +12,8 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
 
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Surface;
@@ -107,14 +109,12 @@ public class MotionPhotoWidget extends TextureView {
                 Log.d(TAG, "Surface texture available");
                 if (savedSurfaceTexture == null) {
                     savedSurfaceTexture = surface;
-                    if (reader == null) {
-                        Log.d(TAG, "Opening new motion photo reader");
-                        try {
-                            reader = MotionPhotoReader.open(filename, new Surface(surface));
-                        } catch (IOException | XMPException e) {
-                            e.printStackTrace();
-                        }
+                    try {
+                        reader = MotionPhotoReader.open(filename, new Surface(surface));
+                    } catch (IOException | XMPException e) {
+                        e.printStackTrace();
                     }
+
                     // set reader to last saved state
                     Log.d(TAG, "Seeking to: " + savedTimestampUs + " us");
                     reader.seekTo(savedTimestampUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
@@ -132,7 +132,7 @@ public class MotionPhotoWidget extends TextureView {
             @Override
             public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
                 Log.d(TAG, "Surface texture destroyed");
-                savedTimestampUs = getCurrentTimestampUs();
+                reader.close();
                 return (savedSurfaceTexture == null);
             }
 
@@ -142,7 +142,37 @@ public class MotionPhotoWidget extends TextureView {
             }
         });
         surfaceTexture = this.getSurfaceTexture();
+    }
 
+    @Override
+    public Parcelable onSaveInstanceState() {
+        // Obtain any state that our super class wants to save.
+        Parcelable superState = super.onSaveInstanceState();
+
+        // Wrap our super class's state with our own.
+        SavedState myState = new SavedState(superState);
+        myState.savedTimstampUs = reader.getCurrentTimestamp();
+        myState.isPaused = this.isPaused;
+
+        // Return our state along with our super class's state.
+        return myState;
+    }
+
+
+    @Override
+    public void onRestoreInstanceState(Parcelable state) {
+        // Cast the incoming Parcelable to our custom SavedState. We produced
+        // this Parcelable before, so we know what type it is.
+        SavedState savedState = (SavedState) state;
+
+        // Let our super class process state before we do because we should
+        // depend on our super class, we shouldn't imply that our super class
+        // might need to depend on us.
+        super.onRestoreInstanceState(savedState.getSuperState());
+
+        // Grab our properties out of our SavedState.
+        this.savedTimestampUs = savedState.savedTimstampUs;
+        this.isPaused = savedState.isPaused;
     }
 
     public void play() {
@@ -217,5 +247,41 @@ public class MotionPhotoWidget extends TextureView {
         public void cancel() {
             exit = true;
         }
+    }
+
+    private static class SavedState extends BaseSavedState {
+        long savedTimstampUs;
+        boolean isPaused;
+
+        SavedState(Parcelable superState) {
+            super(superState);
+        }
+
+        @RequiresApi(api = Build.VERSION_CODES.Q)
+        private SavedState(Parcel in) {
+            super(in);
+            savedTimstampUs = in.readLong();
+            isPaused = in.readBoolean();
+        }
+
+        @RequiresApi(api = Build.VERSION_CODES.Q)
+        @Override
+        public void writeToParcel(Parcel out, int flags) {
+            super.writeToParcel(out, flags);
+            out.writeLong(savedTimstampUs);
+            out.writeBoolean(isPaused);
+        }
+
+        public static final Parcelable.Creator<SavedState> CREATOR
+                = new Parcelable.Creator<SavedState>() {
+            @RequiresApi(api = Build.VERSION_CODES.Q)
+            public SavedState createFromParcel(Parcel in) {
+                return new SavedState(in);
+            }
+
+            public SavedState[] newArray(int size) {
+                return new SavedState[size];
+            }
+        };
     }
 }
