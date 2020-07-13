@@ -83,7 +83,7 @@ class BufferProcessor {
                     bufferIndex,
                     /* offset = */ 0,
                     sampleSize,
-                    /* presentationTimeUs = */ lowResExtractor.getSampleTime(),
+                    lowResExtractor.getSampleTime(),
                     /* flags = */ 0
             );
             lowResExtractor.advance();
