@@ -7,9 +7,11 @@ import android.graphics.SurfaceTexture;
 import android.media.MediaExtractor;
 import android.os.Build;
 import android.os.Bundle;
+
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
+
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Surface;
@@ -100,6 +102,7 @@ public class MotionPhotoWidget extends TextureView {
             @RequiresApi(api = Build.VERSION_CODES.M)
             @Override
             public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+                Log.d(TAG, "Surface texture available");
                 if (savedSurfaceTexture == null) {
                     savedSurfaceTexture = surface;
                     if (reader == null) {
@@ -190,7 +193,6 @@ public class MotionPhotoWidget extends TextureView {
     /**
      * A Runnable for starting up the player.
      */
-
     private class PlayProcess implements Runnable {
         private volatile boolean exit;
 
