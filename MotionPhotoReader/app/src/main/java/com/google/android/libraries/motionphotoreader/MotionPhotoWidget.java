@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.graphics.SurfaceTexture;
 import android.media.MediaExtractor;
 import android.os.Build;
+import android.os.Bundle;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Surface;
@@ -31,7 +32,8 @@ public class MotionPhotoWidget extends TextureView {
     private String filename;
 
     private final boolean autoloop;
-    private SurfaceTexture savedSurfaceTexture;
+    private volatile SurfaceTexture savedSurfaceTexture;
+    private volatile Bundle savedSurfaceState;
 
     public MotionPhotoWidget(Context context) {
         super(context);
@@ -70,19 +72,34 @@ public class MotionPhotoWidget extends TextureView {
         this.setSurfaceTextureListener(new SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+                Log.d(TAG, "Surface texture available");
                 if (savedSurfaceTexture == null) {
                     savedSurfaceTexture = surface;
-                    playerWorker = new PlayerThread(new Surface(surface));
+                    if (savedSurfaceState == null) {
+                        Log.d(TAG, "Surface texture created with new state");
+                        playerWorker = new PlayerThread(new Surface(surface));
+                    } else {
+                        Log.d(TAG, "Surface texture created with saved state");
+                        playerWorker = new PlayerThread(new Surface(surface), savedSurfaceState);
+                    }
                 }
+                Log.d(TAG, "Player thread is null: " + (playerWorker == null));
             }
 
             @Override
             public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-                
+                Log.d(TAG, "Surface texture size changed");
             }
 
             @Override
             public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+            Log.d(TAG, "Surface texture destroyed");
+                if (playerWorker != null) {
+                    Log.d(TAG, "Player thread updated");
+                    savedSurfaceState = new Bundle();
+                    savedSurfaceState.putBoolean("IS_PAUSED", playerWorker.isPaused());
+                    savedSurfaceState.putLong("CURRENT_TIMESTAMP_US", getCurrentTimestampUs());
+                }
                 return (savedSurfaceTexture == null);
             }
 
@@ -148,10 +165,21 @@ public class MotionPhotoWidget extends TextureView {
         private MotionPhotoInfo motionPhotoInfo;
         private Surface surface;
         private volatile boolean paused;
+        private Bundle initState;
 
         public PlayerThread(Surface surface) {
             Log.d(TAG, "PlayerThread created");
             this.surface = surface;
+            initState = new Bundle();
+            initState.putBoolean("IS_PAUSED", true);
+            initState.putLong("CURRENT_TIMESTAMP_US", 0L);
+            start();
+        }
+
+        public PlayerThread(Surface surface, Bundle initState) {
+            Log.d(TAG, "PlayerThread created");
+            this.surface = surface;
+            this.initState = initState;
             start();
         }
 
@@ -164,7 +192,11 @@ public class MotionPhotoWidget extends TextureView {
             }
             reader = MotionPhotoReader.open(filename, surface);
             motionPhotoInfo = reader.getMotionPhotoInfo();
-            reader.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+            reader.seekTo(
+                    /* timeUs = */ initState.getLong("CURRENT_TIMESTAMP_US"),
+                    /* mode = */ MediaExtractor.SEEK_TO_PREVIOUS_SYNC
+            );
+            this.paused = initState.getBoolean("IS_PAUSED");
         }
 
         @RequiresApi(api = Build.VERSION_CODES.P)
