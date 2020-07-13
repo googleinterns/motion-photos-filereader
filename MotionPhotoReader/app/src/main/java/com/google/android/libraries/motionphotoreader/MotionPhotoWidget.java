@@ -73,9 +73,7 @@ public class MotionPhotoWidget extends TextureView {
     public MotionPhotoWidget(Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
         setSaveEnabled(true);
-        TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.MotionPhotoWidget,
-                /* defStyleAttr = */ 0,
-                /* defStyleRes = */ 0);
+        TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.MotionPhotoWidget, 0, 0);
 
         // Fetch value of “custom:background_color”
         backgroundColor = Color.valueOf(
