@@ -6,17 +6,12 @@ import android.graphics.Color;
 import android.graphics.SurfaceTexture;
 import android.media.MediaExtractor;
 import android.os.Build;
-import android.os.Bundle;
-import android.os.Handler;
-import android.os.HandlerThread;
-import android.os.Message;
+
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Surface;
-import android.view.SurfaceHolder;
 import android.view.TextureView;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
@@ -25,7 +20,6 @@ import com.adobe.internal.xmp.XMPException;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 
 /**
@@ -38,7 +32,7 @@ public class MotionPhotoWidget extends TextureView {
 
     private ExecutorService executor;
 
-    private MotionPhotoReader reader;
+    private volatile MotionPhotoReader reader;
     private boolean isPaused = true;
     private SurfaceTexture surfaceTexture;
     private String filename;
@@ -58,7 +52,11 @@ public class MotionPhotoWidget extends TextureView {
     @RequiresApi(api = Build.VERSION_CODES.O)
     public MotionPhotoWidget(Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
-        TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.MotionPhotoWidget, 0, 0);
+        TypedArray ta = context.obtainStyledAttributes(
+                attrs,
+                R.styleable.MotionPhotoWidget,
+                /* defStyleAttr = */ 0,
+                /* defStyleRes = */ 0);
 
         // Fetch value of “custom:background_color”
         Color backgroundColor = Color.valueOf(
@@ -100,6 +98,7 @@ public class MotionPhotoWidget extends TextureView {
             @RequiresApi(api = Build.VERSION_CODES.M)
             @Override
             public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+                Log.d(TAG, "Surface texture available");
                 if (savedSurfaceTexture == null) {
                     savedSurfaceTexture = surface;
                     if (reader == null) {
@@ -112,9 +111,11 @@ public class MotionPhotoWidget extends TextureView {
                     }
                     // set reader to last saved state
                     Log.d(TAG, "Seeking to: " + savedTimestampUs + " us");
-                    reader.seekTo(savedTimestampUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
-                    if (!isPaused) {
-                        executor.submit(playProcess);
+                    synchronized (lock) {
+                        reader.seekTo(savedTimestampUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+                        if (!isPaused) {
+                            executor.submit(playProcess);
+                        }
                     }
                 }
             }
@@ -127,7 +128,10 @@ public class MotionPhotoWidget extends TextureView {
             @Override
             public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
                 Log.d(TAG, "Surface texture destroyed");
-                savedTimestampUs = getCurrentTimestampUs();
+                synchronized (lock) {
+                    savedTimestampUs = getCurrentTimestampUs();
+                }
+                Log.d(TAG, "Set last timestamp to: " + savedTimestampUs + " us");
                 return (savedSurfaceTexture == null);
             }
 
@@ -137,7 +141,6 @@ public class MotionPhotoWidget extends TextureView {
             }
         });
         surfaceTexture = this.getSurfaceTexture();
-
     }
 
     public void play() {
@@ -190,7 +193,6 @@ public class MotionPhotoWidget extends TextureView {
     /**
      * A Runnable for starting up the player.
      */
-
     private class PlayProcess implements Runnable {
         private volatile boolean exit;
 
