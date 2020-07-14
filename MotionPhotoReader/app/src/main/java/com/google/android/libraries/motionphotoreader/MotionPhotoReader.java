@@ -57,7 +57,6 @@ public class MotionPhotoReader {
      */
     private HandlerThread mediaWorker;
     private Handler mediaHandler;
-    private HandlerThread bufferWorker;
     private BufferProcessor bufferProcessor;
 
     /** Available buffer queues **/
@@ -91,12 +90,12 @@ public class MotionPhotoReader {
     @RequiresApi(api = M)
     public static MotionPhotoReader open(File file, Surface surface)
             throws IOException, XMPException {
-        MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(file);
-        MotionPhotoReader reader = new MotionPhotoReader(file, surface,
-                new LinkedBlockingQueue<>(), new LinkedBlockingQueue<>(), motionPhotoInfo);
-        reader.startMediaThread();
-        reader.startBufferThread();
-        return reader;
+        return open(
+                file,
+                surface,
+                /* availableInputBuffers = */ new LinkedBlockingQueue<>(),
+                /* availableOutputBuffers = */ new LinkedBlockingQueue<>()
+        );
     }
 
     @RequiresApi(api = M)
@@ -124,7 +123,12 @@ public class MotionPhotoReader {
                 motionPhotoInfo
         );
         reader.startMediaThread();
-        reader.startBufferThread();
+        reader.bufferProcessor = new BufferProcessor(
+                reader.lowResExtractor,
+                reader.lowResDecoder,
+                availableInputBuffers,
+                availableOutputBuffers
+        );
         return reader;
     }
 
@@ -198,20 +202,6 @@ public class MotionPhotoReader {
     }
 
     /**
-     * Sets up and starts a new handler thread for managing frame advancing calls and available buffers.
-     */
-    private void startBufferThread() {
-        bufferWorker = new HandlerThread("bufferHandler");
-        bufferWorker.start();
-        bufferProcessor = new BufferProcessor(
-                lowResExtractor,
-                lowResDecoder,
-                availableInputBuffers,
-                availableOutputBuffers
-        );
-    }
-
-    /**
      * Shut down all resources allocated to the MotionPhotoReader instance.
      */
     public void close() {
@@ -226,15 +216,12 @@ public class MotionPhotoReader {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
             mediaHandler.getLooper().quitSafely();
             Log.d("ReaderActivity", "Safely quit looper");
-        }
-        else {
+        } else {
             mediaHandler.getLooper().quit();
             Log.d("ReaderActivity", "Quit looper");
         }
         lowResDecoder.release();
         lowResExtractor.release();
-        bufferWorker.interrupt();
-        mediaWorker.interrupt();
     }
 
     /**
@@ -289,7 +276,6 @@ public class MotionPhotoReader {
     public MotionPhotoInfo getMotionPhotoInfo() throws IOException, XMPException {
         return MotionPhotoInfo.newInstance(file);
     }
-
 
     /**
      * @return a bitmap of the JPEG stored by the motion photo.

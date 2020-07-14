@@ -1,6 +1,5 @@
 package com.google.android.libraries.motionphotoreader;
 
-import android.content.Context;
 import android.graphics.Bitmap;
 import android.media.MediaExtractor;
 import android.os.Bundle;
@@ -16,31 +15,21 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
-import org.mockito.stubbing.Answer;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 
 /**
  * Instrumented test for MotionPhotoReader class.
@@ -166,55 +155,29 @@ public class MotionPhotoReaderTest {
     }
 
     @Test
-    public void availableInputBufferQueue_isNotEmpty()
-            throws IOException, XMPException, NoSuchFieldException, IllegalAccessException {
-        MotionPhotoReader reader = MotionPhotoReader.open(fetchAssetFile(filename), null);
+    public void availableInputBufferQueue_isNotEmpty() throws IOException, XMPException {
+        TrackedLinkedBlockingQueue<Integer> fakeAvailableInputBuffers =
+                new TrackedLinkedBlockingQueue<>();
+        TrackedLinkedBlockingQueue<Bundle> fakeAvailableOutputBuffers =
+                new TrackedLinkedBlockingQueue<>();
+
+        MotionPhotoReader reader = MotionPhotoReader.open(
+                fetchAssetFile(filename),
+                null,
+                fakeAvailableInputBuffers,
+                fakeAvailableOutputBuffers
+        );
         cleanup.add(reader::close);
 
-        Field inputBufferQueueField = reader.getClass().getDeclaredField("availableInputBuffers");
-        inputBufferQueueField.setAccessible(true);
-        BlockingQueue<Integer> availableInputBufferQueue =
-                (BlockingQueue<Integer>) inputBufferQueueField.get(reader);
-
-        assertNotNull(availableInputBufferQueue);
-        boolean flag = availableInputBufferQueue.size() > 0;
-        assertTrue("Available input buffer queue is empty", flag);
+        assertFalse("Available input buffer queue is empty", fakeAvailableInputBuffers.isEmpty());
     }
 
     @Test
-    public void availableOutputBufferQueue_isQueried()
-            throws IOException, XMPException, InterruptedException {
-        BlockingQueue<Integer> availableInputBuffers = new LinkedBlockingQueue<>();
-        BlockingQueue<Bundle> availableOutputBuffers = new LinkedBlockingQueue<>();
-
-        BlockingQueue<Integer> fakeAvailableInputBuffers = mock(LinkedBlockingQueue.class);
-        BlockingQueue<Bundle> fakeAvailableOutputBuffers = mock(LinkedBlockingQueue.class);
-
-        doAnswer((Answer<Void>) invocation -> {
-            int index = invocation.getArgument(0);
-            availableInputBuffers.offer(index);
-            return null;
-        }).when(fakeAvailableInputBuffers).offer(anyInt());
-
-        doAnswer((Answer<Void>) invocation -> {
-            Bundle bufferData = invocation.getArgument(0);
-            availableOutputBuffers.offer(bufferData);
-            return null;
-        }).when(fakeAvailableOutputBuffers).offer(any(Bundle.class));
-
-        doAnswer((Answer<Integer>) invocation -> {
-            long timeout = invocation.getArgument(0);
-            TimeUnit timeUnit = invocation.getArgument(1);
-            int index = availableInputBuffers.poll(timeout, timeUnit);
-            return index;
-        }).when(fakeAvailableInputBuffers).poll(anyLong(), any(TimeUnit.class));
-
-        doAnswer((Answer<Bundle>) invocation -> {
-            long timeout = invocation.getArgument(0);
-            TimeUnit timeUnit = invocation.getArgument(1);
-            Bundle bufferData = availableOutputBuffers.poll(timeout, timeUnit);
-            return bufferData;
-        }).when(fakeAvailableOutputBuffers).poll(anyLong(), any(TimeUnit.class));
+    public void availableOutputBufferQueue_isQueried() throws IOException, XMPException {
+        TrackedLinkedBlockingQueue<Integer> fakeAvailableInputBuffers =
+                new TrackedLinkedBlockingQueue<>();
+        TrackedLinkedBlockingQueue<Bundle> fakeAvailableOutputBuffers =
+                new TrackedLinkedBlockingQueue<>();
 
         MotionPhotoReader reader = MotionPhotoReader.open(
                 fetchAssetFile(filename),
@@ -227,9 +190,9 @@ public class MotionPhotoReaderTest {
         while (reader.hasNextFrame()) {
             reader.nextFrame();
         }
-        verify(fakeAvailableOutputBuffers, times(NUM_FRAMES)).offer(any(Bundle.class));
-        verify(fakeAvailableOutputBuffers, times(NUM_FRAMES))
-                .poll(anyLong(), eq(TimeUnit.MILLISECONDS));
+
+        assertEquals(NUM_FRAMES, fakeAvailableOutputBuffers.getOfferCount());
+        assertEquals(NUM_FRAMES, fakeAvailableOutputBuffers.getPollCount());
     }
 
     @Test
@@ -238,5 +201,46 @@ public class MotionPhotoReaderTest {
         cleanup.add(reader::close);
         Bitmap bmp = reader.getMotionPhotoImageBitmap();
         assertNotNull(bmp);
+    }
+
+    /** Mock LinkedBlockingQueue class to simulate and test input/output buffer queue behaviors. */
+    private static class TrackedLinkedBlockingQueue<E> extends LinkedBlockingQueue<E> {
+
+        private final AtomicInteger offerCount = new AtomicInteger(0);
+        private final AtomicInteger pollCount = new AtomicInteger(0);
+        private final AtomicInteger size = new AtomicInteger(0);
+
+        @Override
+        public boolean offer(E e) {
+            offerCount.incrementAndGet();
+            size.incrementAndGet();
+            return super.offer(e);
+        }
+
+        @Override
+        public E poll() {
+            pollCount.incrementAndGet();
+            size.decrementAndGet();
+            return super.poll();
+        }
+
+        @Override
+        public E poll(long timeout, TimeUnit timeUnit) throws InterruptedException {
+            pollCount.incrementAndGet();
+            size.decrementAndGet();
+            return super.poll(timeout, timeUnit);
+        }
+
+        public int getOfferCount() {
+            return offerCount.get();
+        }
+
+        public int getPollCount() {
+            return pollCount.get();
+        }
+
+        public boolean isEmpty() {
+            return size.get() == 1;
+        }
     }
 }
