@@ -6,30 +6,23 @@ import android.graphics.Color;
 import android.graphics.SurfaceTexture;
 import android.media.MediaExtractor;
 import android.os.Build;
-import android.os.Bundle;
-
-import android.os.Handler;
-import android.os.HandlerThread;
-import android.os.Message;
 
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Surface;
-import android.view.SurfaceHolder;
 import android.view.TextureView;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
+import androidx.annotation.VisibleForTesting;
 
 import com.adobe.internal.xmp.XMPException;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 
 /**
@@ -55,7 +48,6 @@ public class MotionPhotoWidget extends TextureView {
     public MotionPhotoWidget(Context context) {
         super(context);
         autoloop = true;
-
         setup();
     }
 
@@ -151,7 +143,7 @@ public class MotionPhotoWidget extends TextureView {
 
         // Wrap our super class's state with our own.
         SavedState myState = new SavedState(superState);
-        myState.savedTimstampUs = reader.getCurrentTimestamp();
+        myState.savedTimestampUs = reader.getCurrentTimestamp();
         myState.isPaused = this.isPaused;
 
         // Return our state along with our super class's state.
@@ -171,7 +163,7 @@ public class MotionPhotoWidget extends TextureView {
         super.onRestoreInstanceState(savedState.getSuperState());
 
         // Grab our properties out of our SavedState.
-        this.savedTimestampUs = savedState.savedTimstampUs;
+        this.savedTimestampUs = savedState.savedTimestampUs;
         this.isPaused = savedState.isPaused;
     }
 
@@ -250,7 +242,7 @@ public class MotionPhotoWidget extends TextureView {
     }
 
     private static class SavedState extends BaseSavedState {
-        long savedTimstampUs;
+        long savedTimestampUs;
         boolean isPaused;
 
         SavedState(Parcelable superState) {
@@ -260,7 +252,7 @@ public class MotionPhotoWidget extends TextureView {
         @RequiresApi(api = Build.VERSION_CODES.Q)
         private SavedState(Parcel in) {
             super(in);
-            savedTimstampUs = in.readLong();
+            savedTimestampUs = in.readLong();
             isPaused = in.readBoolean();
         }
 
@@ -268,7 +260,7 @@ public class MotionPhotoWidget extends TextureView {
         @Override
         public void writeToParcel(Parcel out, int flags) {
             super.writeToParcel(out, flags);
-            out.writeLong(savedTimstampUs);
+            out.writeLong(savedTimestampUs);
             out.writeBoolean(isPaused);
         }
 
