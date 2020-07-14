@@ -169,7 +169,8 @@ public class MotionPhotoReaderTest {
         );
         cleanup.add(reader::close);
 
-        assertFalse("Available input buffer queue is empty", fakeAvailableInputBuffers.isEmpty());
+        assertFalse("Available input buffer queue is empty",
+                fakeAvailableInputBuffers.isEmpty());
     }
 
     @Test
@@ -240,7 +241,7 @@ public class MotionPhotoReaderTest {
         }
 
         public boolean isEmpty() {
-            return size.get() == 1;
+            return size.get() < 1;
         }
     }
 }
