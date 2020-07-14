@@ -3,6 +3,7 @@ package com.google.android.libraries.motionphotoreader;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
 import android.media.MediaExtractor;
 import android.os.Build;
@@ -31,19 +32,21 @@ import java.util.concurrent.ThreadFactory;
 public class MotionPhotoWidget extends TextureView {
 
     private static final String TAG = "MotionPhotoWidget";
-    private static final Object lock = new Object();
-
-    private ExecutorService executor;
-
-    private MotionPhotoReader reader;
-    private boolean isPaused = true;
-    private SurfaceTexture surfaceTexture;
-    private String filename;
 
     private final boolean autoloop;
+    private ExecutorService executor;
+    private MotionPhotoReader reader;
+    private boolean isPaused = true;
+    private String filename;
     private SurfaceTexture savedSurfaceTexture;
-    private long savedTimestampUs;
     private PlayProcess playProcess;
+
+    /** Fields that are saved for the view state. */
+    private long savedTimestampUs;
+    private int videoWidth;
+    private int videoHeight;
+    private int viewWidth;
+    private int viewHeight;
 
     public MotionPhotoWidget(Context context) {
         super(context);
@@ -79,7 +82,13 @@ public class MotionPhotoWidget extends TextureView {
         setup();
     }
 
+    /**
+     * Sets up the executor, the play/pause process to be executed, and the surface texture
+     * listener. This should only be called in a constructor, and should be called in every
+     * constructor.
+     */
     private void setup() {
+        // Set up the executor and play/pause process to facilitate stopping and starting the video
         playProcess = new PlayProcess();
         executor = Executors.newSingleThreadExecutor(new ThreadFactory() {
             @Override
@@ -93,81 +102,35 @@ public class MotionPhotoWidget extends TextureView {
                 };
             }
         });
-
-        this.setSurfaceTextureListener(new SurfaceTextureListener() {
-            @RequiresApi(api = Build.VERSION_CODES.M)
-            @Override
-            public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-                Log.d(TAG, "Surface texture available");
-                if (savedSurfaceTexture == null) {
-                    savedSurfaceTexture = surface;
-                    try {
-                        reader = MotionPhotoReader.open(filename, new Surface(surface));
-                    } catch (IOException | XMPException e) {
-                        e.printStackTrace();
-                    }
-
-                    // set reader to last saved state
-                    Log.d(TAG, "Seeking to: " + savedTimestampUs + " us");
-                    reader.seekTo(savedTimestampUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
-                    if (!isPaused) {
-                        executor.submit(playProcess);
-                    }
-                }
-            }
-
-            @Override
-            public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-                Log.d(TAG, "Surface texture size changed");
-            }
-
-            @Override
-            public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-                Log.d(TAG, "Surface texture destroyed");
-                reader.close();
-                return (savedSurfaceTexture == null);
-            }
-
-            @Override
-            public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-
-            }
-        });
-        surfaceTexture = this.getSurfaceTexture();
+        this.setSurfaceTextureListener(new WidgetSurfaceTextureListener());
     }
 
     @Override
     public Parcelable onSaveInstanceState() {
-        // Obtain any state that our super class wants to save.
+        // Obtain any state that the super class wants to save
         Parcelable superState = super.onSaveInstanceState();
 
-        // Wrap our super class's state with our own.
+        // Wrap our super class's state with our own
         SavedState myState = new SavedState(superState);
         myState.savedTimestampUs = reader.getCurrentTimestamp();
         myState.isPaused = this.isPaused;
 
-        // Return our state along with our super class's state.
         return myState;
     }
 
 
     @Override
     public void onRestoreInstanceState(Parcelable state) {
-        // Cast the incoming Parcelable to our custom SavedState. We produced
-        // this Parcelable before, so we know what type it is.
         SavedState savedState = (SavedState) state;
-
-        // Let our super class process state before we do because we should
-        // depend on our super class, we shouldn't imply that our super class
-        // might need to depend on us.
         super.onRestoreInstanceState(savedState.getSuperState());
 
-        // Grab our properties out of our SavedState.
+        // Grab properties out of the SavedState
         this.savedTimestampUs = savedState.savedTimestampUs;
         this.isPaused = savedState.isPaused;
     }
 
     public void play() {
+        playProcess = new PlayProcess();
         executor.submit(playProcess);
         isPaused = false;
     }
@@ -194,20 +157,15 @@ public class MotionPhotoWidget extends TextureView {
     }
 
     /**
-     * Show the motion photo JPEG image on the widget surface.
-     * TODO: specify behavior when called while video is playing.
-     */
-    public void showPreview() {
-
-    }
-
-    /**
      * Set the motion photo file to a specified file.
      * @param filename is a string pointing to the motion photo file to play.
      */
     @RequiresApi(api = Build.VERSION_CODES.M)
-    public void setFile(String filename) {
+    public void setFile(String filename) throws IOException, XMPException {
         this.filename = filename;
+        MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(filename);
+        videoWidth = motionPhotoInfo.getWidth();
+        videoHeight = motionPhotoInfo.getHeight();
     }
 
     public boolean isPaused() {
@@ -275,5 +233,84 @@ public class MotionPhotoWidget extends TextureView {
                 return new SavedState[size];
             }
         };
+    }
+
+    private class WidgetSurfaceTextureListener implements SurfaceTextureListener {
+
+        /**
+         * Scales the video to fit inside the view.
+         * @param viewWidth The width of the surface texture, in pixels.
+         * @param viewHeight The height of the surface texture, in pixels.
+         */
+        private void adjustAspectRation(int viewWidth, int viewHeight) {
+            double aspectRatio = (double) videoHeight / videoWidth;
+            int newVideoWidth, newVideoHeight;
+            if (viewHeight > (int) (viewWidth * aspectRatio)) {
+                // limited by narrow width, sp restrict height
+                newVideoWidth = viewWidth;
+                newVideoHeight = (int) (viewWidth * aspectRatio);
+            } else {
+                // limited by short height, so restrict width
+                newVideoWidth = (int) (viewHeight / aspectRatio);
+                newVideoHeight = viewHeight;
+            }
+            int xOffset = (viewWidth - newVideoWidth) / 2;
+            int yOffset = (viewHeight - newVideoHeight) / 2;
+
+            // set transformation matrix to apply to videos played to the surface texture
+            Matrix txform = new Matrix();
+            MotionPhotoWidget.this.getTransform(txform);
+            txform.setScale(
+                    (float) newVideoWidth / viewWidth,
+                    (float) newVideoHeight / viewHeight
+            );
+            txform.postTranslate(xOffset, yOffset);
+            MotionPhotoWidget.this.setTransform(txform);
+        }
+
+        @RequiresApi(api = Build.VERSION_CODES.M)
+        @Override
+        public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+            Log.d(TAG, "Surface texture available");
+            if (savedSurfaceTexture == null) {
+                savedSurfaceTexture = surface;
+
+                // scale the video to fit in the texture view
+                viewWidth = width;
+                viewHeight = height;
+                adjustAspectRation(viewWidth, viewHeight);
+
+                // create a new motion photo reader
+                try {
+                    reader = MotionPhotoReader.open(filename, new Surface(surface));
+                } catch (IOException | XMPException e) {
+                    e.printStackTrace();
+                }
+
+                // restore the previous state
+                Log.d(TAG, "Seeking to: " + savedTimestampUs + " us");
+                reader.seekTo(savedTimestampUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+                if (!isPaused) {
+                    executor.submit(playProcess);
+                }
+            }
+        }
+
+        @Override
+        public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+            Log.d(TAG, "Surface texture size changed");
+        }
+
+        @Override
+        public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+            Log.d(TAG, "Surface texture destroyed");
+            reader.close();
+            return (savedSurfaceTexture == null);
+        }
+
+        @Override
+        public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+
+        }
     }
 }

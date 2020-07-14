@@ -8,6 +8,10 @@ import android.view.View;
 
 import androidx.annotation.RequiresApi;
 
+import com.adobe.internal.xmp.XMPException;
+
+import java.io.IOException;
+
 public class MainActivity extends Activity {
 
     private static final String TAG = "MainActivity";
@@ -28,7 +32,11 @@ public class MainActivity extends Activity {
         filename = "/sdcard/MVIMG_" + FILENAMES[0] + ".jpg";
         MotionPhotoWidget motionPhotoWidget = findViewById(R.id.motion_photo_widget);
         Log.d(TAG, "Motion photo widget set up");
-        motionPhotoWidget.setFile(filename);
+        try {
+            motionPhotoWidget.setFile(filename);
+        } catch (IOException | XMPException e) {
+            e.printStackTrace();
+        }
         Log.d(TAG, "Set file to " + filename);
         motionPhotoWidget.setOnClickListener(new MyOnWidgetClickListener(motionPhotoWidget));
     }
