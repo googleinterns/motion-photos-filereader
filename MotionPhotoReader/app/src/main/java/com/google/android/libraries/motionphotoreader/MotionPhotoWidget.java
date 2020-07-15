@@ -21,6 +21,7 @@ import androidx.annotation.RequiresApi;
 import com.adobe.internal.xmp.XMPException;
 
 import java.io.IOException;
+import java.util.concurrent.CountedCompleter;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -53,7 +54,6 @@ public class MotionPhotoWidget extends TextureView {
     public MotionPhotoWidget(Context context) {
         super(context);
         autoloop = true;
-        Color backgroundColor = Color.valueOf(Color.BLACK);
         initialize();
     }
 
@@ -63,11 +63,6 @@ public class MotionPhotoWidget extends TextureView {
         TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.MotionPhotoWidget,
                 /* defStyleAttr = */ 0,
                 /* defStyleRes = */ 0);
-
-        // Fetch value of “custom:background_color”
-        Color backgroundColor = Color.valueOf(
-                ta.getColor(R.styleable.MotionPhotoWidget_background_color, Color.RED)
-        );
 
         // Fetch value of “custom:timeline_base_color”
         Color timelineBaseColor = Color.valueOf(
@@ -85,20 +80,6 @@ public class MotionPhotoWidget extends TextureView {
         initialize();
     }
 
-    @Override
-    public void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        Log.d(TAG, "attached");
-        executor = Executors.newSingleThreadExecutor();
-    }
-
-    @Override
-    public void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-        Log.d(TAG, "detached");
-        executor.shutdown();
-    }
-
     /**
      * Sets up the executor, the play/pause process to be executed, and the surface texture
      * listener. This should only be called in a constructor, and should be called in every
@@ -109,6 +90,21 @@ public class MotionPhotoWidget extends TextureView {
         // Set up the executor and play/pause process to facilitate stopping and starting the video
         playProcess = new PlayProcess();
         this.setSurfaceTextureListener(new WidgetSurfaceTextureListener());
+    }
+
+
+    @Override
+    public void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        Log.d(TAG, "View attached");
+        executor = Executors.newSingleThreadExecutor();
+    }
+
+    @Override
+    public void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        Log.d(TAG, "View detached");
+        executor.shutdown();
     }
 
     @Override
