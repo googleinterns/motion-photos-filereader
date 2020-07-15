@@ -3,7 +3,6 @@ package com.google.android.libraries.motionphotoreader;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.os.Build;
-import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
@@ -12,16 +11,12 @@ import androidx.annotation.VisibleForTesting;
 import com.adobe.internal.xmp.XMPException;
 import com.adobe.internal.xmp.XMPIterator;
 import com.adobe.internal.xmp.XMPMeta;
-import com.adobe.internal.xmp.options.PropertyOptions;
-import com.adobe.internal.xmp.properties.XMPProperty;
 import com.adobe.internal.xmp.properties.XMPPropertyInfo;
 
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.sql.Struct;
-import java.util.IllegalFormatException;
 
 /**
  * Contains information relevant to extracting frames in a Motion Photo file.
@@ -30,8 +25,8 @@ public class MotionPhotoInfo {
 
     private final static String TAG = "MotionPhotoInfo";
 
-    private static int MOTION_PHOTO_VERSION_V1 = 1;
-    private static int MOTION_PHOTO_VERSION_V2 = 2;
+    private final static int MOTION_PHOTO_VERSION_V1 = 1;
+    private final static int MOTION_PHOTO_VERSION_V2 = 2;
 
     private static final String CAMERA_XMP_NAMESPACE =
             "http://ns.google.com/photos/1.0/camera/";
@@ -108,13 +103,13 @@ public class MotionPhotoInfo {
         int version = getMotionPhotoVersion(meta);
         int videoOffset = 0;
         switch (version) {
-            case 1:
+            case MOTION_PHOTO_VERSION_V1:
                 videoOffset = meta.getPropertyInteger(
                         CAMERA_XMP_NAMESPACE,
                         "MicroVideoOffset"
                 );
                 break;
-            case 2:
+            case MOTION_PHOTO_VERSION_V2:
                 // Iterate through the nodes of the XMP metadata to find the desired item length
                 // and padding properties. The items we are looking for belong in an array with name
                 // "Directory" that is indexed starting at 1. We ignore the first item in the array
@@ -155,7 +150,7 @@ public class MotionPhotoInfo {
      */
     private static int getMotionPhotoVersion(XMPMeta meta) throws XMPException {
         if (meta.doesPropertyExist(CAMERA_XMP_NAMESPACE, "MicroVideo")) {
-            // This is microvideo version file
+            // This is microvideo v1 file
             int microVideo = meta.getPropertyInteger(CAMERA_XMP_NAMESPACE, "MicroVideo");
             if (microVideo == 1) {
                 return 1;
@@ -163,7 +158,7 @@ public class MotionPhotoInfo {
                 return 0;
             }
         } else if (meta.doesPropertyExist(CAMERA_XMP_NAMESPACE, "MotionPhoto")) {
-            // This is a motion photo version file
+            // This is a motion photo v2 file
             int motionPhoto = meta.getPropertyInteger(CAMERA_XMP_NAMESPACE, "MotionPhoto");
             if (motionPhoto == 1) {
                 return 2;
@@ -192,6 +187,7 @@ public class MotionPhotoInfo {
         try (FileInputStream fileInputStream = new FileInputStream(file)) {
             FileDescriptor fd = fileInputStream.getFD();
             extractor.setDataSource(fd, file.length() - videoOffset, videoOffset);
+
             // Find the video track and create an appropriate media decoder
             for (int i = 0; i < extractor.getTrackCount(); i++) {
                 MediaFormat format = extractor.getTrackFormat(i);
