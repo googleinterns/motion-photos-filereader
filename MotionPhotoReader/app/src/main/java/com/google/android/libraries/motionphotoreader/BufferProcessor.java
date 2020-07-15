@@ -139,8 +139,10 @@ class BufferProcessor {
                 timestampUs = bufferData.getLong("TIMESTAMP_US");
                 bufferIndex = bufferData.getInt("BUFFER_INDEX");
                 // TODO: Fix playback speed issues
-                long renderTimestampUs = bufferData.getLong("BASE_TIMESTAMP_US") * US_TO_NS + timestampUs;
-                lowResDecoder.releaseOutputBuffer(bufferIndex, renderTimestampUs * 100_000);
+                long baseTimestampUs = messageData.getLong("BASE_TIMESTAMP_US");
+                long renderTimestampUs = baseTimestampUs + timestampUs;
+                Log.d(TAG,"Base timestamp (Us): " + baseTimestampUs + "  Render Timestamp (Us): " + renderTimestampUs);
+                lowResDecoder.releaseOutputBuffer(bufferIndex, 1_000_000 * renderTimestampUs * US_TO_NS);
                 break;
 
             case MotionPhotoReader.MSG_SEEK_TO_FRAME:

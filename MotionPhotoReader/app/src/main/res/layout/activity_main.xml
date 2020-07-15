@@ -4,12 +4,12 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#000"
     tools:context=".MainActivity">
 
     <com.google.android.libraries.motionphotoreader.MotionPhotoWidget
         android:id="@+id/motion_photo_widget"
         app:autoloop="true"
-        app:background_color="#000"
         app:timeline_base_color="#333"
         app:timeline_fill_color="#ff0000"
         android:layout_width="match_parent"

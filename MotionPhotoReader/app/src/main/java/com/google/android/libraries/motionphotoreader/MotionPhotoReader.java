@@ -13,7 +13,6 @@ import android.util.Log;
 import android.view.Surface;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.VisibleForTesting;
 
@@ -22,7 +21,6 @@ import com.adobe.internal.xmp.XMPException;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -241,11 +239,12 @@ public class MotionPhotoReader {
      * Advances the decoder and extractor by one frame.
      */
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-    public void nextFrame(long baseTimestampUs) {
+    public long nextFrame(long baseTimestampUs) {
         Bundle messageData = new Bundle();
         messageData.putInt("MESSAGE_KEY", MSG_NEXT_FRAME);
         messageData.putLong("BASE_TIMESTAMP_US", baseTimestampUs);
         bufferProcessor.process(messageData);
+        return getCurrentTimestampUs();
     }
 
     /**
@@ -266,7 +265,7 @@ public class MotionPhotoReader {
      * Gets the current video timestamp at which the extractor is set (in microseconds).
      * @return a long representing the current timestamp of the video that the reader is at.
      */
-    public long getCurrentTimestamp() {
+    public long getCurrentTimestampUs() {
         return lowResExtractor.getSampleTime();
     }
 

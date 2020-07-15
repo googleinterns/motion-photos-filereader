@@ -86,8 +86,9 @@ public class MotionPhotoReaderTest {
         cleanup.add(reader::close);
 
         int frameCount = 0;
+        long baseTimestampUs = 0;
         while (reader.hasNextFrame()) {
-            reader.nextFrame();
+            reader.nextFrame(baseTimestampUs);
             frameCount++;
         }
         assertEquals(NUM_FRAMES, frameCount);
@@ -97,7 +98,7 @@ public class MotionPhotoReaderTest {
     public void getCurrentTimestamp_onStart_isCorrect() throws IOException, XMPException {
         MotionPhotoReader reader = MotionPhotoReader.open(fetchAssetFile(filename), null);
         cleanup.add(reader::close);
-        assertEquals(0, reader.getCurrentTimestamp());
+        assertEquals(0, reader.getCurrentTimestampUs());
     }
 
     @Test
@@ -106,9 +107,10 @@ public class MotionPhotoReaderTest {
         cleanup.add(reader::close);
 
         long currentTimestampUs = -1L;
+        long baseTimestampUs = 0;
         while (reader.hasNextFrame()) {
-            long newTimestampUs = reader.getCurrentTimestamp();
-            reader.nextFrame();
+            long newTimestampUs = reader.getCurrentTimestampUs();
+            reader.nextFrame(baseTimestampUs);
             boolean flag = currentTimestampUs < newTimestampUs;
             assertTrue("Timestamp did not increase: "
                     + currentTimestampUs + " vs. " + newTimestampUs,
@@ -124,8 +126,8 @@ public class MotionPhotoReaderTest {
 
         long currentTimestampUs = -1L;
         while (reader.hasNextFrame()) {
-            long newTimestampUs = reader.getCurrentTimestamp();
-            reader.seekTo(reader.getCurrentTimestamp() + SEEK_AMOUNT_US,
+            long newTimestampUs = reader.getCurrentTimestampUs();
+            reader.seekTo(reader.getCurrentTimestampUs() + SEEK_AMOUNT_US,
                     MediaExtractor.SEEK_TO_NEXT_SYNC);
             boolean flag = currentTimestampUs < newTimestampUs;
             assertTrue("Timestamp did not increase: "
@@ -188,8 +190,9 @@ public class MotionPhotoReaderTest {
         );
         cleanup.add(reader::close);
 
+        long baseTimestampUs = 0;
         while (reader.hasNextFrame()) {
-            reader.nextFrame();
+            reader.nextFrame(baseTimestampUs);
         }
 
         assertEquals(NUM_FRAMES, fakeAvailableOutputBuffers.getOfferCount());

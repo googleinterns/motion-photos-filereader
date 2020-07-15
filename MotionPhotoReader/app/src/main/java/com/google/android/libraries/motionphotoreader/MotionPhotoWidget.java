@@ -23,7 +23,6 @@ import com.adobe.internal.xmp.XMPException;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 
 /**
  * An Android app widget to set up a video player for a motion photo file.
@@ -53,7 +52,6 @@ public class MotionPhotoWidget extends TextureView {
     public MotionPhotoWidget(Context context) {
         super(context);
         autoloop = true;
-        Color backgroundColor = Color.valueOf(Color.BLACK);
         initialize();
     }
 
@@ -63,11 +61,6 @@ public class MotionPhotoWidget extends TextureView {
         TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.MotionPhotoWidget,
                 /* defStyleAttr = */ 0,
                 /* defStyleRes = */ 0);
-
-        // Fetch value of “custom:background_color”
-        Color backgroundColor = Color.valueOf(
-                ta.getColor(R.styleable.MotionPhotoWidget_background_color, Color.RED)
-        );
 
         // Fetch value of “custom:timeline_base_color”
         Color timelineBaseColor = Color.valueOf(
@@ -85,20 +78,6 @@ public class MotionPhotoWidget extends TextureView {
         initialize();
     }
 
-    @Override
-    public void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        Log.d(TAG, "attached");
-        executor = Executors.newSingleThreadExecutor();
-    }
-
-    @Override
-    public void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-        Log.d(TAG, "detached");
-        executor.shutdown();
-    }
-
     /**
      * Sets up the executor, the play/pause process to be executed, and the surface texture
      * listener. This should only be called in a constructor, and should be called in every
@@ -111,6 +90,21 @@ public class MotionPhotoWidget extends TextureView {
         this.setSurfaceTextureListener(new WidgetSurfaceTextureListener());
     }
 
+
+    @Override
+    public void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        Log.d(TAG, "View attached");
+        executor = Executors.newSingleThreadExecutor();
+    }
+
+    @Override
+    public void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        Log.d(TAG, "View detached");
+        executor.shutdown();
+    }
+
     @Override
     public Parcelable onSaveInstanceState() {
         // Obtain any state that the super class wants to save
@@ -118,7 +112,7 @@ public class MotionPhotoWidget extends TextureView {
 
         // Wrap our super class's state with our own
         SavedState myState = new SavedState(superState);
-        myState.savedTimestampUs = reader.getCurrentTimestamp();
+        myState.savedTimestampUs = reader.getCurrentTimestampUs();
         myState.isPaused = this.isPaused;
 
         return myState;
@@ -159,7 +153,7 @@ public class MotionPhotoWidget extends TextureView {
      * @return the current timestamp of tthe motion photo reader, in microseconds.
      */
     public long getCurrentTimestampUs() {
-        return reader.getCurrentTimestamp();
+        return reader.getCurrentTimestampUs();
     }
 
     /**
