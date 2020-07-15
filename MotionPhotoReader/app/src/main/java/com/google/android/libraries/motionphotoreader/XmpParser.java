@@ -24,8 +24,8 @@ import java.util.Arrays;
  */
 class XmpParser {
 
-    private static final byte[] OPEN_ARR = "<x:xmpmeta".getBytes();  /* Start of XMP metadata tag */
-    private static final byte[] CLOSE_ARR = "</x:xmpmeta>".getBytes();  /* End of XMP metadata tag */
+    private static final byte[] OPEN_ARR = "<x:xmpmeta".getBytes(); /* Start of XMP metadata tag */
+    private static final byte[] CLOSE_ARR = "</x:xmpmeta>".getBytes(); /* End of XMP metadata tag */
 
     /**
      * Returns the metadata of the Motion Photo file.
@@ -64,8 +64,7 @@ class XmpParser {
                 int closeIdx = Bytes.indexOf(Arrays.copyOfRange(fileData, openIdx, fileData.length),
                         CLOSE_ARR) + openIdx + CLOSE_ARR.length;
 
-                byte[] segArr = Arrays.copyOfRange(fileData, openIdx, closeIdx);
-                return segArr;
+                return Arrays.copyOfRange(fileData, openIdx, closeIdx);
             }
         }
         return new byte[0];
