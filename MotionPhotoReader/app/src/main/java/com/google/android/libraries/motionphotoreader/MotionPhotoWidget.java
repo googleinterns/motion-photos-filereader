@@ -45,6 +45,7 @@ public class MotionPhotoWidget extends TextureView {
     private long savedTimestampUs;
     private int videoWidth;
     private int videoHeight;
+    private int videoRotation;
     private int viewWidth;
     private int viewHeight;
 
@@ -166,6 +167,7 @@ public class MotionPhotoWidget extends TextureView {
         MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(filename);
         videoWidth = motionPhotoInfo.getWidth();
         videoHeight = motionPhotoInfo.getHeight();
+        videoRotation = motionPhotoInfo.getRotation();
     }
 
     public boolean isPaused() {
@@ -243,7 +245,9 @@ public class MotionPhotoWidget extends TextureView {
          * @param viewHeight The height of the surface texture, in pixels.
          */
         private void adjustAspectRation(int viewWidth, int viewHeight) {
-            double aspectRatio = (double) videoHeight / videoWidth;
+            double aspectRatio = (videoRotation > 0) ?
+                    (double) videoWidth / videoHeight : (double) videoHeight / videoWidth;
+            Log.d(TAG, "asepct ratio: " + aspectRatio);
             int newVideoWidth, newVideoHeight;
             if (viewHeight > (int) (viewWidth * aspectRatio)) {
                 // limited by narrow width, sp restrict height
