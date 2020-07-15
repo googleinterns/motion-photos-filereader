@@ -123,7 +123,7 @@ class BufferProcessor {
         int key = messageData.getInt("MESSAGE_KEY");
         Bundle bufferData;
         int bufferIndex;
-        long timestamp;
+        long timestampUs;
         switch (key) {
             case MotionPhotoReader.MSG_NEXT_FRAME:
                 // Get the next available input buffer and read frame data
@@ -136,9 +136,11 @@ class BufferProcessor {
                 // Get the next available output buffer and release frame data
                 // TODO: Consider the case when this call times out and returns null
                 bufferData = getAvailableOutputBufferData();
-                timestamp = bufferData.getLong("TIMESTAMP_US");
+                timestampUs = bufferData.getLong("TIMESTAMP_US");
                 bufferIndex = bufferData.getInt("BUFFER_INDEX");
-                lowResDecoder.releaseOutputBuffer(bufferIndex, timestamp * US_TO_NS);
+                // TODO: Fix playback speed issues
+                long renderTimestampUs = bufferData.getLong("BASE_TIMESTAMP_US") * US_TO_NS + timestampUs;
+                lowResDecoder.releaseOutputBuffer(bufferIndex, renderTimestampUs * 100_000);
                 break;
 
             case MotionPhotoReader.MSG_SEEK_TO_FRAME:
@@ -152,9 +154,9 @@ class BufferProcessor {
 
                 // Get the next available output buffer and release frame data
                 bufferData = getAvailableOutputBufferData();
-                timestamp = bufferData.getLong("TIMESTAMP_US");
+                timestampUs = bufferData.getLong("TIMESTAMP_US");
                 bufferIndex = bufferData.getInt("BUFFER_INDEX");
-                lowResDecoder.releaseOutputBuffer(bufferIndex, timestamp * US_TO_NS);
+                lowResDecoder.releaseOutputBuffer(bufferIndex, timestampUs * US_TO_NS);
                 break;
 
             default:

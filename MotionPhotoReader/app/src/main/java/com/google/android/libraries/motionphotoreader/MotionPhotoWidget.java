@@ -17,7 +17,6 @@ import android.view.TextureView;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
-import androidx.annotation.VisibleForTesting;
 
 import com.adobe.internal.xmp.XMPException;
 
@@ -34,6 +33,7 @@ public class MotionPhotoWidget extends TextureView {
     private static final String TAG = "MotionPhotoWidget";
 
     private final boolean autoloop;
+
     private ExecutorService executor;
     private MotionPhotoReader reader;
     private boolean isPaused = true;
@@ -49,10 +49,12 @@ public class MotionPhotoWidget extends TextureView {
     private int viewWidth;
     private int viewHeight;
 
+    @RequiresApi(api = Build.VERSION_CODES.O)
     public MotionPhotoWidget(Context context) {
         super(context);
         autoloop = true;
-        setup();
+        Color backgroundColor = Color.valueOf(Color.BLACK);
+        initialize();
     }
 
     @RequiresApi(api = Build.VERSION_CODES.O)
@@ -80,7 +82,21 @@ public class MotionPhotoWidget extends TextureView {
         // Fetch value of “custom:autoloop”
         autoloop = ta.getBoolean(R.styleable.MotionPhotoWidget_autoloop, true);
         ta.recycle();
-        setup();
+        initialize();
+    }
+
+    @Override
+    public void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        Log.d(TAG, "attached");
+        executor = Executors.newSingleThreadExecutor();
+    }
+
+    @Override
+    public void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        Log.d(TAG, "detached");
+        executor.shutdown();
     }
 
     /**
@@ -88,21 +104,10 @@ public class MotionPhotoWidget extends TextureView {
      * listener. This should only be called in a constructor, and should be called in every
      * constructor.
      */
-    private void setup() {
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    private void initialize() {
         // Set up the executor and play/pause process to facilitate stopping and starting the video
         playProcess = new PlayProcess();
-        executor = Executors.newSingleThreadExecutor(new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                return new Thread(r) {
-                    @Override
-                    public void interrupt() {
-                        super.interrupt();
-                        playProcess.cancel();
-                    }
-                };
-            }
-        });
         this.setSurfaceTextureListener(new WidgetSurfaceTextureListener());
     }
 
@@ -184,13 +189,15 @@ public class MotionPhotoWidget extends TextureView {
         @Override
         public void run() {
             // start playing video
+            long baseTimestampUs = System.nanoTime() / 1_000;
             while (!exit) {
                 boolean hasNextFrame = reader.hasNextFrame();
                 if (hasNextFrame) {
-                    reader.nextFrame();
+                    reader.nextFrame(baseTimestampUs);
                 } else {
                     if (autoloop) {
                         reader.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+                        baseTimestampUs = System.nanoTime() / 1_000;
                     }
                 }
             }
@@ -224,8 +231,8 @@ public class MotionPhotoWidget extends TextureView {
             out.writeBoolean(isPaused);
         }
 
-        public static final Parcelable.Creator<SavedState> CREATOR
-                = new Parcelable.Creator<SavedState>() {
+        public static final Parcelable.Creator<SavedState> CREATOR =
+                new Parcelable.Creator<SavedState>() {
             @RequiresApi(api = Build.VERSION_CODES.Q)
             public SavedState createFromParcel(Parcel in) {
                 return new SavedState(in);
@@ -313,8 +320,6 @@ public class MotionPhotoWidget extends TextureView {
         }
 
         @Override
-        public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-
-        }
+        public void onSurfaceTextureUpdated(SurfaceTexture surface) {}
     }
 }
