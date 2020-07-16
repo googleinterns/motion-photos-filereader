@@ -21,6 +21,9 @@ class BufferProcessor {
     private static final long TIMEOUT_US = 1000L;
     private static final long US_TO_NS = 1000L;
 
+    private long prevRenderTimestampNs;
+    private long prevTimestampUs;
+
     /**
      * Fields shared with motion photo reader.
      */
@@ -44,6 +47,8 @@ class BufferProcessor {
         this.lowResDecoder = lowResDecoder;
         this.availableInputBuffers = availableInputBuffers;
         this.availableOutputBuffers = availableOutputBuffers;
+        prevRenderTimestampNs = 0;
+        prevTimestampUs = 0;
     }
 
     /**
@@ -138,11 +143,28 @@ class BufferProcessor {
                 bufferData = getAvailableOutputBufferData();
                 timestampUs = bufferData.getLong("TIMESTAMP_US");
                 bufferIndex = bufferData.getInt("BUFFER_INDEX");
+
                 // TODO: Fix playback speed issues
-                long baseTimestampUs = messageData.getLong("BASE_TIMESTAMP_US");
-                long renderTimestampUs = baseTimestampUs + timestampUs;
-                Log.d(TAG,"Base timestamp (Us): " + baseTimestampUs + "  Render Timestamp (Us): " + renderTimestampUs);
-                lowResDecoder.releaseOutputBuffer(bufferIndex, 1_000_000 * renderTimestampUs * US_TO_NS);
+                // Compute the delay in render timestamp between the current frame and the previous
+                // frame.
+                long frameDeltaUs = timestampUs - prevTimestampUs;
+                if (frameDeltaUs <= 0) {
+                    frameDeltaUs = 1_000_000 / 30;
+                }
+                Log.d(TAG, "Frame delta: " + frameDeltaUs);
+                // Set the previous timestamp ("zero out" the timestamps) to the current system
+                // timestamp if it has not been set yet (i.e. equals zero).
+                if (prevRenderTimestampNs == 0) {
+                    prevRenderTimestampNs = System.nanoTime();
+                }
+                long renderTimestampNs = prevRenderTimestampNs + frameDeltaUs * US_TO_NS;
+                Log.d(TAG, "Render timestamp: " + renderTimestampNs);
+                if (renderTimestampNs < System.nanoTime()) {
+                    renderTimestampNs = System.nanoTime() + frameDeltaUs * US_TO_NS;
+                }
+                lowResDecoder.releaseOutputBuffer(bufferIndex, renderTimestampNs);
+                prevTimestampUs = timestampUs;
+                prevRenderTimestampNs = renderTimestampNs;
                 break;
 
             case MotionPhotoReader.MSG_SEEK_TO_FRAME:
@@ -158,7 +180,13 @@ class BufferProcessor {
                 bufferData = getAvailableOutputBufferData();
                 timestampUs = bufferData.getLong("TIMESTAMP_US");
                 bufferIndex = bufferData.getInt("BUFFER_INDEX");
-                lowResDecoder.releaseOutputBuffer(bufferIndex, timestampUs * US_TO_NS);
+
+                renderTimestampNs = System.nanoTime();
+                lowResDecoder.releaseOutputBuffer(bufferIndex, renderTimestampNs);
+
+                // Reset the previous timestamp and previous render timestamp
+                prevTimestampUs = timestampUs;
+                prevRenderTimestampNs = renderTimestampNs;
                 break;
 
             default:

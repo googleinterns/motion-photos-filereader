@@ -86,9 +86,8 @@ public class MotionPhotoReaderTest {
         cleanup.add(reader::close);
 
         int frameCount = 0;
-        long baseTimestampUs = 0;
         while (reader.hasNextFrame()) {
-            reader.nextFrame(baseTimestampUs);
+            reader.nextFrame();
             frameCount++;
         }
         assertEquals(NUM_FRAMES, frameCount);
@@ -107,10 +106,9 @@ public class MotionPhotoReaderTest {
         cleanup.add(reader::close);
 
         long currentTimestampUs = -1L;
-        long baseTimestampUs = 0;
         while (reader.hasNextFrame()) {
             long newTimestampUs = reader.getCurrentTimestampUs();
-            reader.nextFrame(baseTimestampUs);
+            reader.nextFrame();
             boolean flag = currentTimestampUs < newTimestampUs;
             assertTrue("Timestamp did not increase: "
                     + currentTimestampUs + " vs. " + newTimestampUs,
@@ -190,9 +188,8 @@ public class MotionPhotoReaderTest {
         );
         cleanup.add(reader::close);
 
-        long baseTimestampUs = 0;
         while (reader.hasNextFrame()) {
-            reader.nextFrame(baseTimestampUs);
+            reader.nextFrame();
         }
 
         assertEquals(NUM_FRAMES, fakeAvailableOutputBuffers.getOfferCount());

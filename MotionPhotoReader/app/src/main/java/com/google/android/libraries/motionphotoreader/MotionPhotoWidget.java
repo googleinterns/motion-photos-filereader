@@ -21,6 +21,7 @@ import androidx.annotation.RequiresApi;
 import com.adobe.internal.xmp.XMPException;
 
 import java.io.IOException;
+import java.util.concurrent.CountedCompleter;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -183,15 +184,12 @@ public class MotionPhotoWidget extends TextureView {
         @Override
         public void run() {
             // start playing video
-            long baseTimestampUs = System.nanoTime() / 1_000;
             while (!exit) {
-                boolean hasNextFrame = reader.hasNextFrame();
-                if (hasNextFrame) {
-                    reader.nextFrame(baseTimestampUs);
+                if (reader.hasNextFrame()) {
+                    reader.nextFrame();
                 } else {
                     if (autoloop) {
                         reader.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
-                        baseTimestampUs = System.nanoTime() / 1_000;
                     }
                 }
             }

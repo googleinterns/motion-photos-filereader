@@ -239,12 +239,10 @@ public class MotionPhotoReader {
      * Advances the decoder and extractor by one frame.
      */
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-    public long nextFrame(long baseTimestampUs) {
+    public void nextFrame() {
         Bundle messageData = new Bundle();
         messageData.putInt("MESSAGE_KEY", MSG_NEXT_FRAME);
-        messageData.putLong("BASE_TIMESTAMP_US", baseTimestampUs);
         bufferProcessor.process(messageData);
-        return getCurrentTimestampUs();
     }
 
     /**
