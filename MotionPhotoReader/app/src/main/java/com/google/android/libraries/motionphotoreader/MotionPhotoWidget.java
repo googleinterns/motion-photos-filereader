@@ -14,7 +14,9 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Surface;
 import android.view.TextureView;
+import android.view.View;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
@@ -95,6 +97,23 @@ public class MotionPhotoWidget extends TextureView {
         this.setSurfaceTextureListener(new WidgetSurfaceTextureListener());
     }
 
+    @Override
+    protected void onVisibilityChanged(@NonNull View changedView, int visibility) {
+        super.onVisibilityChanged(changedView, visibility);
+        switch (visibility) {
+            case VISIBLE:
+                Log.d(TAG, "View is visible");
+                if (!isPaused) {
+                    play();
+                }
+                break;
+            case INVISIBLE:
+            case GONE:
+                Log.d(TAG, "View is invisible or gone");
+                playProcess.cancel();
+                break;
+        }
+    }
 
     @Override
     public void onAttachedToWindow() {
