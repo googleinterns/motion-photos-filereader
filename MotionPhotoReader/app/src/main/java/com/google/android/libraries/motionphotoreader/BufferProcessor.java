@@ -3,6 +3,7 @@ package com.google.android.libraries.motionphotoreader;
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.annotation.RequiresApi;
@@ -155,8 +156,9 @@ class BufferProcessor {
                 // Set the previous timestamp ("zero out" the timestamps) to the current system
                 // timestamp if it has not been set yet (i.e. equals zero).
                 long renderTimestampNs;
-                if (prevRenderTimestampNs == 0 || System.nanoTime() < prevRenderTimestampNs) { // overflow
-                    renderTimestampNs = System.nanoTime() + frameDeltaUs * US_TO_NS;
+                if (prevRenderTimestampNs == 0) {
+                    renderTimestampNs =
+                            SystemClock.elapsedRealtimeNanos() + frameDeltaUs * US_TO_NS;
                 } else {
                     renderTimestampNs = prevRenderTimestampNs + frameDeltaUs * US_TO_NS;
                 }
@@ -164,7 +166,6 @@ class BufferProcessor {
                     Log.d(TAG, "render timestamp adjusted");
                     renderTimestampNs = System.nanoTime() + frameDeltaUs * US_TO_NS;
                 }
-                Log.d(TAG, "Render - system: " + (renderTimestampNs - System.nanoTime()) / 1000000 + " ms");
                 lowResDecoder.releaseOutputBuffer(bufferIndex, renderTimestampNs);
                 prevTimestampUs = timestampUs;
                 prevRenderTimestampNs = renderTimestampNs;
