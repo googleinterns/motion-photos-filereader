@@ -33,6 +33,7 @@ public class MotionPhotoWidget extends TextureView {
     private static final String TAG = "MotionPhotoWidget";
 
     private final boolean autoloop;
+    private final boolean fill;
 
     private ExecutorService executor;
     private MotionPhotoReader reader;
@@ -53,6 +54,7 @@ public class MotionPhotoWidget extends TextureView {
     public MotionPhotoWidget(Context context) {
         super(context);
         autoloop = true;
+        fill = false;
         initialize();
     }
 
@@ -75,6 +77,8 @@ public class MotionPhotoWidget extends TextureView {
 
         // Fetch value of “custom:autoloop”
         autoloop = ta.getBoolean(R.styleable.MotionPhotoWidget_autoloop, true);
+        // Fetch value of “custom:autoloop”
+        fill = ta.getBoolean(R.styleable.MotionPhotoWidget_fill, false);
         ta.recycle();
         initialize();
     }
@@ -249,13 +253,23 @@ public class MotionPhotoWidget extends TextureView {
             Log.d(TAG, "asepct ratio: " + aspectRatio);
             int newVideoWidth, newVideoHeight;
             if (viewHeight > (int) (viewWidth * aspectRatio)) {
-                // limited by narrow width, sp restrict height
-                newVideoWidth = viewWidth;
-                newVideoHeight = (int) (viewWidth * aspectRatio);
+                // limited by narrow width
+                if (fill) {
+                    newVideoWidth = (int) (viewHeight / aspectRatio);
+                    newVideoHeight = viewHeight;
+                } else {
+                    newVideoWidth = viewWidth;
+                    newVideoHeight = (int) (viewWidth * aspectRatio);
+                }
             } else {
-                // limited by short height, so restrict width
-                newVideoWidth = (int) (viewHeight / aspectRatio);
-                newVideoHeight = viewHeight;
+                // limited by short height
+                if (fill) {
+                    newVideoWidth = viewWidth;
+                    newVideoHeight = (int) (viewWidth * aspectRatio);
+                } else{
+                    newVideoWidth = (int) (viewHeight / aspectRatio);
+                    newVideoHeight = viewHeight;
+                }
             }
             int xOffset = (viewWidth - newVideoWidth) / 2;
             int yOffset = (viewHeight - newVideoHeight) / 2;
