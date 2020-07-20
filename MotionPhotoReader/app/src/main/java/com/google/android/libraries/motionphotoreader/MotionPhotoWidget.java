@@ -107,29 +107,24 @@ public class MotionPhotoWidget extends SurfaceView {
             @Override
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
                 Log.d(TAG, "Surface changed");
-                if (savedSurface == null) {
-                    savedSurface = holder.getSurface();
+                Log.d(TAG, "Surface changed");
+                // scale the video to fit in the texture view
+                viewWidth = width;
+                viewHeight = height;
+                adjustAspectRation(viewWidth, viewHeight);
 
-                    // scale the video to fit in the texture view
-                    viewWidth = width;
-                    viewHeight = height;
-                    adjustAspectRation(viewWidth, viewHeight);
+                // create a new motion photo reader
+                try {
+                    reader = MotionPhotoReader.open(filename, holder.getSurface());
+                    Log.d(TAG, "New motion photo reader created");
+                } catch (IOException | XMPException e) {
+                    e.printStackTrace();
+                }
 
-                    // create a new motion photo reader
-                    if (reader == null) {
-                        try {
-                            reader = MotionPhotoReader.open(filename, savedSurface);
-                            Log.d(TAG, "New motion photo reader created");
-                        } catch (IOException | XMPException e) {
-                            e.printStackTrace();
-                        }
-                    }
-
-                    // continue playing the video if not in paused state
-                    reader.seekTo(savedTimestampUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
-                    if (!isPaused) {
-                        executor.submit(playProcess);
-                    }
+                // continue playing the video if not in paused state
+                reader.seekTo(savedTimestampUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+                if (!isPaused) {
+                    play();
                 }
             }
 
@@ -141,6 +136,12 @@ public class MotionPhotoWidget extends SurfaceView {
         });
     }
 
+    /**
+     * Changes the aspect ratio of the video played to the surface so that it has the aspect ratio
+     * of the original video.
+     * @param viewWidth The width of the surface view, in pixels.
+     * @param viewHeight The height of the surface view, in pixels.
+     */
     private void adjustAspectRation(int viewWidth, int viewHeight) {
         double aspectRatio = (videoRotation > 0) ?
                 (double) videoWidth / videoHeight : (double) videoHeight / videoWidth;
@@ -171,7 +172,7 @@ public class MotionPhotoWidget extends SurfaceView {
         // set transformation matrix to apply to videos played to the surface texture
         Matrix txform = new Matrix();
         txform.set(this.getMatrix());
-        txform.setScale(
+        txform.postScale(
                 (float) newVideoWidth / viewWidth,
                 (float) newVideoHeight / viewHeight
         );
@@ -188,6 +189,7 @@ public class MotionPhotoWidget extends SurfaceView {
             case INVISIBLE:
             case GONE:
                 Log.d(TAG, "View is invisible or gone");
+                reader.close();
                 break;
         }
     }
@@ -204,6 +206,7 @@ public class MotionPhotoWidget extends SurfaceView {
         super.onDetachedFromWindow();
         Log.d(TAG, "View detached");
         executor.shutdown();
+        reader.close();
     }
 
     @Override
