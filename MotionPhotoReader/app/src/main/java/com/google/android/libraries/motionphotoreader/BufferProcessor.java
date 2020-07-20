@@ -158,7 +158,7 @@ class BufferProcessor {
                 long renderTimestampNs;
                 if (prevRenderTimestampNs == 0) {
                     renderTimestampNs =
-                            SystemClock.elapsedRealtimeNanos() + frameDeltaUs * US_TO_NS;
+                            System.nanoTime() + frameDeltaUs * US_TO_NS;
                 } else {
                     renderTimestampNs = prevRenderTimestampNs + frameDeltaUs * US_TO_NS;
                 }
@@ -185,12 +185,11 @@ class BufferProcessor {
                 timestampUs = bufferData.getLong("TIMESTAMP_US");
                 bufferIndex = bufferData.getInt("BUFFER_INDEX");
 
-                renderTimestampNs = System.nanoTime();
+                renderTimestampNs = prevRenderTimestampNs;
                 lowResDecoder.releaseOutputBuffer(bufferIndex, renderTimestampNs);
 
                 // Reset the previous timestamp and previous render timestamp
                 prevTimestampUs = timestampUs;
-                prevRenderTimestampNs = renderTimestampNs;
                 break;
 
             default:

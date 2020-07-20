@@ -13,7 +13,8 @@ import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Surface;
-import android.view.TextureView;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.View;
 
 import androidx.annotation.NonNull;
@@ -23,14 +24,13 @@ import androidx.annotation.RequiresApi;
 import com.adobe.internal.xmp.XMPException;
 
 import java.io.IOException;
-import java.util.concurrent.CountedCompleter;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
  * An Android app widget to set up a video player for a motion photo file.
  */
-public class MotionPhotoWidget extends TextureView {
+public class MotionPhotoWidget extends SurfaceView {
 
     private static final String TAG = "MotionPhotoWidget";
 
@@ -41,7 +41,8 @@ public class MotionPhotoWidget extends TextureView {
     private MotionPhotoReader reader;
     private boolean isPaused = true;
     private String filename;
-    private SurfaceTexture savedSurfaceTexture;
+    private SurfaceHolder surfaceHolder;
+    private Surface savedSurface;
     private PlayProcess playProcess;
 
     /** Fields that are saved for the view state. */
@@ -94,7 +95,87 @@ public class MotionPhotoWidget extends TextureView {
     private void initialize() {
         // Set up the executor and play/pause process to facilitate stopping and starting the video
         playProcess = new PlayProcess();
-        this.setSurfaceTextureListener(new WidgetSurfaceTextureListener());
+
+        surfaceHolder = this.getHolder();
+        surfaceHolder.addCallback(new SurfaceHolder.Callback() {
+            @Override
+            public void surfaceCreated(SurfaceHolder holder) {
+                Log.d(TAG, "Surface created");
+            }
+
+            @RequiresApi(api = 23)
+            @Override
+            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+                Log.d(TAG, "Surface changed");
+                if (savedSurface == null) {
+                    savedSurface = holder.getSurface();
+
+                    // scale the video to fit in the texture view
+                    viewWidth = width;
+                    viewHeight = height;
+                    adjustAspectRation(viewWidth, viewHeight);
+
+                    // create a new motion photo reader
+                    if (reader == null) {
+                        try {
+                            reader = MotionPhotoReader.open(filename, savedSurface);
+                            Log.d(TAG, "New motion photo reader created");
+                        } catch (IOException | XMPException e) {
+                            e.printStackTrace();
+                        }
+                    }
+
+                    // continue playing the video if not in paused state
+                    reader.seekTo(savedTimestampUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+                    if (!isPaused) {
+                        executor.submit(playProcess);
+                    }
+                }
+            }
+
+            @Override
+            public void surfaceDestroyed(SurfaceHolder holder) {
+                Log.d(TAG, "Surface destroyed");
+                playProcess.cancel();
+            }
+        });
+    }
+
+    private void adjustAspectRation(int viewWidth, int viewHeight) {
+        double aspectRatio = (videoRotation > 0) ?
+                (double) videoWidth / videoHeight : (double) videoHeight / videoWidth;
+        Log.d(TAG, "asepct ratio: " + aspectRatio);
+        int newVideoWidth, newVideoHeight;
+        if (viewHeight > (int) (viewWidth * aspectRatio)) {
+            // limited by narrow width
+            if (fill) {
+                newVideoWidth = (int) (viewHeight / aspectRatio);
+                newVideoHeight = viewHeight;
+            } else {
+                newVideoWidth = viewWidth;
+                newVideoHeight = (int) (viewWidth * aspectRatio);
+            }
+        } else {
+            // limited by short height
+            if (fill) {
+                newVideoWidth = viewWidth;
+                newVideoHeight = (int) (viewWidth * aspectRatio);
+            } else{
+                newVideoWidth = (int) (viewHeight / aspectRatio);
+                newVideoHeight = viewHeight;
+            }
+        }
+        int xOffset = (viewWidth - newVideoWidth) / 2;
+        int yOffset = (viewHeight - newVideoHeight) / 2;
+
+        // set transformation matrix to apply to videos played to the surface texture
+        Matrix txform = new Matrix();
+        txform.set(this.getMatrix());
+        txform.setScale(
+                (float) newVideoWidth / viewWidth,
+                (float) newVideoHeight / viewHeight
+        );
+        txform.postTranslate(xOffset, yOffset);
     }
 
     @Override
@@ -103,14 +184,10 @@ public class MotionPhotoWidget extends TextureView {
         switch (visibility) {
             case VISIBLE:
                 Log.d(TAG, "View is visible");
-                if (!isPaused) {
-                    play();
-                }
                 break;
             case INVISIBLE:
             case GONE:
                 Log.d(TAG, "View is invisible or gone");
-                playProcess.cancel();
                 break;
         }
     }
@@ -131,6 +208,7 @@ public class MotionPhotoWidget extends TextureView {
 
     @Override
     public Parcelable onSaveInstanceState() {
+        Log.d(TAG, "Saving instance state");
         // Obtain any state that the super class wants to save
         Parcelable superState = super.onSaveInstanceState();
 
@@ -145,6 +223,7 @@ public class MotionPhotoWidget extends TextureView {
 
     @Override
     public void onRestoreInstanceState(Parcelable state) {
+        Log.d(TAG, "Restoring instance state");
         SavedState savedState = (SavedState) state;
         super.onRestoreInstanceState(savedState.getSuperState());
 
@@ -257,94 +336,5 @@ public class MotionPhotoWidget extends TextureView {
                 return new SavedState[size];
             }
         };
-    }
-
-    private class WidgetSurfaceTextureListener implements SurfaceTextureListener {
-
-        /**
-         * Scales the video to fit inside the view.
-         * @param viewWidth The width of the surface texture, in pixels.
-         * @param viewHeight The height of the surface texture, in pixels.
-         */
-        private void adjustAspectRation(int viewWidth, int viewHeight) {
-            double aspectRatio = (videoRotation > 0) ?
-                    (double) videoWidth / videoHeight : (double) videoHeight / videoWidth;
-            Log.d(TAG, "asepct ratio: " + aspectRatio);
-            int newVideoWidth, newVideoHeight;
-            if (viewHeight > (int) (viewWidth * aspectRatio)) {
-                // limited by narrow width
-                if (fill) {
-                    newVideoWidth = (int) (viewHeight / aspectRatio);
-                    newVideoHeight = viewHeight;
-                } else {
-                    newVideoWidth = viewWidth;
-                    newVideoHeight = (int) (viewWidth * aspectRatio);
-                }
-            } else {
-                // limited by short height
-                if (fill) {
-                    newVideoWidth = viewWidth;
-                    newVideoHeight = (int) (viewWidth * aspectRatio);
-                } else{
-                    newVideoWidth = (int) (viewHeight / aspectRatio);
-                    newVideoHeight = viewHeight;
-                }
-            }
-            int xOffset = (viewWidth - newVideoWidth) / 2;
-            int yOffset = (viewHeight - newVideoHeight) / 2;
-
-            // set transformation matrix to apply to videos played to the surface texture
-            Matrix txform = new Matrix();
-            MotionPhotoWidget.this.getTransform(txform);
-            txform.setScale(
-                    (float) newVideoWidth / viewWidth,
-                    (float) newVideoHeight / viewHeight
-            );
-            txform.postTranslate(xOffset, yOffset);
-            MotionPhotoWidget.this.setTransform(txform);
-        }
-
-        @RequiresApi(api = Build.VERSION_CODES.M)
-        @Override
-        public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-            Log.d(TAG, "Surface texture available");
-            if (savedSurfaceTexture == null) {
-                savedSurfaceTexture = surface;
-
-                // scale the video to fit in the texture view
-                viewWidth = width;
-                viewHeight = height;
-                adjustAspectRation(viewWidth, viewHeight);
-
-                // create a new motion photo reader
-                try {
-                    reader = MotionPhotoReader.open(filename, new Surface(surface));
-                } catch (IOException | XMPException e) {
-                    e.printStackTrace();
-                }
-
-                // restore the previous state
-                Log.d(TAG, "Seeking to: " + savedTimestampUs + " us");
-                reader.seekTo(savedTimestampUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
-                if (!isPaused) {
-                    executor.submit(playProcess);
-                }
-            }
-        }
-
-        @Override
-        public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-            Log.d(TAG, "Surface texture size changed");
-        }
-
-        @Override
-        public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-            Log.d(TAG, "Surface texture destroyed");
-            reader.close();
-            return (savedSurfaceTexture == null);
-        }
-
-        @Override
-        public void onSurfaceTextureUpdated(SurfaceTexture surface) {}
     }
 }
