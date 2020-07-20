@@ -5,23 +5,18 @@ import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-
 import androidx.annotation.RequiresApi;
+import com.google.common.io.ByteStreams;
 
-import com.adobe.internal.xmp.XMPException;
-
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 public class MainActivity extends Activity {
 
     private static final String TAG = "MainActivity";
-    private static final String[] FILENAMES = { // replace these with appropriate file access
-            "20200621_200240",
-            "20200616_124008",
-            "20200621_184700"
-    };
-
-    private String filename;
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
@@ -29,33 +24,37 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        filename = "/sdcard/MVIMG_" + FILENAMES[0] + ".jpg";
         MotionPhotoWidget motionPhotoWidget = findViewById(R.id.motion_photo_widget);
         Log.d(TAG, "Motion photo widget set up");
-        try {
-            motionPhotoWidget.setFile(filename);
-        } catch (IOException | XMPException e) {
-            e.printStackTrace();
-        }
-        Log.d(TAG, "Set file to " + filename);
-        motionPhotoWidget.setOnClickListener(new MyOnWidgetClickListener(motionPhotoWidget));
-    }
+        motionPhotoWidget.setFile(fetchRawFile(R.raw.v1, "motionPhotoV1", "jpg"));
 
-    private class MyOnWidgetClickListener implements View.OnClickListener {
-        private MotionPhotoWidget motionPhotoWidget;
-
-        public MyOnWidgetClickListener(MotionPhotoWidget motionPhotoWidget) {
-            this.motionPhotoWidget = motionPhotoWidget;
-        }
-
-        @RequiresApi(api = 28)
-        @Override
-        public void onClick(View v) {
+        // Add play/pause functionality on tap
+        motionPhotoWidget.setOnClickListener((View v) -> {
             if (motionPhotoWidget.isPaused()) {
                 motionPhotoWidget.play();
             } else {
                 motionPhotoWidget.pause();
             }
+        });
+    }
+
+    private File fetchRawFile(int id, String prefix, String suffix) {
+        InputStream input = getResources().openRawResource(id);
+        File file = null;
+        try {
+            file = File.createTempFile(prefix, suffix);
+        } catch (IOException e) {
+            Log.e(TAG, "Error fetching raw file", e);
+        }
+        writeBytesToFile(input, file);
+        return file;
+    }
+
+    private static void writeBytesToFile(InputStream input, File file) {
+        try (OutputStream output = new FileOutputStream(file)) {
+            ByteStreams.copy(input, output);
+        } catch (IOException e) {
+            Log.e(TAG, "Error writing file", e);
         }
     }
 }

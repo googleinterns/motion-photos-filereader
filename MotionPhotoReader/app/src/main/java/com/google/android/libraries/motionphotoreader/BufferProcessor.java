@@ -3,7 +3,6 @@ package com.google.android.libraries.motionphotoreader;
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.os.Bundle;
-import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.annotation.RequiresApi;
@@ -21,6 +20,7 @@ class BufferProcessor {
     private static final String TAG = "BufferProcessor";
     private static final long TIMEOUT_US = 1000L;
     private static final long US_TO_NS = 1000L;
+    private static final long THIRTY_FPS_NS = 1_000_000_000 / 30;
 
     private long prevRenderTimestampNs;
     private long prevTimestampUs;
@@ -148,23 +148,22 @@ class BufferProcessor {
                 // TODO: Fix playback speed issues
                 // Compute the delay in render timestamp between the current frame and the previous
                 // frame.
-                long frameDeltaUs = timestampUs - prevTimestampUs;
-                if (frameDeltaUs <= 0) {
-                    frameDeltaUs = 1_000_000 / 30;
+                long frameDeltaNs = (timestampUs - prevTimestampUs) * US_TO_NS;
+                if (frameDeltaNs <= 0) {
+                    frameDeltaNs = THIRTY_FPS_NS;
                 }
-                Log.d(TAG, "Frame delta: " + frameDeltaUs);
                 // Set the previous timestamp ("zero out" the timestamps) to the current system
                 // timestamp if it has not been set yet (i.e. equals zero).
                 long renderTimestampNs;
                 long currentTimestampNs = System.nanoTime();
                 if (prevRenderTimestampNs == 0) {
-                    renderTimestampNs = currentTimestampNs + frameDeltaUs * US_TO_NS;
+                    renderTimestampNs = currentTimestampNs + frameDeltaNs;
                 } else {
-                    renderTimestampNs = prevRenderTimestampNs + frameDeltaUs * US_TO_NS;
+                    renderTimestampNs = prevRenderTimestampNs + frameDeltaNs;
                 }
+                // Rebase the render timestamp if it has drifted too far behind
                 if (renderTimestampNs < currentTimestampNs) {
-                    Log.d(TAG, "render timestamp adjusted");
-                    renderTimestampNs = currentTimestampNs + frameDeltaUs * US_TO_NS;
+                    renderTimestampNs = currentTimestampNs + frameDeltaNs;
                 }
                 lowResDecoder.releaseOutputBuffer(bufferIndex, renderTimestampNs);
                 prevTimestampUs = timestampUs;

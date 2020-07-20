@@ -3,17 +3,13 @@ package com.google.android.libraries.motionphotoreader;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Color;
-import android.graphics.Matrix;
-import android.graphics.SurfaceTexture;
 import android.media.MediaExtractor;
-import android.opengl.GLSurfaceView;
 import android.os.Build;
 
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.util.Log;
-import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
@@ -24,6 +20,7 @@ import androidx.annotation.RequiresApi;
 
 import com.adobe.internal.xmp.XMPException;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -31,7 +28,7 @@ import java.util.concurrent.Executors;
 /**
  * An Android app widget to set up a video player for a motion photo file.
  */
-public class MotionPhotoWidget extends GLSurfaceView {
+public class MotionPhotoWidget extends SurfaceView {
 
     private static final String TAG = "MotionPhotoWidget";
 
@@ -40,16 +37,13 @@ public class MotionPhotoWidget extends GLSurfaceView {
 
     private ExecutorService executor;
     private MotionPhotoReader reader;
-    private String filename;
+    private File file;
     private SurfaceHolder surfaceHolder;
     private PlayProcess playProcess;
 
     /** Fields that are saved for the view state. */
     private long savedTimestampUs;
     private boolean isPaused = true;
-
-    /** OpenGL fields. */
-    private boolean rendererSet;
 
     @RequiresApi(api = Build.VERSION_CODES.O)
     public MotionPhotoWidget(Context context) {
@@ -105,11 +99,9 @@ public class MotionPhotoWidget extends GLSurfaceView {
             @Override
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
                 Log.d(TAG, "Surface changed");
-                Log.d(TAG, "Surface changed");
-
                 // create a new motion photo reader
                 try {
-                    reader = MotionPhotoReader.open(filename, holder.getSurface());
+                    reader = MotionPhotoReader.open(file, holder.getSurface());
                     Log.d(TAG, "New motion photo reader created");
                 } catch (IOException | XMPException e) {
                     Log.e(TAG, "Exception occurred while opening file", e);
@@ -128,15 +120,6 @@ public class MotionPhotoWidget extends GLSurfaceView {
                 playProcess.cancel();
             }
         });
-    }
-
-    private void eglSetup() {
-        // Request an OpenGL ES 2.0 compatible context
-        this.setEGLContextClientVersion(3);
-
-        // Assign the renderer
-        this.setRenderer(new WidgetOpenGLRenderer());
-        rendererSet = true;
     }
 
     @Override
@@ -225,8 +208,17 @@ public class MotionPhotoWidget extends GLSurfaceView {
      * @param filename is a string pointing to the motion photo file to play.
      */
     @RequiresApi(api = Build.VERSION_CODES.M)
-    public void setFile(String filename) throws IOException, XMPException {
-        this.filename = filename;
+    public void setFile(String filename) {
+        this.file = new File(filename);
+    }
+
+    /**
+     * Set the motion photo file to a specified file.
+     * @param file is the motion photo file to play.
+     */
+    @RequiresApi(api = Build.VERSION_CODES.M)
+    public void setFile(File file) {
+        this.file = file;
     }
 
     public boolean isPaused() {
