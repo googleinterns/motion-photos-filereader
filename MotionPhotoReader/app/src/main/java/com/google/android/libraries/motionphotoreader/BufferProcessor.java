@@ -156,15 +156,15 @@ class BufferProcessor {
                 // Set the previous timestamp ("zero out" the timestamps) to the current system
                 // timestamp if it has not been set yet (i.e. equals zero).
                 long renderTimestampNs;
+                long currentTimestampNs = System.nanoTime();
                 if (prevRenderTimestampNs == 0) {
-                    renderTimestampNs =
-                            System.nanoTime() + frameDeltaUs * US_TO_NS;
+                    renderTimestampNs = currentTimestampNs + frameDeltaUs * US_TO_NS;
                 } else {
                     renderTimestampNs = prevRenderTimestampNs + frameDeltaUs * US_TO_NS;
                 }
-                if (renderTimestampNs < System.nanoTime()) {
+                if (renderTimestampNs < currentTimestampNs) {
                     Log.d(TAG, "render timestamp adjusted");
-                    renderTimestampNs = System.nanoTime() + frameDeltaUs * US_TO_NS;
+                    renderTimestampNs = currentTimestampNs + frameDeltaUs * US_TO_NS;
                 }
                 lowResDecoder.releaseOutputBuffer(bufferIndex, renderTimestampNs);
                 prevTimestampUs = timestampUs;

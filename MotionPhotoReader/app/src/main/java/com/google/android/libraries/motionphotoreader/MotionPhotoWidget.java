@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
 import android.media.MediaExtractor;
+import android.opengl.GLSurfaceView;
 import android.os.Build;
 
 import android.os.Parcel;
@@ -30,7 +31,7 @@ import java.util.concurrent.Executors;
 /**
  * An Android app widget to set up a video player for a motion photo file.
  */
-public class MotionPhotoWidget extends SurfaceView {
+public class MotionPhotoWidget extends GLSurfaceView {
 
     private static final String TAG = "MotionPhotoWidget";
 
@@ -39,19 +40,16 @@ public class MotionPhotoWidget extends SurfaceView {
 
     private ExecutorService executor;
     private MotionPhotoReader reader;
-    private boolean isPaused = true;
     private String filename;
     private SurfaceHolder surfaceHolder;
-    private Surface savedSurface;
     private PlayProcess playProcess;
 
     /** Fields that are saved for the view state. */
     private long savedTimestampUs;
-    private int videoWidth;
-    private int videoHeight;
-    private int videoRotation;
-    private int viewWidth;
-    private int viewHeight;
+    private boolean isPaused = true;
+
+    /** OpenGL fields. */
+    private boolean rendererSet;
 
     @RequiresApi(api = Build.VERSION_CODES.O)
     public MotionPhotoWidget(Context context) {
@@ -108,17 +106,13 @@ public class MotionPhotoWidget extends SurfaceView {
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
                 Log.d(TAG, "Surface changed");
                 Log.d(TAG, "Surface changed");
-                // scale the video to fit in the texture view
-                viewWidth = width;
-                viewHeight = height;
-                adjustAspectRation(viewWidth, viewHeight);
 
                 // create a new motion photo reader
                 try {
                     reader = MotionPhotoReader.open(filename, holder.getSurface());
                     Log.d(TAG, "New motion photo reader created");
                 } catch (IOException | XMPException e) {
-                    e.printStackTrace();
+                    Log.e(TAG, "Exception occurred while opening file", e);
                 }
 
                 // continue playing the video if not in paused state
@@ -136,47 +130,13 @@ public class MotionPhotoWidget extends SurfaceView {
         });
     }
 
-    /**
-     * Changes the aspect ratio of the video played to the surface so that it has the aspect ratio
-     * of the original video.
-     * @param viewWidth The width of the surface view, in pixels.
-     * @param viewHeight The height of the surface view, in pixels.
-     */
-    private void adjustAspectRation(int viewWidth, int viewHeight) {
-        double aspectRatio = (videoRotation > 0) ?
-                (double) videoWidth / videoHeight : (double) videoHeight / videoWidth;
-        Log.d(TAG, "asepct ratio: " + aspectRatio);
-        int newVideoWidth, newVideoHeight;
-        if (viewHeight > (int) (viewWidth * aspectRatio)) {
-            // limited by narrow width
-            if (fill) {
-                newVideoWidth = (int) (viewHeight / aspectRatio);
-                newVideoHeight = viewHeight;
-            } else {
-                newVideoWidth = viewWidth;
-                newVideoHeight = (int) (viewWidth * aspectRatio);
-            }
-        } else {
-            // limited by short height
-            if (fill) {
-                newVideoWidth = viewWidth;
-                newVideoHeight = (int) (viewWidth * aspectRatio);
-            } else{
-                newVideoWidth = (int) (viewHeight / aspectRatio);
-                newVideoHeight = viewHeight;
-            }
-        }
-        int xOffset = (viewWidth - newVideoWidth) / 2;
-        int yOffset = (viewHeight - newVideoHeight) / 2;
+    private void eglSetup() {
+        // Request an OpenGL ES 2.0 compatible context
+        this.setEGLContextClientVersion(3);
 
-        // set transformation matrix to apply to videos played to the surface texture
-        Matrix txform = new Matrix();
-        txform.set(this.getMatrix());
-        txform.postScale(
-                (float) newVideoWidth / viewWidth,
-                (float) newVideoHeight / viewHeight
-        );
-        txform.postTranslate(xOffset, yOffset);
+        // Assign the renderer
+        this.setRenderer(new WidgetOpenGLRenderer());
+        rendererSet = true;
     }
 
     @Override
@@ -206,7 +166,6 @@ public class MotionPhotoWidget extends SurfaceView {
         super.onDetachedFromWindow();
         Log.d(TAG, "View detached");
         executor.shutdown();
-        reader.close();
     }
 
     @Override
@@ -222,7 +181,6 @@ public class MotionPhotoWidget extends SurfaceView {
 
         return myState;
     }
-
 
     @Override
     public void onRestoreInstanceState(Parcelable state) {
@@ -269,10 +227,6 @@ public class MotionPhotoWidget extends SurfaceView {
     @RequiresApi(api = Build.VERSION_CODES.M)
     public void setFile(String filename) throws IOException, XMPException {
         this.filename = filename;
-        MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(filename);
-        videoWidth = motionPhotoInfo.getWidth();
-        videoHeight = motionPhotoInfo.getHeight();
-        videoRotation = motionPhotoInfo.getRotation();
     }
 
     public boolean isPaused() {
