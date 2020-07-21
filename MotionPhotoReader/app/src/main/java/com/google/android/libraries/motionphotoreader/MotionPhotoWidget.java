@@ -7,6 +7,7 @@ import android.media.MediaExtractor;
 import android.os.Build;
 
 import android.os.Parcel;
+import android.os.ParcelFileDescriptor;
 import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -21,12 +22,14 @@ import androidx.annotation.RequiresApi;
 import com.adobe.internal.xmp.XMPException;
 
 import java.io.File;
+import java.io.FileDescriptor;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * An Android app widget to set up a video player for a motion photo file.
+ * Widget that can load and play motion photos video files.
  */
 public class MotionPhotoWidget extends SurfaceView {
 
@@ -99,7 +102,12 @@ public class MotionPhotoWidget extends SurfaceView {
             @Override
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
                 Log.d(TAG, "Surface changed");
+                surfaceHolder = holder;
+
                 // create a new motion photo reader
+                if (reader != null) {
+                    reader.close();
+                }
                 try {
                     reader = MotionPhotoReader.open(file, holder.getSurface());
                     Log.d(TAG, "New motion photo reader created");
@@ -161,6 +169,7 @@ public class MotionPhotoWidget extends SurfaceView {
         SavedState myState = new SavedState(superState);
         myState.savedTimestampUs = reader.getCurrentTimestampUs();
         myState.isPaused = this.isPaused;
+        myState.fileURIPath = this.file.toURI().getPath();
 
         return myState;
     }
@@ -174,9 +183,13 @@ public class MotionPhotoWidget extends SurfaceView {
         // Grab properties out of the SavedState
         this.savedTimestampUs = savedState.savedTimestampUs;
         this.isPaused = savedState.isPaused;
+        this.file = new File(savedState.fileURIPath);
     }
 
     public void play() {
+        if (playProcess != null) {
+            playProcess.cancel();
+        }
         playProcess = new PlayProcess();
         executor.submit(playProcess);
         isPaused = false;
@@ -207,18 +220,28 @@ public class MotionPhotoWidget extends SurfaceView {
      * Set the motion photo file to a specified file.
      * @param filename is a string pointing to the motion photo file to play.
      */
-    @RequiresApi(api = Build.VERSION_CODES.M)
-    public void setFile(String filename) {
-        this.file = new File(filename);
+    @RequiresApi(api = Build.VERSION_CODES.P)
+    public void setFile(String filename) throws IOException, XMPException {
+        setFile(new File(filename));
     }
 
     /**
      * Set the motion photo file to a specified file.
      * @param file is the motion photo file to play.
      */
-    @RequiresApi(api = Build.VERSION_CODES.M)
-    public void setFile(File file) {
+    @RequiresApi(api = Build.VERSION_CODES.P)
+    public void setFile(File file) throws IOException, XMPException {
         this.file = file;
+        // Switch the motion photo reader if another file is already playing
+        if (reader != null) {
+            pause();
+            reader.close();
+            reader = MotionPhotoReader.open(file, surfaceHolder.getSurface());
+            // Show the first frame
+            if (reader.hasNextFrame()) {
+                reader.nextFrame();
+            }
+        }
     }
 
     public boolean isPaused() {
@@ -254,6 +277,7 @@ public class MotionPhotoWidget extends SurfaceView {
     private static class SavedState extends BaseSavedState {
         long savedTimestampUs;
         boolean isPaused;
+        String fileURIPath;
 
         SavedState(Parcelable superState) {
             super(superState);
@@ -264,6 +288,7 @@ public class MotionPhotoWidget extends SurfaceView {
             super(in);
             savedTimestampUs = in.readLong();
             isPaused = in.readBoolean();
+            fileURIPath = in.readString();
         }
 
         @RequiresApi(api = Build.VERSION_CODES.Q)
@@ -272,6 +297,7 @@ public class MotionPhotoWidget extends SurfaceView {
             super.writeToParcel(out, flags);
             out.writeLong(savedTimestampUs);
             out.writeBoolean(isPaused);
+            out.writeString(fileURIPath);
         }
 
         public static final Parcelable.Creator<SavedState> CREATOR =

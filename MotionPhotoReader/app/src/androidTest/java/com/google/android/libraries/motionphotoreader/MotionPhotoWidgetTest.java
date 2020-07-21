@@ -23,6 +23,7 @@ import java.util.List;
 
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.action.ViewActions.longClick;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 
 /**
@@ -80,19 +81,73 @@ public class MotionPhotoWidgetTest {
     @Test
     public void widgetUI_playPause_isCorrect() throws InterruptedException {
         Thread.sleep(1000);
+        // Video should play
         onView(withId(R.id.motion_photo_widget)).perform(click());
         Thread.sleep(1000);
+        // Video should pause
         onView(withId(R.id.motion_photo_widget)).perform(click());
     }
 
     @Test
     public void widgetUI_onRotation_isCorrect() throws InterruptedException {
         Thread.sleep(1000);
+        // Video should play
         onView(withId(R.id.motion_photo_widget)).perform(click());
         Thread.sleep(1000);
-        activityRule.getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        // Video should continue playing in landscape mode, starting from where the video left off
+        // as the screen was rotated
+        activityRule
+                .getActivity()
+                .setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         Thread.sleep(2000);
-        activityRule.getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        // Video should continue playing in portrait mode, starting from where the video left off
+        // as the screen was rotated
+        activityRule
+                .getActivity()
+                .setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         Thread.sleep(2000);
+    }
+
+    @Test
+    public void widgetUI_setFile_isCorrect() throws InterruptedException {
+        Thread.sleep(1000);
+        // Video file should change to new video
+        onView(withId(R.id.motion_photo_widget)).perform(longClick());
+        Thread.sleep(1000);
+        // Video should play
+        onView(withId(R.id.motion_photo_widget)).perform(click());
+        Thread.sleep(2000);
+        // Video file should change back to original video
+        onView(withId(R.id.motion_photo_widget)).perform(longClick());
+        Thread.sleep(2000);
+    }
+
+    @Test
+    public void widgetUI_setFileOnRotation_isCorrect() throws InterruptedException {
+        Thread.sleep(1000);
+        // Video file should change to new video
+        onView(withId(R.id.motion_photo_widget)).perform(longClick());
+        Thread.sleep(1000);
+        // Video should play
+        onView(withId(R.id.motion_photo_widget)).perform(click());
+        Thread.sleep(1000);
+        // Video should continue playing in landscape mode, starting from where the video left off
+        // as the screen was rotated
+        activityRule
+                .getActivity()
+                .setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        Thread.sleep(1000);
+        // Video should change to new file
+        onView(withId(R.id.motion_photo_widget)).perform(longClick());
+        Thread.sleep(1000);
+        // New video should begin playing
+        onView(withId(R.id.motion_photo_widget)).perform(click());
+        Thread.sleep(1000);
+        // Video should continue playing in portrait mode, starting from where the video left off
+        // as the screen was rotated
+        activityRule
+                .getActivity()
+                .setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        Thread.sleep(1000);
     }
 }
