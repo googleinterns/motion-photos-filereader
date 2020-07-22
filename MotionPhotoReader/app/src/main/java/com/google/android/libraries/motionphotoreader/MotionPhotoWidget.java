@@ -136,7 +136,9 @@ public class MotionPhotoWidget extends SurfaceView {
             case INVISIBLE:
             case GONE:
                 Log.d(TAG, "View is invisible or gone");
-                reader.close();
+                if (reader != null) {
+                    reader.close();
+                }
                 break;
         }
     }
@@ -163,7 +165,11 @@ public class MotionPhotoWidget extends SurfaceView {
 
         // Wrap our super class's state with our own
         SavedState myState = new SavedState(superState);
-        myState.savedTimestampUs = reader.getCurrentTimestampUs();
+        if (reader != null) {
+            myState.savedTimestampUs = reader.getCurrentTimestampUs();
+        } else {
+            myState.savedTimestampUs = 0L;
+        }
         myState.isPaused = this.isPaused;
 
         return myState;

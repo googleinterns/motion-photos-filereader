@@ -36,6 +36,7 @@ import static android.os.Build.VERSION_CODES.M;
 public class MotionPhotoReader {
 
     private static final String TAG = "MotionPhotoReader";
+
     private final File file;
     private final Surface surface;
     private final MotionPhotoInfo motionPhotoInfo;
@@ -144,14 +145,6 @@ public class MotionPhotoReader {
         renderWorker.start();
         renderHandler = new Handler(renderWorker.getLooper());
 
-        // Set up OpenGL pipeline
-        outputSurface = new OutputSurface(
-                renderHandler,
-                motionPhotoInfo.getWidth(),
-                motionPhotoInfo.getHeight()
-        );
-        outputSurface.setSurface(surface);
-
         // Set up input stream from Motion Photo file for media extractor
         fileInputStream = new FileInputStream(file);
         FileDescriptor fd = fileInputStream.getFD();
@@ -208,7 +201,19 @@ public class MotionPhotoReader {
             }
         }, renderHandler);
 
-        lowResDecoder.configure(videoFormat, outputSurface.getRenderSurface(), null, 0);
+        // Set up OpenGL pipeline if the surface is not null
+        if (surface != null) {
+            outputSurface = new OutputSurface(
+                    renderHandler,
+                    motionPhotoInfo.getWidth(),
+                    motionPhotoInfo.getHeight()
+            );
+            outputSurface.setSurface(surface);
+            lowResDecoder.configure(videoFormat, outputSurface.getRenderSurface(), null, 0);
+        } else {
+            lowResDecoder.configure(videoFormat, null, null, 0);
+        }
+
         lowResDecoder.start();
     }
 
@@ -234,7 +239,9 @@ public class MotionPhotoReader {
         }
         lowResDecoder.release();
         lowResExtractor.release();
-        outputSurface.release();
+        if (outputSurface != null) {
+            outputSurface.release();
+        }
     }
 
     /**

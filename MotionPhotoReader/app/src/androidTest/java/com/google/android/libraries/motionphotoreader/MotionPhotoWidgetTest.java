@@ -1,5 +1,6 @@
 package com.google.android.libraries.motionphotoreader;
 
+import android.content.Intent;
 import android.content.pm.ActivityInfo;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -9,6 +10,7 @@ import androidx.test.rule.ActivityTestRule;
 import com.google.common.io.ByteStreams;
 
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -23,6 +25,8 @@ import java.util.List;
 
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 
 /**
@@ -40,6 +44,13 @@ public class MotionPhotoWidgetTest {
     @Rule
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
+    @Rule
+    public ActivityTestRule<WidgetTestActivity> activityRule = new ActivityTestRule<>(
+            WidgetTestActivity.class,
+            /* initialTouchMode = */ true,
+            /* launchActivity= */ true
+    );
+
     @After
     public void tearDown() {
         for (Runnable r : cleanup) {
@@ -47,10 +58,6 @@ public class MotionPhotoWidgetTest {
         }
         cleanup.clear();
     }
-
-    @Rule
-    public ActivityTestRule<MainActivity> activityRule =
-            new ActivityTestRule<>(MainActivity.class);
 
     private File fetchAssetFile(String filename) throws IOException {
         InputStream input = InstrumentationRegistry.getInstrumentation()
@@ -73,12 +80,13 @@ public class MotionPhotoWidgetTest {
 
     @Test
     public void widgetUI_surface_isPrepared() throws InterruptedException {
-        onView(withId(R.id.motion_photo_widget));
+        onView(withId(R.id.motion_photo_widget)).check(matches(isDisplayed()));
         Thread.sleep(1000);
     }
 
     @Test
     public void widgetUI_playPause_isCorrect() throws InterruptedException {
+        onView(withId(R.id.motion_photo_widget)).check(matches(isDisplayed()));
         Thread.sleep(1000);
         onView(withId(R.id.motion_photo_widget)).perform(click());
         Thread.sleep(1000);
@@ -87,12 +95,15 @@ public class MotionPhotoWidgetTest {
 
     @Test
     public void widgetUI_onRotation_isCorrect() throws InterruptedException {
+        onView(withId(R.id.motion_photo_widget)).check(matches(isDisplayed()));
         Thread.sleep(1000);
         onView(withId(R.id.motion_photo_widget)).perform(click());
         Thread.sleep(1000);
         activityRule.getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        onView(withId(R.id.motion_photo_widget)).check(matches(isDisplayed()));
         Thread.sleep(2000);
         activityRule.getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        onView(withId(R.id.motion_photo_widget)).check(matches(isDisplayed()));
         Thread.sleep(2000);
     }
 }

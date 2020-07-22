@@ -7,8 +7,12 @@
     android:background="#000"
     tools:context=".MainActivity">
 
-    <SurfaceView
-        android:id="@+id/surface_view"
+    <com.google.android.libraries.motionphotoreader.MotionPhotoWidget
+        android:id="@+id/motion_photo_widget"
+        app:autoloop="true"
+        app:fill="false"
+        app:timeline_base_color="#333"
+        app:timeline_fill_color="#ff0000"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:layout_constraintHorizontal_bias="0.5"
