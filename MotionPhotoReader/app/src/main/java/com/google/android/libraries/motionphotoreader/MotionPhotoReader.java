@@ -64,7 +64,6 @@ public class MotionPhotoReader {
 
     /** OpenGL fields. */
     private OutputSurface outputSurface;
-    private SurfaceTexture surfaceTexture;
 
     /**
      * Standard MotionPhotoReader constructor.
@@ -152,7 +151,6 @@ public class MotionPhotoReader {
                 motionPhotoInfo.getHeight()
         );
         outputSurface.setSurface(surface);
-        surfaceTexture = outputSurface.getSurfaceTexture();
 
         // Set up input stream from Motion Photo file for media extractor
         fileInputStream = new FileInputStream(file);
@@ -210,7 +208,7 @@ public class MotionPhotoReader {
             }
         }, renderHandler);
 
-        lowResDecoder.configure(videoFormat, new Surface(surfaceTexture), null, 0);
+        lowResDecoder.configure(videoFormat, outputSurface.getRenderSurface(), null, 0);
         lowResDecoder.start();
     }
 

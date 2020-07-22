@@ -33,6 +33,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
 
     private int surfaceTextureHandle;
     private SurfaceTexture surfaceTexture;
+    private Surface renderSurface;
     private TextureRender textureRender;
     private Handler renderHandler;
     private boolean frameAvailable;
@@ -43,83 +44,84 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         if (width <= 0 || height <= 0) {
             throw new IllegalArgumentException("Invalid surface dimensions");
         }
-        renderHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                eglSetup(width, height);
-            }
-        });
-        renderHandler.post(this::setup);
+        eglSetup(width, height);
+        setup();
     }
 
     private void setup() {
-        textureRender = new TextureRender();
-        textureRender.onSurfaceCreated();
+        Log.d(TAG, "Setup output surface");
+        renderHandler.post(() -> {
+            textureRender = new TextureRender();
+            textureRender.onSurfaceCreated();
 
-        // Texture for motion photo outputs
-        surfaceTextureHandle = textureRender.getTextureID();
+            // Texture for motion photo outputs
+            surfaceTextureHandle = textureRender.getTextureID();
 
-        // After the motion photo texture has been created, the motion photo surface can be
-        // initialized
-        surfaceTexture = new SurfaceTexture(surfaceTextureHandle);
-        surfaceTexture.setOnFrameAvailableListener(this);
+            // After the motion photo texture has been created, the motion photo surface can be
+            // initialized
+            surfaceTexture = new SurfaceTexture(surfaceTextureHandle);
+            renderSurface = new Surface(surfaceTexture);
+            surfaceTexture.setOnFrameAvailableListener(this);
 
+        });
     }
 
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     private void eglSetup(int width, int height) {
-        // Initialize EGL display
-        eglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY);
-        if (eglDisplay == EGL14.EGL_NO_DISPLAY) {
-            throw new RuntimeException("Unable to get EGL14 display");
-        }
+        renderHandler.post(() -> {
+            // Initialize EGL display
+            eglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY);
+            if (eglDisplay == EGL14.EGL_NO_DISPLAY) {
+                throw new RuntimeException("Unable to get EGL14 display");
+            }
 
-        // Initialize EGL
-        int[] version = new int[2];
-        if (!EGL14.eglInitialize(eglDisplay, version, 0, version, 1)) {
-            eglDisplay = null;
-            throw new RuntimeException("Unable to initialize EGL14");
-        }
+            // Initialize EGL
+            int[] version = new int[2];
+            if (!EGL14.eglInitialize(eglDisplay, version, 0, version, 1)) {
+                eglDisplay = null;
+                throw new RuntimeException("Unable to initialize EGL14");
+            }
 
-        // Configure EGL
-        int[] numConfigs = new int[1];
-        EGLConfig[] configs = new EGLConfig[1];
-        int[] attributes = {
-                EGL14.EGL_RED_SIZE, 8,
-                EGL14.EGL_GREEN_SIZE, 8,
-                EGL14.EGL_BLUE_SIZE, 8,
-                EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
-                EGL14.EGL_NONE
-        };
-        if (!EGL14.eglChooseConfig(
-                eglDisplay,
-                attributes, /* attrib_listOffset = */0,
-                configs, /* configsOffset = */0,
-                configs.length, numConfigs, /* num_configOffset = */ 0
-        )) {
-            throw new RuntimeException("Unable to find RGB888+recordable ES2 EGL config");
-        } else if (numConfigs[0] == 0) {
-            throw new IllegalArgumentException("Could not find suitable EGLConfig");
-        }
-        eglConfig = configs[0];
+            // Configure EGL
+            int[] numConfigs = new int[1];
+            EGLConfig[] configs = new EGLConfig[1];
+            int[] attributes = {
+                    EGL14.EGL_RED_SIZE, 8,
+                    EGL14.EGL_GREEN_SIZE, 8,
+                    EGL14.EGL_BLUE_SIZE, 8,
+                    EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+                    EGL14.EGL_NONE
+            };
+            if (!EGL14.eglChooseConfig(
+                    eglDisplay,
+                    attributes, /* attrib_listOffset = */0,
+                    configs, /* configsOffset = */0,
+                    configs.length, numConfigs, /* num_configOffset = */ 0
+            )) {
+                throw new RuntimeException("eglChooseConfig failed");
+            } else if (numConfigs[0] == 0) {
+                throw new IllegalArgumentException("Could not find suitable EGLConfig");
+            }
+            eglConfig = configs[0];
 
-        // Initialize EGL
-        eglContext = EGL14.eglCreateContext(
-                eglDisplay,
-                eglConfig,
-                EGL14.EGL_NO_CONTEXT,
-                new int[] {
-                        EGL14.EGL_CONTEXT_CLIENT_VERSION, 3,
-                        EGL14.EGL_NONE
-                },
-                /* offset = */ 0
-        );
+            // Initialize EGL context
+            eglContext = EGL14.eglCreateContext(
+                    eglDisplay,
+                    eglConfig,
+                    EGL14.EGL_NO_CONTEXT,
+                    new int[] {
+                            EGL14.EGL_CONTEXT_CLIENT_VERSION, 3,
+                            EGL14.EGL_NONE
+                    },
+                    /* offset = */ 0
+            );
 
-        // Make context current (with EGL_NO_SURFACE)
-        eglSurface = EGL14.EGL_NO_SURFACE;
-        if (!EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
-            Log.e(TAG, "Failed to make context current");
-        }
+            // Make context current (with EGL_NO_SURFACE)
+            eglSurface = EGL14.EGL_NO_SURFACE;
+            if (!EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
+                Log.e(TAG, "Failed to make context current");
+            }
+        });
     }
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
@@ -173,16 +175,18 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             textureRender = null;
             surfaceTexture.release();
             surfaceTexture = null;
+            renderSurface.release();
+            renderSurface = null;
         });
     }
 
-    public SurfaceTexture getSurfaceTexture() {
-        SettableFuture<SurfaceTexture> surfaceTextureFuture = SettableFuture.create();
+    public Surface getRenderSurface() {
+        SettableFuture<Surface> surfaceFuture = SettableFuture.create();
         renderHandler.post(() -> {
-            surfaceTextureFuture.set(surfaceTexture);
+            surfaceFuture.set(renderSurface);
         });
         try {
-            return surfaceTextureFuture.get();
+            return surfaceFuture.get();
         } catch (InterruptedException | ExecutionException e) {
             Log.e(TAG, "Could not set surface texture", e);
             return null;
