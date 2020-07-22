@@ -243,13 +243,14 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
 
             // Latch the data
             surfaceTexture.updateTexImage();
-            EGL14.eglSwapBuffers(eglDisplay, eglSurface);
         });
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     public void drawImage() {
         renderHandler.post(() -> {
             textureRender.drawFrame(surfaceTexture);
+            EGL14.eglSwapBuffers(eglDisplay, eglSurface);
         });
     }
 
