@@ -7,8 +7,6 @@ import android.opengl.EGLContext;
 import android.opengl.EGLDisplay;
 import android.opengl.EGLSurface;
 import android.opengl.GLES20;
-import android.opengl.GLES30;
-import android.opengl.GLUtils;
 import android.os.Build;
 import android.os.Handler;
 import android.util.Log;
@@ -19,10 +17,15 @@ import androidx.annotation.VisibleForTesting;
 
 import com.google.common.util.concurrent.SettableFuture;
 
-import java.nio.IntBuffer;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
+/**
+ * Holds state associated with a Surface used for MediaCodec decoder input. Creates an EGL surface
+ * from a given surface (obtained in OutputSurface.setSurface()) and gets a SurfaceTexture from a
+ * TextureRender object to hold frames from the decoder. The TextureRender draws frames to the EGL
+ * surface.
+ */
 public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private static final String TAG = "OutputSurface";
 
@@ -37,7 +40,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
 
     private int surfaceTextureHandle;
     private SurfaceTexture surfaceTexture;
-    private Surface renderSurface;
+    private Surface decodeSurface;
     private TextureRender textureRender;
     private Handler renderHandler;
     private boolean frameAvailable;
@@ -69,7 +72,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             // After the motion photo texture has been created, the motion photo surface can be
             // initialized
             surfaceTexture = new SurfaceTexture(surfaceTextureHandle);
-            renderSurface = new Surface(surfaceTexture);
+            decodeSurface = new Surface(surfaceTexture);
             surfaceTexture.setOnFrameAvailableListener(this);
         });
     }
@@ -198,18 +201,18 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             textureRender = null;
             surfaceTexture.release();
             surfaceTexture = null;
-            renderSurface.release();
-            renderSurface = null;
+            decodeSurface.release();
+            decodeSurface = null;
 
             // Check for any errors
             glError += GLES20.glGetError();
         });
     }
 
-    public Surface getRenderSurface() {
+    public Surface getDecodeSurface() {
         SettableFuture<Surface> surfaceFuture = SettableFuture.create();
         renderHandler.post(() -> {
-            surfaceFuture.set(renderSurface);
+            surfaceFuture.set(decodeSurface);
         });
         try {
             return surfaceFuture.get();

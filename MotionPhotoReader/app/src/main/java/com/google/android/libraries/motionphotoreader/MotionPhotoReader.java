@@ -2,7 +2,6 @@ package com.google.android.libraries.motionphotoreader;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
@@ -43,6 +42,8 @@ public class MotionPhotoReader {
 
     private MediaExtractor lowResExtractor;
     private MediaCodec lowResDecoder;
+    private MediaExtractor highResExtractor;
+    private MediaCodec highResDecoder;
     private MediaFormat videoFormat;
     private FileInputStream fileInputStream;
 
@@ -76,6 +77,7 @@ public class MotionPhotoReader {
         this.file = file;
         this.surface = surface;
         this.lowResExtractor = new MediaExtractor();
+        this.highResExtractor = new MediaExtractor();
         this.availableInputBuffers = availableInputBuffers;
         this.availableOutputBuffers = availableOutputBuffers;
         this.motionPhotoInfo = motionPhotoInfo;
@@ -152,6 +154,7 @@ public class MotionPhotoReader {
         lowResExtractor.setDataSource(fd, file.length() - videoOffset, videoOffset);
 
         // Find the video track and create an appropriate media decoder
+        // TODO: Initialize high resolution media decoder (for stabilization)
         for (int i = 0; i < lowResExtractor.getTrackCount(); i++) {
             MediaFormat format = lowResExtractor.getTrackFormat(i);
             String mime = format.getString(MediaFormat.KEY_MIME);
@@ -209,7 +212,7 @@ public class MotionPhotoReader {
                     motionPhotoInfo.getHeight()
             );
             outputSurface.setSurface(surface);
-            lowResDecoder.configure(videoFormat, outputSurface.getRenderSurface(), null, 0);
+            lowResDecoder.configure(videoFormat, outputSurface.getDecodeSurface(), null, 0);
         } else {
             lowResDecoder.configure(videoFormat, null, null, 0);
         }

@@ -14,6 +14,10 @@ import java.nio.FloatBuffer;
 import javax.microedition.khronos.egl.EGL;
 import javax.microedition.khronos.opengles.GL;
 
+/**
+ * Renders frames from a MediaCodec decoder (obtained from a surface texture attached to an OpenGL
+ * texture) onto an EGL surface.
+ */
 public class TextureRender {
 
     private static final String TAG = "TextureRender";
@@ -57,6 +61,7 @@ public class TextureRender {
     private int aPositionHandle;
     private int aTextureHandle;
     private int uMatrixHandle;
+    private int uTextureUnitHandle;
 
     private FloatBuffer triangleVertices;
 
@@ -77,7 +82,7 @@ public class TextureRender {
     public void onSurfaceCreated() {
         Log.d(TAG, "Initializing state");
 
-        GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        GLES20.glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
 
         int vertexShader = compileShader(GLES20.GL_VERTEX_SHADER, VERTEX_SHADER);
         int fragmentShader = compileShader(GLES20.GL_FRAGMENT_SHADER, FRAGMENT_SHADER);
@@ -87,6 +92,7 @@ public class TextureRender {
         aPositionHandle = GLES20.glGetAttribLocation(program, "a_Position");
         aTextureHandle = GLES20.glGetAttribLocation(program, "a_TextureCoordinates");
         uMatrixHandle = GLES20.glGetUniformLocation(program, "u_Matrix");
+        uTextureUnitHandle = GLES20.glGetUniformLocation(program, "u_TextureUnit");
 
         // Validate the program
         GLES20.glValidateProgram(program);
@@ -190,12 +196,9 @@ public class TextureRender {
         surfaceTexture.getTransformMatrix(uMatrix);
 
         GLES20.glClearColor(/* red = */ 0.0f, /* green = */ 0.0f, /* blue = */ 0.0f, /* alpha = */ 1.0f);
-        GLES20.glClear(/* mask = */ GLES20.GL_DEPTH_BUFFER_BIT | GLES20.GL_COLOR_BUFFER_BIT);
+        GLES20.glClear(/* mask = */ GLES20.GL_COLOR_BUFFER_BIT);
 
         GLES20.glUseProgram(program);
-
-        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureID);
 
         // Process vertices
         triangleVertices.position(TRIANGLE_VERTICES_DATA_POS_OFFSET);
@@ -204,7 +207,8 @@ public class TextureRender {
                 /* size = */ 3,
                 /* type = */ GLES20.GL_FLOAT,
                 /* normalized = */ false,
-                TRIANGLE_VERTICES_DATA_STRIDE_BYTES, triangleVertices
+                TRIANGLE_VERTICES_DATA_STRIDE_BYTES,
+                triangleVertices
         );
         GLES20.glEnableVertexAttribArray(aPositionHandle);
 
@@ -215,19 +219,12 @@ public class TextureRender {
                 /* size = */ 2,
                 /* type = */ GLES20.GL_FLOAT,
                 /* normalized = */ false,
-                TRIANGLE_VERTICES_DATA_STRIDE_BYTES, triangleVertices
+                TRIANGLE_VERTICES_DATA_STRIDE_BYTES,
+                triangleVertices
         );
         GLES20.glEnableVertexAttribArray(aTextureHandle);
 
         // Apply matrix transforms
-//        Matrix.setIdentityM(mvpMatrix, 0);
-//        GLES20.glUniformMatrix4fv(
-//                uMVPMatrixHandle,
-//                /* count = */ 1,
-//                /* transpose = */ false,
-//                mvpMatrix,
-//                /* offset = */ 0
-//        );
         GLES20.glUniformMatrix4fv(
                 uMatrixHandle,
                 /* count = */ 1,
@@ -235,6 +232,10 @@ public class TextureRender {
                 uMatrix,
                 /* offset = */ 0
         );
+
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureID);
+        GLES20.glUniform1i(uTextureUnitHandle, /* x = */0);
 
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, /* first = */ 0, /* count = */ 4);
         GLES20.glFinish();
