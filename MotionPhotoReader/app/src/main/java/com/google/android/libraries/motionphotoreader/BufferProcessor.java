@@ -28,6 +28,7 @@ class BufferProcessor {
     /**
      * Fields shared with motion photo reader.
      */
+    private final OutputSurface outputSurface;
     private final MediaExtractor lowResExtractor;
     private final MediaCodec lowResDecoder;
     private final BlockingQueue<Integer> availableInputBuffers;
@@ -40,10 +41,12 @@ class BufferProcessor {
      * @param availableInputBuffers The queue of available input buffers.
      * @param availableOutputBuffers The queue of available output buffers.
      */
-    public BufferProcessor(MediaExtractor lowResExtractor,
+    public BufferProcessor(OutputSurface outputSurface,
+                           MediaExtractor lowResExtractor,
                            MediaCodec lowResDecoder,
                            BlockingQueue<Integer> availableInputBuffers,
                            BlockingQueue<Bundle> availableOutputBuffers) {
+        this.outputSurface = outputSurface;
         this.lowResExtractor = lowResExtractor;
         this.lowResDecoder = lowResDecoder;
         this.availableInputBuffers = availableInputBuffers;
@@ -168,6 +171,11 @@ class BufferProcessor {
                 lowResDecoder.releaseOutputBuffer(bufferIndex, renderTimestampNs);
                 prevTimestampUs = timestampUs;
                 prevRenderTimestampNs = renderTimestampNs;
+
+                // Wait for the image and render it after it arrives
+                outputSurface.awaitNewImage();
+                outputSurface.drawImage();
+
                 break;
 
             case MotionPhotoReader.MSG_SEEK_TO_FRAME:
@@ -189,6 +197,11 @@ class BufferProcessor {
 
                 // Reset the previous timestamp and previous render timestamp
                 prevTimestampUs = timestampUs;
+
+                // Wait for the image and render it after it arrives
+                outputSurface.awaitNewImage();
+                outputSurface.drawImage();
+
                 break;
 
             default:

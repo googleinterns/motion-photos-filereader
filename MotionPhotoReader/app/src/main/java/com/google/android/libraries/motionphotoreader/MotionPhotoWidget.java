@@ -100,6 +100,9 @@ public class MotionPhotoWidget extends SurfaceView {
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
                 Log.d(TAG, "Surface changed");
                 // create a new motion photo reader
+                if (reader != null) {
+                    reader.close();
+                }
                 try {
                     reader = MotionPhotoReader.open(file, holder.getSurface());
                     Log.d(TAG, "New motion photo reader created");
@@ -122,6 +125,7 @@ public class MotionPhotoWidget extends SurfaceView {
         });
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     @Override
     protected void onVisibilityChanged(@NonNull View changedView, int visibility) {
         super.onVisibilityChanged(changedView, visibility);

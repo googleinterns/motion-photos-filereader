@@ -1,6 +1,7 @@
 package com.google.android.libraries.motionphotoreader;
 
 import android.graphics.SurfaceTexture;
+import android.opengl.GLES11;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
 import android.opengl.Matrix;
@@ -10,24 +11,35 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 
+import javax.microedition.khronos.egl.EGL;
+import javax.microedition.khronos.opengles.GL;
+
 public class TextureRender {
 
     private static final String TAG = "TextureRender";
 
-    private static final int FLOAT_SIZE_BYTES = 4; // number of bytes for a float?
+    private static final int FLOAT_SIZE_BYTES = 4; // number of bytes for a float
     private static final int TRIANGLE_VERTICES_DATA_POS_OFFSET = 0;
-    private static final int TRIANGLE_VERTICES_DATA_STRIDE_BYTES = 5 * FLOAT_SIZE_BYTES; // 5 due to five coordinate float values (x,y,z,u,v)?
+    private static final int TRIANGLE_VERTICES_DATA_STRIDE_BYTES = 5 * FLOAT_SIZE_BYTES; // 5 due to five coordinate float values (x,y,z,u,v)
     private static final int TRIANGLE_VERTICES_DATA_UV_OFFSET = 3; // texture coords begin 3 offset units from array start (skip the position coordinates)
 
-    private static final String VERTEX_SHADER = "attribute vec4 a_Position\n"
-            + "void main() {\n"
-            + "  gl_Position = a_Position;\n"
-            + "}\n";
-    private static final String FRAGMENT_SHADER = "precision mediump float;\n"
-            + "uniform vec4 u_Color;\n"
-            + "void main() {\n"
-            + "  gl_FragColor = u_Color;\n"
-            + "}\n";
+    private static final String VERTEX_SHADER =
+            "uniform mat4 u_Matrix;\n" +
+            "attribute vec4 a_Position;\n" +
+            "attribute vec2 a_TextureCoordinates;\n" +
+            "varying vec2 v_TextureCoordinates;\n" +
+            "void main() {\n" +
+            "  v_TextureCoordinates = a_TextureCoordinates;\n" +
+            "  gl_Position = u_Matrix * a_Position;\n" +
+            "}";
+
+    private static final String FRAGMENT_SHADER =
+            "precision mediump float;\n" +
+            "uniform sampler2D u_TextureUnit;\n" +
+            "varying vec2 v_TextureCoordinates;\n" +
+            "void main() {\n" +
+            "  gl_FragColor = texture2D(u_TextureUnit, v_TextureCoordinates);\n" +
+            "}";
 
     // A single plane comprised of two triangles to hold the image texture
     private final float[] triangleVerticesData = {
@@ -38,11 +50,13 @@ public class TextureRender {
              1.0f,  1.0f, 0.0f,     1.0f, 1.0f,  // top right
     };
 
-    private float[] stMatrix;
+    private float[] uMatrix = new float[16];
+
     private int textureID;
     private int program;
     private int aPositionHandle;
     private int aTextureHandle;
+    private int uMatrixHandle;
 
     private FloatBuffer triangleVertices;
 
@@ -52,83 +66,133 @@ public class TextureRender {
                 .order(ByteOrder.nativeOrder())
                 .asFloatBuffer();
         triangleVertices.put(triangleVerticesData).position(/* newPosition = */ 0);
-        Matrix.setIdentityM(stMatrix, /* smOffset = */ 0);
+
+        Matrix.setIdentityM(/* sm = */ uMatrix, /* smOffset = */ 0);
     }
 
     public int getTextureID() {
         return textureID;
     }
 
-    public void initializeStatePostSurfaceCreated() {
-        program = createProgram(VERTEX_SHADER, FRAGMENT_SHADER);
+    public void onSurfaceCreated() {
+        Log.d(TAG, "Initializing state");
+
+        GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+
+        int vertexShader = compileShader(GLES20.GL_VERTEX_SHADER, VERTEX_SHADER);
+        int fragmentShader = compileShader(GLES20.GL_FRAGMENT_SHADER, FRAGMENT_SHADER);
+        program = linkProgram(vertexShader, fragmentShader);
+
+        // Get vertex and texture handles
+        aPositionHandle = GLES20.glGetAttribLocation(program, "a_Position");
+        aTextureHandle = GLES20.glGetAttribLocation(program, "a_TextureCoordinates");
+        uMatrixHandle = GLES20.glGetUniformLocation(program, "u_Matrix");
+
+        // Validate the program
+        GLES20.glValidateProgram(program);
+        final int[] validateStatus = new int[1];
+        GLES20.glGetProgramiv(program, GLES20.GL_VALIDATE_STATUS, validateStatus, /* offset = */ 0);
+        Log.v(TAG, "Program validation results: " + validateStatus[0]
+                + "\nLog: " + GLES20.glGetProgramInfoLog(program));
+
+        GLES20.glUseProgram(program);
+
+        // Create and bind textures
+        int[] textureIds = new int[1];
+        GLES20.glGenTextures(/* n = */ 1, textureIds, 0);
+        textureID = textureIds[0];
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureID);
+
+        // Set texture parameters
+        GLES20.glTexParameterf(
+                GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
+                GLES20.GL_TEXTURE_MIN_FILTER,
+                GLES20.GL_NEAREST
+        );
+        GLES20.glTexParameterf(
+                GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
+                GLES20.GL_TEXTURE_MAG_FILTER,
+                GLES20.GL_LINEAR
+        );
+        GLES20.glTexParameteri(
+                GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
+                GLES20.GL_TEXTURE_WRAP_S,
+                GLES20.GL_CLAMP_TO_EDGE
+        );
+        GLES20.glTexParameteri(
+                GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
+                GLES20.GL_TEXTURE_WRAP_T,
+                GLES20.GL_CLAMP_TO_EDGE
+        );
     }
 
-    private int createProgram(String vertexSource, String fragmentSource) {
-        // Load the shaders
-        int vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vertexSource);
-        if (vertexShader == 0) {
-            return 0;
-        }
-        int fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentSource);
-        if (fragmentShader == 0) {
+    private static int linkProgram(int vertexShader, int fragmentShader) {
+        Log.d(TAG, "Linking program");
+
+        // Create the program
+        final int program = GLES20.glCreateProgram();
+        if (program == 0) {
+            Log.w(TAG, "Could not create new program");
             return 0;
         }
 
-        // Create the program
-        int program = GLES20.glCreateProgram();
-        if (program != 0) {
-            GLES20.glAttachShader(program, vertexShader);
-            checkGlError("glAttachShader");
-            GLES20.glAttachShader(program, fragmentShader);
-            checkGlError("glAttachShader");
-            GLES20.glLinkProgram(program);
-            int[] linkStatus = new int[1];
-            GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linkStatus, 0);
-            if (linkStatus[0] != GLES20.GL_TRUE) {
-                String infoLog = GLES20.glGetProgramInfoLog(program);
-                Log.e(TAG, "Could not link program: " + infoLog);
-                GLES20.glDeleteProgram(program);
-                program = 0;
-            }
+        // Attach shaders to program and link them together
+        GLES20.glAttachShader(program, vertexShader);
+        GLES20.glAttachShader(program, fragmentShader);
+        GLES20.glLinkProgram(program);
+
+        // Verify linking status
+        final int[] linkStatus = new int[1];
+        GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linkStatus, /* offset = */ 0);
+        if (linkStatus[0] == 0) {
+            // Delete the program if linking failed
+            GLES20.glDeleteProgram(program);
+            Log.w(TAG, "Failed to link program");
+            return 0;
         }
+
         return program;
     }
 
-    private int loadShader(int type, String shaderSrc) {
-        // Create the shader object
-        int shader = GLES20.glCreateShader(type);
+    private int compileShader(int type, String shaderSrc) {
+        Log.d(TAG, "Compiling shader: " + type);
+
+        // Create new shader object
+        final int shader = GLES20.glCreateShader(type);
         if (shader == 0) {
+            Log.w(TAG, "Could not create new shader");
             return 0;
         }
 
-        // Load the shader source, compile the shader
+        // Pass in the shader source
         GLES20.glShaderSource(shader, shaderSrc);
+
+        // Compile the shader
         GLES20.glCompileShader(shader);
 
-        // check the compile status
-        int[] compiled = new int[1];
-        GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, compiled, 0);
+        // Verify the compile status
+        final int[] compiled = new int[1];
+        GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, compiled, /* offset = */ 0);
         if (compiled[0] == 0) {
-            // Retrieve the compiler messages when compilation fails
-            int[] infoLen = new int[0];
-            GLES20.glGetShaderiv(shader, GLES20.GL_INFO_LOG_LENGTH, infoLen, 0);
-            if (infoLen[0] > 1) {
-                String infoLog = GLES20.glGetShaderInfoLog(shader);
-                Log.d(TAG, infoLog);
-            }
+            // Delete the shader if compilation failed
+            GLES20.glDeleteShader(shader);
+            Log.w(TAG, "Shader failed to compile");
+            return 0;
         }
+
         return shader;
     }
 
     public void drawFrame(SurfaceTexture surfaceTexture) {
-        checkGlError("onDrawFrame start");
-        surfaceTexture.getTransformMatrix(stMatrix);
+        Log.d(TAG, "Drawing frame");
+
+        // Set the transform matrix of the surface texture
+        surfaceTexture.getTransformMatrix(uMatrix);
 
         GLES20.glClearColor(/* red = */ 0.0f, /* green = */ 0.0f, /* blue = */ 0.0f, /* alpha = */ 1.0f);
-        GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT | GLES20.GL_COLOR_BUFFER_BIT);
+        GLES20.glClear(/* mask = */ GLES20.GL_DEPTH_BUFFER_BIT | GLES20.GL_COLOR_BUFFER_BIT);
 
         GLES20.glUseProgram(program);
-        checkGlError("glUseProgram");
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureID);
@@ -142,9 +206,7 @@ public class TextureRender {
                 /* normalized = */ false,
                 TRIANGLE_VERTICES_DATA_STRIDE_BYTES, triangleVertices
         );
-        checkGlError("glVertexAttribPointer aPosition");
         GLES20.glEnableVertexAttribArray(aPositionHandle);
-        checkGlError("glEnableVertexAttribArray aPositionHandle");
 
         // Process texture
         triangleVertices.position(TRIANGLE_VERTICES_DATA_UV_OFFSET);
@@ -155,21 +217,26 @@ public class TextureRender {
                 /* normalized = */ false,
                 TRIANGLE_VERTICES_DATA_STRIDE_BYTES, triangleVertices
         );
-        checkGlError("glVertexAttribPointer aTextureHandle");
         GLES20.glEnableVertexAttribArray(aTextureHandle);
-        checkGlError("glEnableVertexAttribArray aTextureHandle");
 
-        // Do matrix stuff here...
+        // Apply matrix transforms
+//        Matrix.setIdentityM(mvpMatrix, 0);
+//        GLES20.glUniformMatrix4fv(
+//                uMVPMatrixHandle,
+//                /* count = */ 1,
+//                /* transpose = */ false,
+//                mvpMatrix,
+//                /* offset = */ 0
+//        );
+//        GLES20.glUniformMatrix4fv(
+//                uSTMatrixHandle,
+//                /* count = */ 1,
+//                /* transpose = */ false,
+//                stMatrix,
+//                /* offset = */ 0
+//        );
 
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, /* first = */ 0, /* count = */ 4);
-        checkGlError("glDrawArrays");
         GLES20.glFinish();
-    }
-
-    public void checkGlError(String tag) {
-        int error;
-        while ((error = GLES20.glGetError()) != GLES20.GL_NO_ERROR) {
-            throw new RuntimeException(tag+ ": glError " + error);
-        }
     }
 }

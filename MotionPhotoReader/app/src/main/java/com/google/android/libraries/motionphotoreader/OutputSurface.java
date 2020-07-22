@@ -5,19 +5,22 @@ import android.opengl.EGL14;
 import android.opengl.EGLConfig;
 import android.opengl.EGLContext;
 import android.opengl.EGLDisplay;
-import android.opengl.EGLExt;
 import android.opengl.EGLSurface;
 import android.opengl.GLES20;
 import android.opengl.GLES30;
 import android.opengl.GLUtils;
 import android.os.Build;
+import android.os.Handler;
 import android.util.Log;
 import android.view.Surface;
 
 import androidx.annotation.RequiresApi;
 
+import com.google.common.util.concurrent.SettableFuture;
+
 import java.nio.IntBuffer;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
 
 public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private static final String TAG = "OutputSurface";
@@ -31,23 +34,36 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private int surfaceTextureHandle;
     private SurfaceTexture surfaceTexture;
     private TextureRender textureRender;
-    private Surface surface;
+    private Handler renderHandler;
     private boolean frameAvailable;
 
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
-    public OutputSurface(int width, int height) {
+    public OutputSurface(Handler renderHandler, int width, int height) {
+        this.renderHandler = renderHandler;
         if (width <= 0 || height <= 0) {
             throw new IllegalArgumentException("Invalid surface dimensions");
         }
-
-        setup();
-        eglSetup(width, height);
+        renderHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                eglSetup(width, height);
+            }
+        });
+        renderHandler.post(this::setup);
     }
 
     private void setup() {
         textureRender = new TextureRender();
-        textureRender.initializeStatePostSurfaceCreated();
-        createAndBindMotionPhotoTexture();
+        textureRender.onSurfaceCreated();
+
+        // Texture for motion photo outputs
+        surfaceTextureHandle = textureRender.getTextureID();
+
+        // After the motion photo texture has been created, the motion photo surface can be
+        // initialized
+        surfaceTexture = new SurfaceTexture(surfaceTextureHandle);
+        surfaceTexture.setOnFrameAvailableListener(this);
+
     }
 
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
@@ -108,114 +124,99 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     public void setSurface(Surface surface) {
-        this.surface = surface;
+        renderHandler.post(() -> {
+            // Abort if context is null
+            if (eglContext == null) {
+                Log.i(TAG, "EGL Context is null, can't set EGL surface");
+                return;
+            }
 
-        // Abort if context is null
-        if (eglContext == null) {
-            Log.i(TAG, "EGL Context is null, can't set EGL surface");
-            return;
-        }
+            // Destroy EGL surface if valid
+            if (!Objects.equals(eglSurface, EGL14.EGL_NO_SURFACE)) {
+                EGL14.eglDestroySurface(eglDisplay, eglSurface);
+            }
 
-        // Destroy EGL surface if valid
-        if (!Objects.equals(eglSurface, EGL14.EGL_NO_SURFACE)) {
-            EGL14.eglDestroySurface(eglDisplay, eglSurface);
-        }
+            // Initialize EGL surface
+            if (surface == null) {
+                eglSurface = EGL14.EGL_NO_SURFACE;
+            } else {
+                eglSurface = EGL14.eglCreateWindowSurface(
+                        eglDisplay,
+                        eglConfig,
+                        surface,
+                        new int[] { EGL14.EGL_NONE },
+                        /* offset = */ 0
+                );
+            }
 
-        // Initialize EGL surface
-        if (surface == null) {
-            eglSurface = EGL14.EGL_NO_SURFACE;
-        } else {
-            eglSurface = EGL14.eglCreateWindowSurface(
-                    eglDisplay,
-                    eglConfig,
-                    surface,
-                    new int[] { EGL14.EGL_NONE },
-                    /* offset = */ 0
-            );
-        }
-
-        // Make EGL surface current
-        if (!EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
-            Log.e(TAG, "Failed to make context current");
-        }
+            // Make EGL surface current
+            if (!EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
+                Log.e(TAG, "Failed to make context current");
+            }
+        });
     }
 
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     public void release() {
-        if (eglDisplay != EGL14.EGL_NO_DISPLAY) {
-            EGL14.eglDestroySurface(eglDisplay, eglSurface);
-            EGL14.eglDestroyContext(eglDisplay, eglContext);
-            EGL14.eglReleaseThread();
-            EGL14.eglTerminate(eglDisplay);
-        }
+        renderHandler.post(() -> {
+            if (eglDisplay != EGL14.EGL_NO_DISPLAY) {
+                EGL14.eglDestroySurface(eglDisplay, eglSurface);
+                EGL14.eglDestroyContext(eglDisplay, eglContext);
+                EGL14.eglReleaseThread();
+                EGL14.eglTerminate(eglDisplay);
+            }
 
-        eglDisplay = EGL14.EGL_NO_DISPLAY;
-        eglContext = EGL14.EGL_NO_CONTEXT;
-        eglSurface = EGL14.EGL_NO_SURFACE;
+            eglDisplay = EGL14.EGL_NO_DISPLAY;
+            eglContext = EGL14.EGL_NO_CONTEXT;
+            eglSurface = EGL14.EGL_NO_SURFACE;
 
-        textureRender = null;
-        surfaceTexture.release();
-        surfaceTexture = null;
-    }
-
-    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
-    public void makeCurrent() {
-        if (!EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
-            throw new RuntimeException("Failed to make EGL context and surface current");
-        }
+            textureRender = null;
+            surfaceTexture.release();
+            surfaceTexture = null;
+        });
     }
 
     public SurfaceTexture getSurfaceTexture() {
-        return surfaceTexture;
+        SettableFuture<SurfaceTexture> surfaceTextureFuture = SettableFuture.create();
+        renderHandler.post(() -> {
+            surfaceTextureFuture.set(surfaceTexture);
+        });
+        try {
+            return surfaceTextureFuture.get();
+        } catch (InterruptedException | ExecutionException e) {
+            Log.e(TAG, "Could not set surface texture", e);
+            return null;
+        }
     }
 
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
-    private void checkEglError(String msg) {
-        int error;
-        if ((error = EGL14.eglGetError()) != EGL14.EGL_SUCCESS) {
-            throw new RuntimeException(msg + ": EGL error: 0x" + Integer.toHexString(error));
-        }
-    }
-
-    private void createAndBindMotionPhotoTexture() {
-        IntBuffer frameBufferIds = IntBuffer.allocate(1);
-        GLES30.glGenFramebuffers(1, frameBufferIds);
-
-        IntBuffer textureIds = IntBuffer.allocate(1);
-        GLES30.glGenTextures(1, textureIds);
-
-        // Texture for motion photo outputs
-        surfaceTextureHandle = textureIds.get(0);
-
-        // After the motion photo texture has been created, the motion photo surface can be
-        // initialized
-        surfaceTexture = new SurfaceTexture(surfaceTextureHandle);
-    }
-
     public void awaitNewImage() {
-        final int TIMEOUT_MS = 500;
+        renderHandler.post(() -> {
+            final int TIMEOUT_MS = 500;
 
-        synchronized(frameSyncObject) {
-            while (!frameAvailable) {
-                try {
-                    frameSyncObject.wait(TIMEOUT_MS);
-                    if (!frameAvailable) {
-                        throw new RuntimeException("Surface frame wait timed out");
+            synchronized(frameSyncObject) {
+                while (!frameAvailable) {
+                    try {
+                        frameSyncObject.wait(TIMEOUT_MS);
+                        if (!frameAvailable) {
+                            throw new RuntimeException("Surface frame wait timed out");
+                        }
+                    } catch (InterruptedException e) {
+                        Log.e(TAG, "Failed to wait for available frame");
                     }
-                } catch (InterruptedException e) {
-                    Log.e(TAG, "Failed to wait for available frame");
                 }
+                frameAvailable = false;
             }
-            frameAvailable = false;
-        }
 
-        // Latch the data
-        textureRender.checkGlError("before updateTexImage");
-        surfaceTexture.updateTexImage();
+            // Latch the data
+            surfaceTexture.updateTexImage();
+        });
     }
 
     public void drawImage() {
-        textureRender.drawFrame(surfaceTexture);
+        renderHandler.post(() -> {
+            textureRender.drawFrame(surfaceTexture);
+        });
     }
 
     @Override
