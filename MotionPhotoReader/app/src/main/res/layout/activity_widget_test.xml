@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#000"
-    tools:context=".MainActivity">
+    tools:context=".WidgetTestActivity">
 
     <com.google.android.libraries.motionphotoreader.MotionPhotoWidget
         android:id="@+id/motion_photo_widget"
