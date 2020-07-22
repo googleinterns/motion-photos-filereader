@@ -18,6 +18,7 @@ import static android.os.Build.VERSION_CODES.LOLLIPOP;
  */
 class BufferProcessor {
     private static final String TAG = "BufferProcessor";
+
     private static final long TIMEOUT_US = 1000L;
     private static final long US_TO_NS = 1000L;
     private static final long THIRTY_FPS_NS = 1_000_000_000 / 30;
@@ -173,9 +174,10 @@ class BufferProcessor {
                 prevRenderTimestampNs = renderTimestampNs;
 
                 // Wait for the image and render it after it arrives
-                outputSurface.awaitNewImage();
-                outputSurface.drawImage();
-
+                if (outputSurface != null) {
+                    outputSurface.awaitNewImage();
+                    outputSurface.drawImage();
+                }
                 break;
 
             case MotionPhotoReader.MSG_SEEK_TO_FRAME:
@@ -199,9 +201,10 @@ class BufferProcessor {
                 prevTimestampUs = timestampUs;
 
                 // Wait for the image and render it after it arrives
-                outputSurface.awaitNewImage();
-                outputSurface.drawImage();
-
+                if (outputSurface != null) {
+                    outputSurface.awaitNewImage();
+                    outputSurface.drawImage();
+                }
                 break;
 
             default:
