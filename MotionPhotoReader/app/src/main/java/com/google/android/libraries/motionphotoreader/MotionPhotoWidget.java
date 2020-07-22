@@ -7,7 +7,6 @@ import android.media.MediaExtractor;
 import android.os.Build;
 
 import android.os.Parcel;
-import android.os.ParcelFileDescriptor;
 import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -22,8 +21,6 @@ import androidx.annotation.RequiresApi;
 import com.adobe.internal.xmp.XMPException;
 
 import java.io.File;
-import java.io.FileDescriptor;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -130,6 +127,7 @@ public class MotionPhotoWidget extends SurfaceView {
         });
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     @Override
     protected void onVisibilityChanged(@NonNull View changedView, int visibility) {
         super.onVisibilityChanged(changedView, visibility);
@@ -140,7 +138,9 @@ public class MotionPhotoWidget extends SurfaceView {
             case INVISIBLE:
             case GONE:
                 Log.d(TAG, "View is invisible or gone");
-                reader.close();
+                if (reader != null) {
+                    reader.close();
+                }
                 break;
         }
     }
@@ -167,7 +167,11 @@ public class MotionPhotoWidget extends SurfaceView {
 
         // Wrap our super class's state with our own
         SavedState myState = new SavedState(superState);
-        myState.savedTimestampUs = reader.getCurrentTimestampUs();
+        if (reader != null) {
+            myState.savedTimestampUs = reader.getCurrentTimestampUs();
+        } else {
+            myState.savedTimestampUs = 0L;
+        }
         myState.isPaused = this.isPaused;
         myState.fileURIPath = this.file.toURI().getPath();
 
@@ -244,6 +248,10 @@ public class MotionPhotoWidget extends SurfaceView {
         }
     }
 
+    /**
+     * Checks if the video playback is paused.
+     * @return true if the video is paused, otherwise return false.
+     */
     public boolean isPaused() {
         return isPaused;
     }
@@ -274,6 +282,10 @@ public class MotionPhotoWidget extends SurfaceView {
         }
     }
 
+    /**
+     * Used to store state variables of the widget which will allow for continuity in video playback
+     * when the widget surface view is destroyed and recreated.
+     */
     private static class SavedState extends BaseSavedState {
         long savedTimestampUs;
         boolean isPaused;

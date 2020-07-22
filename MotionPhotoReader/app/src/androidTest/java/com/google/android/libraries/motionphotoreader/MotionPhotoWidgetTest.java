@@ -24,6 +24,8 @@ import java.util.List;
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.action.ViewActions.longClick;
+import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 
 /**
@@ -41,6 +43,13 @@ public class MotionPhotoWidgetTest {
     @Rule
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
+    @Rule
+    public ActivityTestRule<WidgetTestActivity> activityRule = new ActivityTestRule<>(
+            WidgetTestActivity.class,
+            /* initialTouchMode = */ true,
+            /* launchActivity= */ true
+    );
+
     @After
     public void tearDown() {
         for (Runnable r : cleanup) {
@@ -48,10 +57,6 @@ public class MotionPhotoWidgetTest {
         }
         cleanup.clear();
     }
-
-    @Rule
-    public ActivityTestRule<MainActivity> activityRule =
-            new ActivityTestRule<>(MainActivity.class);
 
     private File fetchAssetFile(String filename) throws IOException {
         InputStream input = InstrumentationRegistry.getInstrumentation()
@@ -74,12 +79,13 @@ public class MotionPhotoWidgetTest {
 
     @Test
     public void widgetUI_surface_isPrepared() throws InterruptedException {
-        onView(withId(R.id.motion_photo_widget));
+        onView(withId(R.id.motion_photo_widget)).check(matches(isDisplayed()));
         Thread.sleep(1000);
     }
 
     @Test
     public void widgetUI_playPause_isCorrect() throws InterruptedException {
+        onView(withId(R.id.motion_photo_widget)).check(matches(isDisplayed()));
         Thread.sleep(1000);
         // Video should play
         onView(withId(R.id.motion_photo_widget)).perform(click());
@@ -90,6 +96,7 @@ public class MotionPhotoWidgetTest {
 
     @Test
     public void widgetUI_onRotation_isCorrect() throws InterruptedException {
+        onView(withId(R.id.motion_photo_widget)).check(matches(isDisplayed()));
         Thread.sleep(1000);
         // Video should play
         onView(withId(R.id.motion_photo_widget)).perform(click());
@@ -99,12 +106,14 @@ public class MotionPhotoWidgetTest {
         activityRule
                 .getActivity()
                 .setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        onView(withId(R.id.motion_photo_widget)).check(matches(isDisplayed()));
         Thread.sleep(2000);
         // Video should continue playing in portrait mode, starting from where the video left off
         // as the screen was rotated
         activityRule
                 .getActivity()
                 .setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        onView(withId(R.id.motion_photo_widget)).check(matches(isDisplayed()));
         Thread.sleep(2000);
     }
 

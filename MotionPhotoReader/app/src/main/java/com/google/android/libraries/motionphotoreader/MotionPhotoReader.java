@@ -35,6 +35,7 @@ import static android.os.Build.VERSION_CODES.M;
 public class MotionPhotoReader {
 
     private static final String TAG = "MotionPhotoReader";
+
     private final File file;
     private final Surface surface;
     private final MotionPhotoInfo motionPhotoInfo;
@@ -53,14 +54,13 @@ public class MotionPhotoReader {
      * available buffers to the buffer queue. The buffer worker receives messages to process frames
      * and uses the available buffers posted by the media worker thread.
      */
-    private HandlerThread mediaWorker;
-    private Handler mediaHandler;
+    private HandlerThread renderWorker;
+    private Handler renderHandler;
     private BufferProcessor bufferProcessor;
 
     /** Available buffer queues **/
     private final BlockingQueue<Integer> availableInputBuffers;
     private final BlockingQueue<Bundle> availableOutputBuffers;
-
 
     /**
      * Standard MotionPhotoReader constructor.
@@ -120,7 +120,7 @@ public class MotionPhotoReader {
                 availableOutputBuffers,
                 motionPhotoInfo
         );
-        reader.startMediaThread();
+        reader.startRenderThread(motionPhotoInfo);
         reader.bufferProcessor = new BufferProcessor(
                 reader.lowResExtractor,
                 reader.lowResDecoder,
@@ -134,10 +134,11 @@ public class MotionPhotoReader {
      * Sets up and starts a new handler thread for MediaCodec objects (decoder and extractor).
      */
     @RequiresApi(api = 23)
-    private void startMediaThread() throws IOException {
-        mediaWorker = new HandlerThread("mediaHandler");
-        mediaWorker.start();
-        mediaHandler = new Handler(mediaWorker.getLooper());
+    private void startRenderThread(MotionPhotoInfo motionPhotoInfo) throws IOException {
+        // Set up the render handler and thread
+        renderWorker = new HandlerThread("renderHandler");
+        renderWorker.start();
+        renderHandler = new Handler(renderWorker.getLooper());
 
         // Set up input stream from Motion Photo file for media extractor
         fileInputStream = new FileInputStream(file);
@@ -193,7 +194,7 @@ public class MotionPhotoReader {
                                               @NonNull MediaFormat format) {
 
             }
-        }, mediaHandler);
+        }, renderHandler);
 
         lowResDecoder.configure(videoFormat, surface, null, 0);
         lowResDecoder.start();
@@ -202,6 +203,7 @@ public class MotionPhotoReader {
     /**
      * Shut down all resources allocated to the MotionPhotoReader instance.
      */
+    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     public void close() {
         Log.d("ReaderActivity", "Closed decoder and extractor");
         try {
@@ -212,10 +214,10 @@ public class MotionPhotoReader {
             e.printStackTrace();
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-            mediaHandler.getLooper().quitSafely();
+            renderHandler.getLooper().quitSafely();
             Log.d("ReaderActivity", "Safely quit looper");
         } else {
-            mediaHandler.getLooper().quit();
+            renderHandler.getLooper().quit();
             Log.d("ReaderActivity", "Quit looper");
         }
         lowResDecoder.release();
