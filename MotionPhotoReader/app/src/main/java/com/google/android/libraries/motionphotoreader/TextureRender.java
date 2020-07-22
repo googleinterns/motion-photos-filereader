@@ -228,13 +228,13 @@ public class TextureRender {
 //                mvpMatrix,
 //                /* offset = */ 0
 //        );
-//        GLES20.glUniformMatrix4fv(
-//                uSTMatrixHandle,
-//                /* count = */ 1,
-//                /* transpose = */ false,
-//                stMatrix,
-//                /* offset = */ 0
-//        );
+        GLES20.glUniformMatrix4fv(
+                uMatrixHandle,
+                /* count = */ 1,
+                /* transpose = */ false,
+                uMatrix,
+                /* offset = */ 0
+        );
 
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, /* first = */ 0, /* count = */ 4);
         GLES20.glFinish();

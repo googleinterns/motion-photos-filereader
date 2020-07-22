@@ -15,6 +15,7 @@ import android.util.Log;
 import android.view.Surface;
 
 import androidx.annotation.RequiresApi;
+import androidx.annotation.VisibleForTesting;
 
 import com.google.common.util.concurrent.SettableFuture;
 
@@ -24,12 +25,15 @@ import java.util.concurrent.ExecutionException;
 
 public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private static final String TAG = "OutputSurface";
-    private static final Object frameSyncObject = new Object();
+
+    private final Object frameSyncObject = new Object();
 
     private EGLDisplay eglDisplay;
     private EGLContext eglContext;
     private EGLSurface eglSurface;
     private EGLConfig eglConfig;
+
+    private int glError = 0; /* For debugging purposes */
 
     private int surfaceTextureHandle;
     private SurfaceTexture surfaceTexture;
@@ -48,6 +52,11 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         setup();
     }
 
+    @VisibleForTesting
+    int getGlErrors() {
+        return glError;
+    }
+
     private void setup() {
         Log.d(TAG, "Setup output surface");
         renderHandler.post(() -> {
@@ -62,7 +71,6 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             surfaceTexture = new SurfaceTexture(surfaceTextureHandle);
             renderSurface = new Surface(surfaceTexture);
             surfaceTexture.setOnFrameAvailableListener(this);
-
         });
     }
 
@@ -119,8 +127,12 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             // Make context current (with EGL_NO_SURFACE)
             eglSurface = EGL14.EGL_NO_SURFACE;
             if (!EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
+                glError++;
                 Log.e(TAG, "Failed to make context current");
             }
+
+            // Check for any errors
+            glError += GLES20.glGetError();
         });
     }
 
@@ -129,6 +141,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         renderHandler.post(() -> {
             // Abort if context is null
             if (eglContext == null) {
+                glError++;
                 Log.i(TAG, "EGL Context is null, can't set EGL surface");
                 return;
             }
@@ -140,8 +153,10 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
 
             // Initialize EGL surface
             if (surface == null) {
+                Log.d(TAG, "EGL initialized to no surface");
                 eglSurface = EGL14.EGL_NO_SURFACE;
             } else {
+                Log.d(TAG, "Creating EGL surface");
                 eglSurface = EGL14.eglCreateWindowSurface(
                         eglDisplay,
                         eglConfig,
@@ -153,13 +168,18 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
 
             // Make EGL surface current
             if (!EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
+                glError++;
                 Log.e(TAG, "Failed to make context current");
             }
+
+            // Check for any errors
+            glError += GLES20.glGetError();
         });
     }
 
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     public void release() {
+        Log.d(TAG, "Releasing output surface");
         renderHandler.post(() -> {
             if (eglDisplay != EGL14.EGL_NO_DISPLAY) {
                 EGL14.eglDestroySurface(eglDisplay, eglSurface);
@@ -177,6 +197,9 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             surfaceTexture = null;
             renderSurface.release();
             renderSurface = null;
+
+            // Check for any errors
+            glError += GLES20.glGetError();
         });
     }
 
@@ -214,6 +237,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
 
             // Latch the data
             surfaceTexture.updateTexImage();
+            EGL14.eglSwapBuffers(eglDisplay, eglSurface);
         });
     }
 
