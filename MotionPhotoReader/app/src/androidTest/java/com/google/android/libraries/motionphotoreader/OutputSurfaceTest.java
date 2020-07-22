@@ -1,37 +1,21 @@
 package com.google.android.libraries.motionphotoreader;
 
-import android.graphics.Bitmap;
-import android.media.MediaExtractor;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.view.Surface;
 import android.view.SurfaceView;
-import android.view.View;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.rule.ActivityTestRule;
-
-import com.adobe.internal.xmp.XMPException;
-import com.google.common.io.ByteStreams;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -109,6 +93,6 @@ public class OutputSurfaceTest {
         outputSurface.setSurface(surface);
         Thread.sleep(1000);
         cleanup.add(outputSurface::release);
-        assertNotNull(outputSurface.getRenderSurface());
+        assertNotNull(outputSurface.getDecodeSurface());
     }
 }
