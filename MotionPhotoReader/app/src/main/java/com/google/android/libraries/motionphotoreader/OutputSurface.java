@@ -94,10 +94,13 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             int[] numConfigs = new int[1];
             EGLConfig[] configs = new EGLConfig[1];
             int[] attributes = {
+                    EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
                     EGL14.EGL_RED_SIZE, 8,
                     EGL14.EGL_GREEN_SIZE, 8,
                     EGL14.EGL_BLUE_SIZE, 8,
-                    EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+                    EGL14.EGL_ALPHA_SIZE, 8,
+                    EGL14.EGL_DEPTH_SIZE, 8,
+                    EGL14.EGL_STENCIL_SIZE, 0,
                     EGL14.EGL_NONE
             };
             if (!EGL14.eglChooseConfig(

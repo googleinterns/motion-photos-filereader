@@ -222,26 +222,23 @@ public class MotionPhotoReader {
      */
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     public void close() {
-        Log.d("ReaderActivity", "Closed decoder and extractor");
+        Log.d(TAG, "Closing motion photo reader");
+        if (outputSurface != null) {
+            outputSurface.release();
+        }
         try {
             fileInputStream.close();
-            Log.d("ReaderActivity", "Close file input stream");
 
         } catch (IOException e) {
             e.printStackTrace();
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
             renderHandler.getLooper().quitSafely();
-            Log.d("ReaderActivity", "Safely quit looper");
         } else {
             renderHandler.getLooper().quit();
-            Log.d("ReaderActivity", "Quit looper");
         }
         lowResDecoder.release();
         lowResExtractor.release();
-        if (outputSurface != null) {
-            outputSurface.release();
-        }
     }
 
     /**

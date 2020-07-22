@@ -59,8 +59,12 @@ public class OutputSurfaceTest {
     private final List<Runnable> cleanup = new ArrayList<>();
 
     @Rule
-    public ActivityTestRule<MainActivity> activityRule =
-            new ActivityTestRule<>(MainActivity.class);
+    public ActivityTestRule<OutputSurfaceTestActivity> activityRule =
+            new ActivityTestRule<>(
+                    OutputSurfaceTestActivity.class,
+                    /* initialTouchMode = */ true,
+                    /* launchActivity= */ true
+            );
 
     @Before
     public void setUp() {
@@ -68,8 +72,8 @@ public class OutputSurfaceTest {
         renderThread.start();
         renderHandler = new Handler(renderThread.getLooper());
 
-        SurfaceView view = new SurfaceView(activityRule.getActivity().getApplicationContext());
-        surface = new Surface(view.getSurfaceControl());
+        SurfaceView surfaceView = activityRule.getActivity().findViewById(R.id.surface_view);
+        surface = new Surface(surfaceView.getSurfaceControl());
     }
 
     @After
@@ -81,24 +85,29 @@ public class OutputSurfaceTest {
     }
 
     @Test
-    public void setupOutputSurface_hasCorrectBehavior() {
+    public void setupOutputSurface_hasCorrectBehavior() throws InterruptedException {
         OutputSurface outputSurface = new OutputSurface(renderHandler, WIDTH, HEIGHT);
+        Thread.sleep(1000);
         cleanup.add(outputSurface::release);
         assertEquals(0, outputSurface.getGlErrors());
     }
 
     @Test
-    public void setSurface_hasCorrectBehavior() {
+    public void setSurface_hasCorrectBehavior() throws InterruptedException {
         OutputSurface outputSurface = new OutputSurface(renderHandler, WIDTH, HEIGHT);
+        Thread.sleep(500);
         outputSurface.setSurface(surface);
+        Thread.sleep(1000);
         cleanup.add(outputSurface::release);
         assertEquals(0, outputSurface.getGlErrors());
     }
 
     @Test
-    public void getRenderSurface_isNotNull() {
+    public void getRenderSurface_isNotNull() throws InterruptedException {
         OutputSurface outputSurface = new OutputSurface(renderHandler, WIDTH, HEIGHT);
+        Thread.sleep(500);
         outputSurface.setSurface(surface);
+        Thread.sleep(1000);
         cleanup.add(outputSurface::release);
         assertNotNull(outputSurface.getRenderSurface());
     }
