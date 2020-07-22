@@ -3,6 +3,8 @@ package com.google.android.libraries.motionphotoreader;
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -12,14 +14,12 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -31,6 +31,10 @@ import static org.mockito.Mockito.verify;
  */
 public class BufferProcessorTest {
 
+    private final static int WIDTH = 4032;
+    private final static int HEIGHT = 3024;
+
+    private OutputSurface outputSurface;
     private MediaExtractor lowResExtractor;
     private MediaCodec lowResDecoder;
     private BlockingQueue<Integer> availableInputBuffers;
@@ -38,6 +42,7 @@ public class BufferProcessorTest {
 
     @Before
     public void setUp() {
+        outputSurface = new OutputSurface(mock(Handler.class), WIDTH, HEIGHT);
         lowResExtractor = mock(MediaExtractor.class);
         lowResDecoder = mock(MediaCodec.class);
         availableInputBuffers = new LinkedBlockingQueue<>();
@@ -56,7 +61,11 @@ public class BufferProcessorTest {
     @Test
     public void handleNextFrameMsg_hasNextFrameTrue_isCorrect() {
         BufferProcessor bufferProcessor = spy(new BufferProcessor(
-                lowResExtractor, lowResDecoder, availableInputBuffers, availableOutputBuffers
+                outputSurface,
+                lowResExtractor,
+                lowResDecoder,
+                availableInputBuffers,
+                availableOutputBuffers
         ));
 
         doAnswer((Answer<Integer>) invocation -> 16)
@@ -83,7 +92,11 @@ public class BufferProcessorTest {
     @Test
     public void handleNextFrameMsg_hasNextFrameFalse_isCorrect() {
         BufferProcessor bufferProcessor = spy(new BufferProcessor(
-                lowResExtractor, lowResDecoder, availableInputBuffers, availableOutputBuffers
+                outputSurface,
+                lowResExtractor,
+                lowResDecoder,
+                availableInputBuffers,
+                availableOutputBuffers
         ));
 
         doAnswer((Answer<Integer>) invocation -> -1)
@@ -113,7 +126,11 @@ public class BufferProcessorTest {
     @Test
     public void handleSeekToFrameMsg_isCorrect() {
         BufferProcessor bufferProcessor = spy(new BufferProcessor(
-                lowResExtractor, lowResDecoder, availableInputBuffers, availableOutputBuffers
+                outputSurface,
+                lowResExtractor,
+                lowResDecoder,
+                availableInputBuffers,
+                availableOutputBuffers
         ));
 
         Bundle messageData = mock(Bundle.class);
@@ -129,7 +146,11 @@ public class BufferProcessorTest {
     @Test(expected = IllegalStateException.class)
     public void handleIncorrectMsg_isCorrect() {
         BufferProcessor bufferProcessor = spy(new BufferProcessor(
-                lowResExtractor, lowResDecoder, availableInputBuffers, availableOutputBuffers
+                outputSurface,
+                lowResExtractor,
+                lowResDecoder,
+                availableInputBuffers,
+                availableOutputBuffers
         ));
 
         Bundle messageData = mock(Bundle.class);
