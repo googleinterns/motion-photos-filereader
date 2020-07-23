@@ -64,18 +64,25 @@ public class MotionPhotoReader {
     private final BlockingQueue<Integer> availableInputBuffers;
     private final BlockingQueue<Bundle> availableOutputBuffers;
 
-    /** OpenGL fields. */
+    /** Fields passed onto OpenGL pipeline. */
     private OutputSurface outputSurface;
+    private int surfaceWidth;
+    private int surfaceHeight;
 
     /**
      * Standard MotionPhotoReader constructor.
      */
-    private MotionPhotoReader(File file, Surface surface,
+    private MotionPhotoReader(File file,
+                              Surface surface,
+                              int surfaceWidth,
+                              int surfaceHeight,
                               BlockingQueue<Integer> availableInputBuffers,
                               BlockingQueue<Bundle> availableOutputBuffers,
                               MotionPhotoInfo motionPhotoInfo) {
         this.file = file;
         this.surface = surface;
+        this.surfaceWidth = surfaceWidth;
+        this.surfaceHeight = surfaceHeight;
         this.lowResExtractor = new MediaExtractor();
         this.highResExtractor = new MediaExtractor();
         this.availableInputBuffers = availableInputBuffers;
@@ -84,6 +91,34 @@ public class MotionPhotoReader {
     }
 
     /**
+     * Opens and prepares a new MotionPhotoReader for a particular file.
+     * @param file The motion photo file to open.
+     * @param surface The surface for the motion photo reader to decode.
+     * @param surfaceWidth The width of the surface, in pixels.
+     * @param surfaceHeight The height of the surface, in pixels.
+     * @return a MotionPhotoReader object for the specified file.
+     * @throws IOException when the file cannot be found.
+     * @throws XMPException when parsing invalid XML syntax.
+     */
+    @RequiresApi(api = M)
+    public static MotionPhotoReader open(
+            File file,
+            Surface surface,
+            int surfaceWidth,
+            int surfaceHeight
+    ) throws IOException, XMPException {
+        return open(
+                file,
+                surface,
+                surfaceWidth,
+                surfaceHeight,
+                /* availableInputBuffers = */ new LinkedBlockingQueue<>(),
+                /* availableOutputBuffers = */ new LinkedBlockingQueue<>()
+        );
+    }
+
+    /**
+     * TODO: Discuss phasing out of methods with no dimension arguments.
      * Opens and prepares a new MotionPhotoReader for a particular file.
      * @param file The motion photo file to open.
      * @param surface The surface for the motion photo reader to decode.
@@ -97,11 +132,14 @@ public class MotionPhotoReader {
         return open(
                 file,
                 surface,
+                /* surfaceWidth = */ 0,
+                /* surfaceHeight = */ 0,
                 /* availableInputBuffers = */ new LinkedBlockingQueue<>(),
                 /* availableOutputBuffers = */ new LinkedBlockingQueue<>()
         );
     }
 
+    // TODO: Discuss phasing out of methods with no dimension arguments.
     @RequiresApi(api = M)
     public static MotionPhotoReader open(String filename, Surface surface)
             throws IOException, XMPException {
@@ -115,6 +153,8 @@ public class MotionPhotoReader {
     @VisibleForTesting
     static MotionPhotoReader open(File file,
                                   Surface surface,
+                                  int surfaceWidth,
+                                  int surfaceHeight,
                                   BlockingQueue<Integer> availableInputBuffers,
                                   BlockingQueue<Bundle> availableOutputBuffers)
             throws IOException, XMPException {
@@ -122,6 +162,8 @@ public class MotionPhotoReader {
         MotionPhotoReader reader = new MotionPhotoReader(
                 file,
                 surface,
+                surfaceWidth,
+                surfaceHeight,
                 availableInputBuffers,
                 availableOutputBuffers,
                 motionPhotoInfo
@@ -206,12 +248,8 @@ public class MotionPhotoReader {
 
         // Set up OpenGL pipeline if the surface is not null
         if (surface != null) {
-            outputSurface = new OutputSurface(
-                    renderHandler,
-                    motionPhotoInfo.getWidth(),
-                    motionPhotoInfo.getHeight()
-            );
-            outputSurface.setSurface(surface);
+            outputSurface = new OutputSurface(renderHandler, motionPhotoInfo);
+            outputSurface.setSurface(surface, surfaceWidth, surfaceHeight);
             lowResDecoder.configure(videoFormat, outputSurface.getDecodeSurface(), null, 0);
         } else {
             lowResDecoder.configure(videoFormat, null, null, 0);
