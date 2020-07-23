@@ -207,7 +207,7 @@ public class MotionPhotoWidget extends SurfaceView {
 
     /**
      * Get the timestamp of the motion photo being played.
-     * @return the current timestamp of tthe motion photo reader, in microseconds.
+     * @return the current timestamp of the motion photo reader, in microseconds.
      */
     public long getCurrentTimestampUs() {
         return reader.getCurrentTimestampUs();

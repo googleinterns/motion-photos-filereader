@@ -6,7 +6,6 @@ import android.opengl.EGLConfig;
 import android.opengl.EGLContext;
 import android.opengl.EGLDisplay;
 import android.opengl.EGLSurface;
-import android.opengl.GLES20;
 import android.os.Build;
 import android.os.Handler;
 import android.util.Log;
@@ -20,11 +19,14 @@ import com.google.common.util.concurrent.SettableFuture;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
+import static android.opengl.GLES30.*;
+
 /**
- * Holds state associated with a Surface used for MediaCodec decoder input. Creates an EGL surface
- * from a given surface (obtained in OutputSurface.setSurface()) and gets a SurfaceTexture from a
- * TextureRender object to hold frames from the decoder. The TextureRender draws frames to the EGL
- * surface.
+ * Holds state associated with a Surface used for MediaCodec decoder input.
+ *
+ * Creates an EGL surface from a given surface (obtained in OutputSurface.setSurface()) and gets a
+ * SurfaceTexture from a TextureRender object to hold frames from the decoder. The TextureRender
+ * draws frames to the EGL surface.
  */
 public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private static final String TAG = "OutputSurface";
@@ -45,13 +47,19 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private Handler renderHandler;
     private boolean frameAvailable;
 
+    private int width;
+    private int height;
+
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     public OutputSurface(Handler renderHandler, int width, int height) {
         this.renderHandler = renderHandler;
         if (width <= 0 || height <= 0) {
             throw new IllegalArgumentException("Invalid surface dimensions");
         }
-        eglSetup(width, height);
+        this.width = width;
+        this.height = height;
+
+        eglSetup();
         setup();
     }
 
@@ -64,7 +72,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         Log.d(TAG, "Setup output surface");
         renderHandler.post(() -> {
             textureRender = new TextureRender();
-            textureRender.onSurfaceCreated();
+            textureRender.onSurfaceCreated(width, height);
 
             // Texture for motion photo outputs
             surfaceTextureHandle = textureRender.getTextureID();
@@ -78,7 +86,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     }
 
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
-    private void eglSetup(int width, int height) {
+    private void eglSetup() {
         renderHandler.post(() -> {
             // Initialize EGL display
             eglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY);
@@ -102,7 +110,6 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
                     EGL14.EGL_GREEN_SIZE, 8,
                     EGL14.EGL_BLUE_SIZE, 8,
                     EGL14.EGL_ALPHA_SIZE, 8,
-                    EGL14.EGL_DEPTH_SIZE, 8,
                     EGL14.EGL_STENCIL_SIZE, 0,
                     EGL14.EGL_NONE
             };
@@ -138,7 +145,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             }
 
             // Check for any errors
-            glError += GLES20.glGetError();
+            glError += glGetError();
         });
     }
 
@@ -179,7 +186,10 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             }
 
             // Check for any errors
-            glError += GLES20.glGetError();
+            if (glGetError() != 0) {
+                glError += glGetError();
+                throw new RuntimeException("Failed to initialize EGL");
+            }
         });
     }
 
@@ -205,7 +215,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             decodeSurface = null;
 
             // Check for any errors
-            glError += GLES20.glGetError();
+            glError += glGetError();
         });
     }
 
