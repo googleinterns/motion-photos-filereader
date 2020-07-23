@@ -9,6 +9,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 
+import static android.opengl.GLES11Ext.GL_TEXTURE_EXTERNAL_OES;
 import static android.opengl.GLES30.*;
 
 /**
@@ -21,7 +22,7 @@ public class TextureRender {
 
     private static final int FLOAT_SIZE_BYTES = 4;
     private static final int TRIANGLE_VERTICES_DATA_POS_OFFSET = 0;
-    private static final int TRIANGLE_VERTICES_DATA_STRIDE_BYTES = 5 * FLOAT_SIZE_BYTES;
+    private static final int TRIANGLE_VERTICES_DATA_STRIDE_BYTES = 2 * FLOAT_SIZE_BYTES;
 
     private static final String VERTEX_SHADER =
             "#version 300 es\n" +
@@ -29,14 +30,15 @@ public class TextureRender {
             "in vec2 aPosition;\n" +
             "out vec2 TexCoord;\n" +
             "void main() {\n" +
-            "  TexCoord = (vec2(1.0, 1.0) + aPosition) * 0.5;\n" +
+            "  TexCoord = 0.5 * (vec2(1.0, 1.0) + aPosition);\n" +
             "  gl_Position = uMatrix * vec4(aPosition, 0.0, 1.0);\n" +
             "}";
 
     private static final String FRAGMENT_SHADER =
             "#version 300 es\n" +
+            "#extension GL_OES_EGL_image_external_essl3 : require\n" +
             "precision mediump float;\n" +
-            "uniform sampler2D uTexUnit;\n" +
+            "uniform samplerExternalOES uTexUnit;\n" +
             "in vec2 TexCoord;\n" +
             "out vec4 FragColor;\n" +
             "void main() {\n" +
@@ -46,10 +48,10 @@ public class TextureRender {
     // A single plane comprised of two triangles to hold the image texture
     private final float[] triangleVerticesData = {
             // positions (x,y)
-            -1.0f, -1.0f,  // bottom left
-             1.0f, -1.0f,  // bottom right
-            -1.0f,  1.0f,  // top left
-             1.0f,  1.0f,  // top right
+            -1.0f, -1.0f,   // bottom left
+             1.0f, -1.0f,   // bottom right
+            -1.0f,  1.0f,   // top left
+             1.0f,  1.0f    // top right
     };
 
     private float[] uMatrix = new float[16];
@@ -62,24 +64,49 @@ public class TextureRender {
 
     private FloatBuffer triangleVertices;
 
+    private int videoWidth = 0;
+    private int videoHeight = 0;
+    private int videoRotation = 0;
+
+    /**
+     * If true, the video will fill the surface in a center cropped format. Otherwise, the video
+     * will be scaled to fit in the surface.
+     */
+    private boolean fill;
+
     public TextureRender() {
         triangleVertices = ByteBuffer
                 .allocateDirect(triangleVerticesData.length * FLOAT_SIZE_BYTES)
-                .order(ByteOrder.nativeOrder())
+                .order(ByteOrder.nativeOrder()) // TODO: check this order
                 .asFloatBuffer();
         triangleVertices.put(triangleVerticesData).position(/* newPosition = */ 0);
+        Matrix.setIdentityM(uMatrix, /* smOffset = */ 0);
+    }
 
-        Matrix.setIdentityM(/* sm = */ uMatrix, /* smOffset = */ 0);
+    public void setVideoWidth(int videoWidth) {
+        this.videoWidth = videoWidth;
+    }
+
+    public void setVideoHeight(int videoHeight) {
+        this.videoHeight = videoHeight;
+    }
+
+    public void setVideoRotation(int videoRotation) {
+        this.videoRotation = videoRotation;
+    }
+
+    public void setFill(boolean fill) {
+        this.fill = fill;
     }
 
     public int getTextureID() {
         return textureID;
     }
 
-    public void onSurfaceCreated(int width, int height) {
+    public void onSurfaceCreated(int surfaceWidth, int surfaceHeight) {
         Log.d(TAG, "Initializing state");
 
-        glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
+        glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
 
         int vertexShader = compileShader(GL_VERTEX_SHADER, VERTEX_SHADER);
         int fragmentShader = compileShader(GL_FRAGMENT_SHADER, FRAGMENT_SHADER);
@@ -92,40 +119,42 @@ public class TextureRender {
         Log.v(TAG, "Program validation results: " + validateStatus[0]
                 + "\nLog: " + glGetProgramInfoLog(program));
 
-        glViewport(0, 0, width, height);
+        // Set up viewport, and make sure to account for rotated video orientation
+        // TODO: scale video to fit entire surface view, depending on app:fill in widget attributes
+        glViewport(0, 0, surfaceWidth, surfaceHeight);
+        if (glGetError() != 0) {
+            throw new RuntimeException("Failed to set up viewport");
+        }
+
+        // Set up rotation matrix if the camera orientation is greater than 0 degrees
+        if (videoRotation > 0) {
+            Log.d(TAG, "rotation: " + videoRotation);
+            Matrix.setRotateM(
+                    uMatrix,
+                    /* rmOffset = */ 0,
+                    /* a = */ -videoRotation,  // original video rotation is stored clockwise
+                    /* x = */ 0,
+                    /* y = */ 0,
+                    /* z = */ 1
+            );
+        }
+
         glUseProgram(program);
 
         // Create and bind textures
         int[] textureIds = new int[1];
         glGenTextures(/* n = */ 1, textureIds, 0);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureID);
+        glBindTexture(GL_TEXTURE_EXTERNAL_OES, textureID);
         textureID = textureIds[0];
 
-        // Set texture parameters
-        glTexParameterf(
-                GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
-                GL_TEXTURE_MIN_FILTER,
-                GL_NEAREST
-        );
-        glTexParameterf(
-                GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
-                GL_TEXTURE_MAG_FILTER,
-                GL_LINEAR
-        );
-        glTexParameteri(
-                GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
-                GL_TEXTURE_WRAP_S,
-                GL_CLAMP_TO_EDGE
-        );
-        glTexParameteri(
-                GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
-                GL_TEXTURE_WRAP_T,
-                GL_CLAMP_TO_EDGE
-        );
+        if (glGetError() != 0) {
+            throw new RuntimeException("Failed to set up textures");
+        }
 
         // TODO: Switch to VBOs and VAOs
         aPositionHandle = glGetAttribLocation(program, "aPosition");
+        glEnableVertexAttribArray(aPositionHandle);
         glVertexAttribPointer(
                 aPositionHandle,
                 /* size = */ 2,
@@ -134,7 +163,9 @@ public class TextureRender {
                 TRIANGLE_VERTICES_DATA_STRIDE_BYTES,
                 triangleVertices.position(TRIANGLE_VERTICES_DATA_POS_OFFSET)
         );
-        glEnableVertexAttribArray(aPositionHandle);
+        if (glGetError() != 0) {
+            throw new RuntimeException("Failed to get vertex position");
+        }
 
         uMatrixHandle = glGetUniformLocation(program, "uMatrix");
         glUniformMatrix4fv(
@@ -145,8 +176,16 @@ public class TextureRender {
                 /* offset = */ 0
         );
 
+        if (glGetError() != 0) {
+            throw new RuntimeException("Failed to get matrix");
+        }
+
         uTextureUnitHandle = glGetUniformLocation(program, "uTexUnit");
         glUniform1i(uTextureUnitHandle, /* x = */0);
+
+        if (glGetError() != 0) {
+            throw new RuntimeException("Failed to get texture unit");
+        }
     }
 
     private static int linkProgram(int vertexShader, int fragmentShader) {
@@ -208,10 +247,14 @@ public class TextureRender {
     public void drawFrame(SurfaceTexture surfaceTexture) {
         Log.d(TAG, "Drawing frame");
 
-        // Set the transform matrix of the surface texture
+        // Get the transform matrix of the surface texture
         surfaceTexture.getTransformMatrix(uMatrix);
 
         glClear(/* mask = */ GL_COLOR_BUFFER_BIT);
         glDrawArrays(GL_TRIANGLE_STRIP, /* first = */ 0, /* count = */ 4);
+        if (glGetError() != 0) {
+            throw new RuntimeException("Failed to draw to frame");
+        }
+
     }
 }

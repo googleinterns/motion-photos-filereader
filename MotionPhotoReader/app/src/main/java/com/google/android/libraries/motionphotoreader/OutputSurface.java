@@ -12,14 +12,11 @@ import android.util.Log;
 import android.view.Surface;
 
 import androidx.annotation.RequiresApi;
-import androidx.annotation.VisibleForTesting;
 
 import com.google.common.util.concurrent.SettableFuture;
 
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
-
-import static android.opengl.GLES30.*;
 
 /**
  * Holds state associated with a Surface used for MediaCodec decoder input.
@@ -38,41 +35,32 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private EGLSurface eglSurface;
     private EGLConfig eglConfig;
 
-    private int glError = 0; /* For debugging purposes */
-
     private int surfaceTextureHandle;
     private SurfaceTexture surfaceTexture;
     private Surface decodeSurface;
     private TextureRender textureRender;
     private Handler renderHandler;
     private boolean frameAvailable;
-
-    private int width;
-    private int height;
+    private MotionPhotoInfo motionPhotoInfo;
 
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
-    public OutputSurface(Handler renderHandler, int width, int height) {
+    public OutputSurface(Handler renderHandler, MotionPhotoInfo motionPhotoInfo) {
         this.renderHandler = renderHandler;
-        if (width <= 0 || height <= 0) {
+        if (motionPhotoInfo.getWidth() <= 0 || motionPhotoInfo.getHeight() <= 0) {
             throw new IllegalArgumentException("Invalid surface dimensions");
         }
-        this.width = width;
-        this.height = height;
-
+        this.motionPhotoInfo = motionPhotoInfo;
         eglSetup();
-        setup();
     }
 
-    @VisibleForTesting
-    int getGlErrors() {
-        return glError;
-    }
-
-    private void setup() {
+    private void setupTextureRender(int surfaceWidth, int surfaceHeight) {
         Log.d(TAG, "Setup output surface");
         renderHandler.post(() -> {
             textureRender = new TextureRender();
-            textureRender.onSurfaceCreated(width, height);
+            textureRender.setVideoWidth(motionPhotoInfo.getWidth());
+            textureRender.setVideoHeight(motionPhotoInfo.getHeight());
+            textureRender.setVideoRotation(motionPhotoInfo.getRotation());
+            textureRender.onSurfaceCreated(surfaceWidth, surfaceHeight);
 
             // Texture for motion photo outputs
             surfaceTextureHandle = textureRender.getTextureID();
@@ -80,8 +68,8 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             // After the motion photo texture has been created, the motion photo surface can be
             // initialized
             surfaceTexture = new SurfaceTexture(surfaceTextureHandle);
-            decodeSurface = new Surface(surfaceTexture);
             surfaceTexture.setOnFrameAvailableListener(this);
+            decodeSurface = new Surface(surfaceTexture);
         });
     }
 
@@ -140,21 +128,19 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             // Make context current (with EGL_NO_SURFACE)
             eglSurface = EGL14.EGL_NO_SURFACE;
             if (!EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
-                glError++;
                 Log.e(TAG, "Failed to make context current");
             }
-
-            // Check for any errors
-            glError += glGetError();
         });
     }
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
-    public void setSurface(Surface surface) {
+    public void setSurface(Surface surface, int surfaceWidth, int surfaceHeight) {
+        // Set up the texture render
+        setupTextureRender(surfaceWidth, surfaceHeight);
+
         renderHandler.post(() -> {
             // Abort if context is null
             if (eglContext == null) {
-                glError++;
                 Log.i(TAG, "EGL Context is null, can't set EGL surface");
                 return;
             }
@@ -181,14 +167,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
 
             // Make EGL surface current
             if (!EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
-                glError++;
                 Log.e(TAG, "Failed to make context current");
-            }
-
-            // Check for any errors
-            if (glGetError() != 0) {
-                glError += glGetError();
-                throw new RuntimeException("Failed to initialize EGL");
             }
         });
     }
@@ -213,9 +192,6 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             surfaceTexture = null;
             decodeSurface.release();
             decodeSurface = null;
-
-            // Check for any errors
-            glError += glGetError();
         });
     }
 
@@ -264,6 +240,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         });
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     @Override
     public void onFrameAvailable(SurfaceTexture surfaceTexture) {
         Log.d(TAG, "New frame available");
