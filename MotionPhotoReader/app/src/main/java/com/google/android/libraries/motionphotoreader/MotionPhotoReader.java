@@ -179,6 +179,34 @@ public class MotionPhotoReader {
         return reader;
     }
 
+    @RequiresApi(api = M)
+    @VisibleForTesting
+    static MotionPhotoReader open(File file,
+                                  Surface surface,
+                                  BlockingQueue<Integer> availableInputBuffers,
+                                  BlockingQueue<Bundle> availableOutputBuffers)
+            throws IOException, XMPException {
+        MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(file);
+        MotionPhotoReader reader = new MotionPhotoReader(
+                file,
+                surface,
+                /* surfaceWidth = */ 0,
+                /* surfaceHeight = */ 0,
+                availableInputBuffers,
+                availableOutputBuffers,
+                motionPhotoInfo
+        );
+        reader.startRenderThread(motionPhotoInfo);
+        reader.bufferProcessor = new BufferProcessor(
+                reader.outputSurface,
+                reader.lowResExtractor,
+                reader.lowResDecoder,
+                availableInputBuffers,
+                availableOutputBuffers
+        );
+        return reader;
+    }
+
     /**
      * Sets up and starts a new handler thread for MediaCodec objects (decoder and extractor).
      */

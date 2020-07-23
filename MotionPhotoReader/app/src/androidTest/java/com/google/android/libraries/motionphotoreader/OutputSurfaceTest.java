@@ -6,14 +6,23 @@ import android.view.Surface;
 import android.view.SurfaceView;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.rule.ActivityTestRule;
+
+import com.adobe.internal.xmp.XMPException;
+import com.google.common.io.ByteStreams;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -38,6 +47,7 @@ public class OutputSurfaceTest {
     private HandlerThread renderThread;
     private Handler renderHandler;
     private Surface surface;
+    private MotionPhotoInfo motionPhotoInfo;
 
     /** A list of output surfaces to release afterwards. */
     private final List<Runnable> cleanup = new ArrayList<>();
@@ -50,14 +60,21 @@ public class OutputSurfaceTest {
                     /* launchActivity= */ true
             );
 
+    @Rule
+    public TemporaryFolder temporaryFolder = new TemporaryFolder();
+
     @Before
-    public void setUp() {
+    public void setUp() throws IOException, XMPException {
+        // Set up rendering threads
         renderThread = new HandlerThread("renderThread");
         renderThread.start();
         renderHandler = new Handler(renderThread.getLooper());
 
         SurfaceView surfaceView = activityRule.getActivity().findViewById(R.id.surface_view);
         surface = new Surface(surfaceView.getSurfaceControl());
+
+        // Get motion photo info
+        motionPhotoInfo = MotionPhotoInfo.newInstance(fetchAssetFile(filename));
     }
 
     @After
@@ -68,29 +85,47 @@ public class OutputSurfaceTest {
         cleanup.clear();
     }
 
+    private File fetchAssetFile(String filename) throws IOException {
+        InputStream input = InstrumentationRegistry.getInstrumentation()
+                .getContext()
+                .getResources()
+                .getAssets()
+                .open(filename);
+
+        // Write file to temporary folder for instrumentation test access
+        File f = temporaryFolder.newFile(filename);
+        writeBytesToFile(input, f);
+        return f;
+    }
+
+    private static void writeBytesToFile(InputStream input, File file) throws IOException {
+        try (FileOutputStream fos = new FileOutputStream(file)) {
+            ByteStreams.copy(input, fos);
+        }
+    }
+
+
     @Test
     public void setupOutputSurface_hasCorrectBehavior() throws InterruptedException {
-        OutputSurface outputSurface = new OutputSurface(renderHandler, WIDTH, HEIGHT);
+        OutputSurface outputSurface = new OutputSurface(renderHandler, motionPhotoInfo);
         Thread.sleep(1000);
         cleanup.add(outputSurface::release);
-        assertEquals(0, outputSurface.getGlErrors());
     }
 
     @Test
     public void setSurface_hasCorrectBehavior() throws InterruptedException {
-        OutputSurface outputSurface = new OutputSurface(renderHandler, WIDTH, HEIGHT);
+        OutputSurface outputSurface = new OutputSurface(renderHandler, motionPhotoInfo);
         Thread.sleep(500);
-        outputSurface.setSurface(surface);
+        outputSurface.setSurface(surface, 0, 0);
         Thread.sleep(1000);
         cleanup.add(outputSurface::release);
-        assertEquals(0, outputSurface.getGlErrors());
     }
 
     @Test
     public void getRenderSurface_isNotNull() throws InterruptedException {
-        OutputSurface outputSurface = new OutputSurface(renderHandler, WIDTH, HEIGHT);
+        OutputSurface outputSurface = new OutputSurface(renderHandler, motionPhotoInfo);
         Thread.sleep(500);
-        outputSurface.setSurface(surface);
+        outputSurface.setSurface(surface, 0, 0);
         Thread.sleep(1000);
         cleanup.add(outputSurface::release);
         assertNotNull(outputSurface.getDecodeSurface());
