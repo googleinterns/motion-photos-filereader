@@ -208,7 +208,12 @@ public class MotionPhotoReader {
     }
 
     /**
-     * Sets up and starts a new handler thread for MediaCodec objects (decoder and extractor).
+     * Sets up and starts a new handler thread for the rendering pipeline and media decoders and
+     * extractors.
+     *
+     * A low resolution decoder and extractor are set up for the video track which holds frame data.
+     * If applicable, a high resolution decoder and extractor are set up for the motion track, which
+     * contains video stabilization data.
      */
     @RequiresApi(api = 23)
     private void startRenderThread(MotionPhotoInfo motionPhotoInfo) throws IOException {
@@ -242,7 +247,6 @@ public class MotionPhotoReader {
             Log.e("MotionPhotoReader", "Insufficient Android build version");
             return;
         }
-
         lowResDecoder.setCallback(new MediaCodec.Callback() {
 
             @Override
@@ -311,8 +315,7 @@ public class MotionPhotoReader {
 
     /**
      * Checks whether the Motion Photo video has a succeeding frame.
-     * @return 1 if there is no frame, 0 if the next frame exists, and -1 if no buffers are
-     * available.
+     * @return true if there is a frame, otherwise return false.
      */
     @RequiresApi(api = Build.VERSION_CODES.P)
     public boolean hasNextFrame() {

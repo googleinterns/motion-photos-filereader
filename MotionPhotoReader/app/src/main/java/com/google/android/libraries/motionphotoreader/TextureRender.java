@@ -1,7 +1,6 @@
 package com.google.android.libraries.motionphotoreader;
 
 import android.graphics.SurfaceTexture;
-import android.opengl.GLES11Ext;
 import android.opengl.Matrix;
 import android.util.Log;
 
@@ -10,13 +9,51 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 
 import static android.opengl.GLES11Ext.GL_TEXTURE_EXTERNAL_OES;
-import static android.opengl.GLES30.*;
+import static android.opengl.GLES30.GL_COLOR_BUFFER_BIT;
+import static android.opengl.GLES30.GL_COMPILE_STATUS;
+import static android.opengl.GLES30.GL_FLOAT;
+import static android.opengl.GLES30.GL_FRAGMENT_SHADER;
+import static android.opengl.GLES30.GL_LINK_STATUS;
+import static android.opengl.GLES30.GL_TEXTURE0;
+import static android.opengl.GLES30.GL_TRIANGLE_STRIP;
+import static android.opengl.GLES30.GL_VALIDATE_STATUS;
+import static android.opengl.GLES30.GL_VERTEX_SHADER;
+import static android.opengl.GLES30.glActiveTexture;
+import static android.opengl.GLES30.glAttachShader;
+import static android.opengl.GLES30.glBindTexture;
+import static android.opengl.GLES30.glClear;
+import static android.opengl.GLES30.glClearColor;
+import static android.opengl.GLES30.glCompileShader;
+import static android.opengl.GLES30.glCreateProgram;
+import static android.opengl.GLES30.glCreateShader;
+import static android.opengl.GLES30.glDeleteProgram;
+import static android.opengl.GLES30.glDeleteShader;
+import static android.opengl.GLES30.glDrawArrays;
+import static android.opengl.GLES30.glEnableVertexAttribArray;
+import static android.opengl.GLES30.glGenTextures;
+import static android.opengl.GLES30.glGetAttribLocation;
+import static android.opengl.GLES30.glGetError;
+import static android.opengl.GLES30.glGetProgramInfoLog;
+import static android.opengl.GLES30.glGetProgramiv;
+import static android.opengl.GLES30.glGetShaderiv;
+import static android.opengl.GLES30.glGetUniformLocation;
+import static android.opengl.GLES30.glLinkProgram;
+import static android.opengl.GLES30.glShaderSource;
+import static android.opengl.GLES30.glUniform1i;
+import static android.opengl.GLES30.glUniformMatrix4fv;
+import static android.opengl.GLES30.glUseProgram;
+import static android.opengl.GLES30.glValidateProgram;
+import static android.opengl.GLES30.glVertexAttribPointer;
+import static android.opengl.GLES30.glViewport;
 
 /**
- * Renders frames from a MediaCodec decoder (obtained from a surface texture attached to an OpenGL
- * texture) onto an EGL surface.
+ * Renders frames from a MediaCodec decoder onto an EGL surface.
+ *
+ * Video frames are decoded onto a Surface wrapped around a Surface Texture attached to this GL
+ * context. Stabilization is applied, and the texture is then rendered to a flat image plane
+ * covering the viewport.
  */
-public class TextureRender {
+class TextureRender {
 
     private static final String TAG = "TextureRender";
 
@@ -62,11 +99,11 @@ public class TextureRender {
     private int uMatrixHandle;
     private int uTextureUnitHandle;
 
-    private FloatBuffer triangleVertices;
-
     private int videoWidth = 0;
     private int videoHeight = 0;
     private int videoRotation = 0;
+
+    private FloatBuffer triangleVertices;
 
     /**
      * If true, the video will fill the surface in a center cropped format. Otherwise, the video
@@ -74,35 +111,54 @@ public class TextureRender {
      */
     private boolean fill;
 
+    /**
+     * Create a TextureRender instance and allocate memory for image data.
+     */
     public TextureRender() {
         triangleVertices = ByteBuffer
                 .allocateDirect(triangleVerticesData.length * FLOAT_SIZE_BYTES)
-                .order(ByteOrder.nativeOrder()) // TODO: check this order
+                .order(ByteOrder.nativeOrder())
                 .asFloatBuffer();
         triangleVertices.put(triangleVerticesData).position(/* newPosition = */ 0);
         Matrix.setIdentityM(uMatrix, /* smOffset = */ 0);
     }
 
+    /**
+     * Specify the original width of the video being rendered, in pixels. This should be called
+     * after constructing an instance.
+     */
     public void setVideoWidth(int videoWidth) {
         this.videoWidth = videoWidth;
     }
 
+    /**
+     * Specify the original width of the video being rendered, in pixels. This should be called
+     * after constructing an instance.
+     */
     public void setVideoHeight(int videoHeight) {
         this.videoHeight = videoHeight;
     }
 
+    /**
+     * Specify the camera orientation (as a rotation) of the video being rendered, in degrees.
+     */
     public void setVideoRotation(int videoRotation) {
         this.videoRotation = videoRotation;
     }
 
+    /**
+     * Specify the fill mode.
+     */
     public void setFill(boolean fill) {
         this.fill = fill;
     }
 
-    public int getTextureID() {
-        return textureID;
-    }
-
+    /**
+     * Sets up the GL program to render the video frames. Should be called immediately after
+     * constructing an instance of the TextureRender.
+     * @param surfaceWidth The width of the display Surface that the GL viewport covers, in pixels.
+     * @param surfaceHeight The height of the display Surface that the GL viewport covers, in pixels.
+     */
     public void onSurfaceCreated(int surfaceWidth, int surfaceHeight) {
         Log.d(TAG, "Initializing state");
 
@@ -244,6 +300,10 @@ public class TextureRender {
         return shader;
     }
 
+    /**
+     * Render the curremt frame.
+     * @param surfaceTexture The surface texture containing the texture of the current frame.
+     */
     public void drawFrame(SurfaceTexture surfaceTexture) {
         Log.d(TAG, "Drawing frame");
 
@@ -256,5 +316,12 @@ public class TextureRender {
             throw new RuntimeException("Failed to draw to frame");
         }
 
+    }
+
+    /**
+     * Gets the ID of the texture bound to the GL program.
+     */
+    public int getTextureID() {
+        return textureID;
     }
 }

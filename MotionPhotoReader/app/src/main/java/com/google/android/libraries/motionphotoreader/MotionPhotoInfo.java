@@ -20,6 +20,13 @@ import java.io.IOException;
 
 /**
  * Contains information relevant to extracting frames in a Motion Photo file.
+ *
+ * The fields stored are:
+ *   - The width of the video (before camera orientation rotations are applied) in pixels.
+ *   - The height of the video (before camera orientation rotations are applied) in pixels.
+ *   - The duration of the video in microseconds.
+ *   - The camera orientation while the motion photo was taken, as a rotation in degrees.
+ *   - The byte offset from the end of the file at which the video track begins.
  */
 public class MotionPhotoInfo {
 
@@ -27,15 +34,11 @@ public class MotionPhotoInfo {
 
     private final static int MOTION_PHOTO_VERSION_V1 = 1;
     private final static int MOTION_PHOTO_VERSION_V2 = 2;
-
-    private static final String CAMERA_XMP_NAMESPACE =
-            "http://ns.google.com/photos/1.0/camera/";
-    private static final String CONTAINER_XMP_NAMESPACE =
-            "http://ns.google.com/photos/1.0/container/";
+    private static final String CAMERA_XMP_NAMESPACE = "http://ns.google.com/photos/1.0/camera/";
 
     private final int width;
     private final int height;
-    private final long duration;
+    private final long durationUs;
     private final int rotation;
     private final int videoOffset;
 
@@ -43,10 +46,11 @@ public class MotionPhotoInfo {
      * Creates a MotionPhotoInfo object associated with a given file.
      */
     @RequiresApi(api = Build.VERSION_CODES.M)
-    private MotionPhotoInfo(MediaFormat mediaFormat, int videoOffset) {
+    @VisibleForTesting
+    MotionPhotoInfo(MediaFormat mediaFormat, int videoOffset) {
         width = mediaFormat.getInteger(MediaFormat.KEY_WIDTH);
         height = mediaFormat.getInteger(MediaFormat.KEY_HEIGHT);
-        duration = mediaFormat.getLong(MediaFormat.KEY_DURATION);
+        durationUs = mediaFormat.getLong(MediaFormat.KEY_DURATION);
         rotation = mediaFormat.containsKey(MediaFormat.KEY_ROTATION)
                 ? mediaFormat.getInteger(MediaFormat.KEY_ROTATION)
                 : 0;
@@ -57,39 +61,21 @@ public class MotionPhotoInfo {
      * Returns a new instance of MotionPhotoInfo for a specified file.
      */
     @RequiresApi(api = Build.VERSION_CODES.M)
-    public static MotionPhotoInfo newInstance(String filename) throws IOException, XMPException {
-        return MotionPhotoInfo.newInstance(new File(filename));
-    }
-
-    @RequiresApi(api = Build.VERSION_CODES.M)
     public static MotionPhotoInfo newInstance(File file) throws IOException, XMPException {
         MediaExtractor extractor = new MediaExtractor();
         try {
-            return MotionPhotoInfo.newInstance(file, new MediaExtractor());
+            XMPMeta meta = getFileXmp(file);
+            int videoOffset = getVideoOffset(meta);
+            MediaFormat mediaFormat = getFileMediaFormat(file, new MediaExtractor(), videoOffset);
+            return new MotionPhotoInfo(mediaFormat, videoOffset);
         } finally {
             extractor.release();
         }
     }
 
-    /**
-     * Returns a new instance of MotionPhotoInfo with a specified file and MediaExtractor.
-     * Used for testing.
-     */
-    @VisibleForTesting
     @RequiresApi(api = Build.VERSION_CODES.M)
-    static MotionPhotoInfo newInstance(String filename, MediaExtractor extractor)
-            throws IOException, XMPException {
-        return MotionPhotoInfo.newInstance(new File(filename), extractor);
-    }
-
-    @VisibleForTesting
-    @RequiresApi(api = Build.VERSION_CODES.M)
-    static MotionPhotoInfo newInstance(File file, MediaExtractor extractor)
-            throws IOException, XMPException {
-        XMPMeta meta = getFileXmp(file);
-        int videoOffset = getVideoOffset(meta);
-        MediaFormat mediaFormat = getFileMediaFormat(file, extractor, videoOffset);
-        return new MotionPhotoInfo(mediaFormat, videoOffset);
+    public static MotionPhotoInfo newInstance(String filename) throws IOException, XMPException {
+        return MotionPhotoInfo.newInstance(new File(filename));
     }
 
     /**
@@ -150,7 +136,7 @@ public class MotionPhotoInfo {
      */
     private static int getMotionPhotoVersion(XMPMeta meta) throws XMPException {
         if (meta.doesPropertyExist(CAMERA_XMP_NAMESPACE, "MicroVideo")) {
-            // This is microvideo v1 file
+            // This is a motion photo v1 file
             int microVideo = meta.getPropertyInteger(CAMERA_XMP_NAMESPACE, "MicroVideo");
             if (microVideo == 1) {
                 return 1;
@@ -213,8 +199,8 @@ public class MotionPhotoInfo {
         return videoOffset;
     }
 
-    public long getDuration() {
-        return duration;
+    public long getDurationUs() {
+        return durationUs;
     }
 
     public int getRotation() {

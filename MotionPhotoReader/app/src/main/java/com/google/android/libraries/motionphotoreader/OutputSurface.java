@@ -25,7 +25,7 @@ import java.util.concurrent.ExecutionException;
  * SurfaceTexture from a TextureRender object to hold frames from the decoder. The TextureRender
  * draws frames to the EGL surface.
  */
-public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
+class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private static final String TAG = "OutputSurface";
 
     private final Object frameSyncObject = new Object();
@@ -43,6 +43,12 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private boolean frameAvailable;
     private MotionPhotoInfo motionPhotoInfo;
 
+    /**
+     * Creates a new output surface.
+     * @param renderHandler The handler thread on which all calls from this instance will run.
+     * @param motionPhotoInfo The motion photo info associated with the video being played to this
+     *                        output surface.
+     */
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     public OutputSurface(Handler renderHandler, MotionPhotoInfo motionPhotoInfo) {
         this.renderHandler = renderHandler;
@@ -53,6 +59,12 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         eglSetup();
     }
 
+    /**
+     * Sets up the texture render object for preprocessing video frames before rendering to the
+     * final output surface.
+     * @param surfaceWidth The width of the surface on which the video is displayed, in pixels.
+     * @param surfaceHeight The height of the surface on which the video is displayed, in pixels.
+     */
     private void setupTextureRender(int surfaceWidth, int surfaceHeight) {
         Log.d(TAG, "Setup output surface");
         renderHandler.post(() -> {
@@ -62,7 +74,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             textureRender.setVideoRotation(motionPhotoInfo.getRotation());
             textureRender.onSurfaceCreated(surfaceWidth, surfaceHeight);
 
-            // Texture for motion photo outputs
+            // Get the texture for motion photo outputs
             surfaceTextureHandle = textureRender.getTextureID();
 
             // After the motion photo texture has been created, the motion photo surface can be
@@ -73,6 +85,9 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         });
     }
 
+    /**
+     * Configures and initializes the EGL context.
+     */
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     private void eglSetup() {
         renderHandler.post(() -> {
@@ -133,6 +148,13 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         });
     }
 
+    /**
+     * Associate a Surface object with this OutputSurface on which the final video will be
+     * displayed. This should be called immediately after the instance is constructed.
+     * @param surface The Surface object on which the final video will be displayed.
+     * @param surfaceWidth The width of the Surface object, in pixels.
+     * @param surfaceHeight The height of the Surface object, in pixels.
+     */
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     public void setSurface(Surface surface, int surfaceWidth, int surfaceHeight) {
         // Set up the texture render
@@ -172,6 +194,9 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         });
     }
 
+    /**
+     * Free up all resources associated with this OutputSurface.
+     */
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     public void release() {
         Log.d(TAG, "Releasing output surface");
@@ -195,11 +220,15 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         });
     }
 
+    /**
+     * Get the Surface object which decoded video frames are rendered to before processing. Note
+     * that this Surface does not display the final rendered video, but instead holds the
+     * SurfaceTexture that supply textures to the TextureRender.
+     * @return the intermediate decoding Surface.
+     */
     public Surface getDecodeSurface() {
         SettableFuture<Surface> surfaceFuture = SettableFuture.create();
-        renderHandler.post(() -> {
-            surfaceFuture.set(decodeSurface);
-        });
+        renderHandler.post(() -> surfaceFuture.set(decodeSurface));
         try {
             return surfaceFuture.get();
         } catch (InterruptedException | ExecutionException e) {
@@ -208,6 +237,9 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         }
     }
 
+    /**
+     * Wait for a new frame to be decoded to the decode Surface.
+     */
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     public void awaitNewImage() {
         renderHandler.post(() -> {
@@ -226,12 +258,13 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
                 }
                 frameAvailable = false;
             }
-
-            // Latch the data
             surfaceTexture.updateTexImage();
         });
     }
 
+    /**
+     * Draw the image to the final display Surface.
+     */
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     public void drawImage() {
         renderHandler.post(() -> {

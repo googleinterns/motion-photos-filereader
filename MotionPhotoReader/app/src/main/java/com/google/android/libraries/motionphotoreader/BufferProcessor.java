@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit;
 import static android.os.Build.VERSION_CODES.LOLLIPOP;
 
 /**
- * A handler meant specifically for handling messages received from a motion photo reader.
+ * A processor specifically used to handle nextFrame() and seekTo() calls from MotionPhotoReader.
  */
 class BufferProcessor {
     private static final String TAG = "BufferProcessor";
@@ -149,7 +149,6 @@ class BufferProcessor {
                 timestampUs = bufferData.getLong("TIMESTAMP_US");
                 bufferIndex = bufferData.getInt("BUFFER_INDEX");
 
-                // TODO: Fix playback speed issues
                 // Compute the delay in render timestamp between the current frame and the previous
                 // frame.
                 long frameDeltaNs = (timestampUs - prevTimestampUs) * US_TO_NS;

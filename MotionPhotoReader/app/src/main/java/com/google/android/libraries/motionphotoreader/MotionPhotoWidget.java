@@ -5,7 +5,6 @@ import android.content.res.TypedArray;
 import android.graphics.Color;
 import android.media.MediaExtractor;
 import android.os.Build;
-
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.util.AttributeSet;
@@ -27,11 +26,18 @@ import java.util.concurrent.Executors;
 
 /**
  * Widget that can load and play motion photos video files.
+ *
+ * Customizable attribute fields include:
+ *   - autoloop: If true, the video automatically loops when the end is reached. Otherwise, stop
+ *     video after it ends.
+ *   - fill: If true, the video fills the entire surface it is being played to, in a center-crop
+ *     display. Otherwise, scale the video to fit entirely within the surface.
  */
 public class MotionPhotoWidget extends SurfaceView {
 
     private static final String TAG = "MotionPhotoWidget";
 
+    /** Customizable attribute fields. */
     private final boolean autoloop;
     private final boolean fill;
 
@@ -44,6 +50,8 @@ public class MotionPhotoWidget extends SurfaceView {
     /** Fields that are saved for the view state. */
     private long savedTimestampUs;
     private boolean isPaused = true;
+    private int surfaceWidth = 0;
+    private int surfaceHeight = 0;
 
     @RequiresApi(api = Build.VERSION_CODES.O)
     public MotionPhotoWidget(Context context) {
@@ -53,6 +61,11 @@ public class MotionPhotoWidget extends SurfaceView {
         initialize();
     }
 
+    /**
+     * Initialize a motion photo widget with the given attributes.
+     * @param context The context of the activity to which the widget is attached.
+     * @param attrs The attributes specifying the customizable fields of the widget.
+     */
     @RequiresApi(api = Build.VERSION_CODES.O)
     public MotionPhotoWidget(Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
@@ -63,11 +76,6 @@ public class MotionPhotoWidget extends SurfaceView {
         // Fetch value of “custom:timeline_base_color”
         Color timelineBaseColor = Color.valueOf(
                 ta.getColor(R.styleable.MotionPhotoWidget_timeline_base_color, Color.RED)
-        );
-
-        // Fetch value of “custom:timeline_fill_color”
-        Color timelineFillColor = Color.valueOf(
-                ta.getColor(R.styleable.MotionPhotoWidget_timeline_fill_color, Color.RED)
         );
 
         // Fetch value of “custom:autoloop”
@@ -100,19 +108,21 @@ public class MotionPhotoWidget extends SurfaceView {
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
                 Log.d(TAG, "Surface changed");
                 surfaceHolder = holder;
+                surfaceWidth = width;
+                surfaceHeight = height;
 
-                // create a new motion photo reader
+                // Create a new motion photo reader
                 if (reader != null) {
                     reader.close();
                 }
                 try {
-                    reader = MotionPhotoReader.open(file, holder.getSurface(), width, height);
+                    reader = MotionPhotoReader.open(file, holder.getSurface(), surfaceWidth, surfaceHeight);
                     Log.d(TAG, "New motion photo reader created");
                 } catch (IOException | XMPException e) {
                     Log.e(TAG, "Exception occurred while opening file", e);
                 }
 
-                // continue playing the video if not in paused state
+                // Continue playing the video if not in paused state
                 reader.seekTo(savedTimestampUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
                 if (!isPaused) {
                     play();
@@ -173,6 +183,8 @@ public class MotionPhotoWidget extends SurfaceView {
             myState.savedTimestampUs = 0L;
         }
         myState.isPaused = this.isPaused;
+        myState.surfaceWidth = this.surfaceWidth;
+        myState.surfaceHeight = this.surfaceHeight;
         myState.fileURIPath = this.file.toURI().getPath();
 
         return myState;
@@ -187,9 +199,14 @@ public class MotionPhotoWidget extends SurfaceView {
         // Grab properties out of the SavedState
         this.savedTimestampUs = savedState.savedTimestampUs;
         this.isPaused = savedState.isPaused;
+        this.surfaceWidth = savedState.surfaceWidth;
+        this.surfaceHeight = savedState.surfaceHeight;
         this.file = new File(savedState.fileURIPath);
     }
 
+    /**
+     * Plays the motion photo video.
+     */
     public void play() {
         if (playProcess != null) {
             playProcess.cancel();
@@ -199,6 +216,9 @@ public class MotionPhotoWidget extends SurfaceView {
         isPaused = false;
     }
 
+    /**
+     * Pauses the motion photo video.
+     */
     public void pause() {
         playProcess.cancel();
         isPaused = true;
@@ -240,7 +260,7 @@ public class MotionPhotoWidget extends SurfaceView {
         if (reader != null) {
             pause();
             reader.close();
-            reader = MotionPhotoReader.open(file, surfaceHolder.getSurface());
+            reader = MotionPhotoReader.open(file, surfaceHolder.getSurface(), surfaceWidth, surfaceHeight);
             // Show the first frame
             if (reader.hasNextFrame()) {
                 reader.nextFrame();
@@ -265,7 +285,7 @@ public class MotionPhotoWidget extends SurfaceView {
         @RequiresApi(api = Build.VERSION_CODES.P)
         @Override
         public void run() {
-            // start playing video
+            // Start playing video
             while (!exit) {
                 if (reader.hasNextFrame()) {
                     reader.nextFrame();
@@ -289,6 +309,8 @@ public class MotionPhotoWidget extends SurfaceView {
     private static class SavedState extends BaseSavedState {
         long savedTimestampUs;
         boolean isPaused;
+        int surfaceWidth;
+        int surfaceHeight;
         String fileURIPath;
 
         SavedState(Parcelable superState) {
@@ -300,6 +322,8 @@ public class MotionPhotoWidget extends SurfaceView {
             super(in);
             savedTimestampUs = in.readLong();
             isPaused = in.readBoolean();
+            surfaceWidth = in.readInt();
+            surfaceHeight = in.readInt();
             fileURIPath = in.readString();
         }
 
@@ -309,6 +333,8 @@ public class MotionPhotoWidget extends SurfaceView {
             super.writeToParcel(out, flags);
             out.writeLong(savedTimestampUs);
             out.writeBoolean(isPaused);
+            out.writeInt(surfaceWidth);
+            out.writeInt(surfaceHeight);
             out.writeString(fileURIPath);
         }
 
