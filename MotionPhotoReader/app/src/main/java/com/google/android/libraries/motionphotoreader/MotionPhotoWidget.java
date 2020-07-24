@@ -40,8 +40,6 @@ public class MotionPhotoWidget extends SurfaceView {
 
     /** Customizable attribute fields. */
     private final boolean autoloop;
-    private final boolean fill;
-    private final Color backgroundColor;
 
     private ExecutorService executor;
     private MotionPhotoReader reader;
@@ -59,8 +57,6 @@ public class MotionPhotoWidget extends SurfaceView {
     public MotionPhotoWidget(Context context) {
         super(context);
         autoloop = true;
-        fill = false;
-        backgroundColor = Color.valueOf(Color.BLACK);
         initialize();
     }
 
@@ -76,16 +72,8 @@ public class MotionPhotoWidget extends SurfaceView {
                 /* defStyleAttr = */ 0,
                 /* defStyleRes = */ 0);
 
-        // Fetch value of “custom:background_color”
-        backgroundColor = Color.valueOf(
-                ta.getColor(R.styleable.MotionPhotoWidget_background_color, Color.BLACK)
-        );
-
         // Fetch value of “custom:autoloop”
         autoloop = ta.getBoolean(R.styleable.MotionPhotoWidget_autoloop, true);
-
-        // Fetch value of “custom:autoloop”
-        fill = ta.getBoolean(R.styleable.MotionPhotoWidget_fill, false);
 
         ta.recycle();
         initialize();

@@ -108,12 +108,6 @@ class TextureRender {
     private FloatBuffer triangleVertices;
 
     /**
-     * If true, the video will fill the surface in a center cropped format. Otherwise, the video
-     * will be scaled to fit in the surface.
-     */
-    private boolean fill;
-
-    /**
      * Create a TextureRender instance and allocate memory for image data.
      */
     public TextureRender() {
@@ -149,13 +143,6 @@ class TextureRender {
     }
 
     /**
-     * Specify the fill mode.
-     */
-    public void setFill(boolean fill) {
-        this.fill = fill;
-    }
-
-    /**
      * Sets up the GL program to render the video frames. Should be called immediately after
      * constructing an instance of the TextureRender.
      * @param surfaceWidth The width of the display Surface that the GL viewport covers, in pixels.
@@ -166,7 +153,7 @@ class TextureRender {
         this.surfaceWidth = surfaceWidth;
         this.surfaceHeight = surfaceHeight;
 
-        glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
         int vertexShader = compileShader(GL_VERTEX_SHADER, VERTEX_SHADER);
         int fragmentShader = compileShader(GL_FRAGMENT_SHADER, FRAGMENT_SHADER);
@@ -233,7 +220,6 @@ class TextureRender {
     }
 
     private void setViewport() {
-        Log.d(TAG, "Setting frame transform, fill = " + fill);
         // Rotate video dimensions dimensions if necessary
         int newVideoWidth = videoWidth;
         int newVideoHeight = videoHeight;
@@ -249,24 +235,14 @@ class TextureRender {
         int translateOffsetY = 0;
         if (surfaceWidth / aspectRatio > surfaceHeight) {
             // Video is "narrower" than display surface (limited by height)
-            if (fill) {
-                viewportWidth = surfaceWidth;
-                viewportHeight = (int) (surfaceWidth / aspectRatio);
-            } else {
-                viewportWidth = (int) (surfaceHeight * aspectRatio);
-                viewportHeight = surfaceHeight;
-                translateOffsetX = (surfaceWidth - viewportWidth) / 2;
-            }
+            viewportWidth = (int) (surfaceHeight * aspectRatio);
+            viewportHeight = surfaceHeight;
+            translateOffsetX = (surfaceWidth - viewportWidth) / 2;
         } else {
             // Video is "wider" than display surface (limited by width)
-            if (fill) {
-                viewportWidth = (int) (surfaceHeight * aspectRatio);
-                viewportHeight = surfaceHeight;
-            } else {
-                viewportWidth = surfaceWidth;
-                viewportHeight = (int) (surfaceWidth / aspectRatio);
-                translateOffsetY = (surfaceHeight - viewportHeight) / 2;
-            }
+            viewportWidth = surfaceWidth;
+            viewportHeight = (int) (surfaceWidth / aspectRatio);
+            translateOffsetY = (surfaceHeight - viewportHeight) / 2;
         }
 
         glViewport(translateOffsetX, translateOffsetY, viewportWidth, viewportHeight);
