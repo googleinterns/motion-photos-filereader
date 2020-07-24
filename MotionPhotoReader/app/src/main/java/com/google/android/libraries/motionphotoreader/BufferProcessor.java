@@ -21,7 +21,7 @@ class BufferProcessor {
 
     private static final long TIMEOUT_US = 1000L;
     private static final long US_TO_NS = 1000L;
-    private static final long THIRTY_FPS_NS = 1_000_000_000 / 30;
+    private static final long FALLBACK_FRAME_DELTA_NS = 1_000_000_000L / 30;
 
     private long prevRenderTimestampNs;
     private long prevTimestampUs;
@@ -154,7 +154,7 @@ class BufferProcessor {
                 // frame.
                 long frameDeltaNs = (timestampUs - prevTimestampUs) * US_TO_NS;
                 if (frameDeltaNs <= 0) {
-                    frameDeltaNs = THIRTY_FPS_NS;
+                    frameDeltaNs = FALLBACK_FRAME_DELTA_NS;
                 }
                 // Set the previous timestamp ("zero out" the timestamps) to the current system
                 // timestamp if it has not been set yet (i.e. equals zero).

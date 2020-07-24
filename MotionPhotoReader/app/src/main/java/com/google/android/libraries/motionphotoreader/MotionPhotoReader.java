@@ -282,7 +282,6 @@ public class MotionPhotoReader {
         } else {
             lowResDecoder.configure(videoFormat, null, null, 0);
         }
-
         lowResDecoder.start();
     }
 

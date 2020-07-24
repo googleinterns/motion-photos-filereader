@@ -6,6 +6,8 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import androidx.annotation.RequiresApi;
+
+import com.adobe.internal.xmp.XMPException;
 import com.google.common.io.ByteStreams;
 
 import java.io.File;
@@ -18,7 +20,9 @@ public class MainActivity extends Activity {
 
     private static final String TAG = "MainActivity";
 
-    @RequiresApi(api = Build.VERSION_CODES.M)
+    private boolean isV1;
+
+    @RequiresApi(api = Build.VERSION_CODES.P)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
