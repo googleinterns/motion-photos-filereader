@@ -97,7 +97,7 @@ public class MotionPhotoReaderTest {
     public void getCurrentTimestamp_onStart_isCorrect() throws IOException, XMPException {
         MotionPhotoReader reader = MotionPhotoReader.open(fetchAssetFile(filename), null);
         cleanup.add(reader::close);
-        assertEquals(0, reader.getCurrentTimestamp());
+        assertEquals(0, reader.getCurrentTimestampUs());
     }
 
     @Test
@@ -107,7 +107,7 @@ public class MotionPhotoReaderTest {
 
         long currentTimestampUs = -1L;
         while (reader.hasNextFrame()) {
-            long newTimestampUs = reader.getCurrentTimestamp();
+            long newTimestampUs = reader.getCurrentTimestampUs();
             reader.nextFrame();
             boolean flag = currentTimestampUs < newTimestampUs;
             assertTrue("Timestamp did not increase: "
@@ -124,8 +124,8 @@ public class MotionPhotoReaderTest {
 
         long currentTimestampUs = -1L;
         while (reader.hasNextFrame()) {
-            long newTimestampUs = reader.getCurrentTimestamp();
-            reader.seekTo(reader.getCurrentTimestamp() + SEEK_AMOUNT_US,
+            long newTimestampUs = reader.getCurrentTimestampUs();
+            reader.seekTo(reader.getCurrentTimestampUs() + SEEK_AMOUNT_US,
                     MediaExtractor.SEEK_TO_NEXT_SYNC);
             boolean flag = currentTimestampUs < newTimestampUs;
             assertTrue("Timestamp did not increase: "
@@ -169,7 +169,8 @@ public class MotionPhotoReaderTest {
         );
         cleanup.add(reader::close);
 
-        assertFalse("Available input buffer queue is empty", fakeAvailableInputBuffers.isEmpty());
+        assertFalse("Available input buffer queue is empty",
+                fakeAvailableInputBuffers.isEmpty());
     }
 
     @Test
@@ -240,7 +241,7 @@ public class MotionPhotoReaderTest {
         }
 
         public boolean isEmpty() {
-            return size.get() == 1;
+            return size.get() < 1;
         }
     }
 }
