@@ -102,6 +102,8 @@ class TextureRender {
     private int videoWidth = 0;
     private int videoHeight = 0;
     private int videoRotation = 0;
+    int surfaceWidth = 0;
+    int surfaceHeight = 0;
 
     private FloatBuffer triangleVertices;
 
@@ -161,6 +163,8 @@ class TextureRender {
      */
     public void onSurfaceCreated(int surfaceWidth, int surfaceHeight) {
         Log.d(TAG, "Initializing state");
+        this.surfaceWidth = surfaceWidth;
+        this.surfaceHeight = surfaceHeight;
 
         glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
 
@@ -177,23 +181,7 @@ class TextureRender {
 
         // Set up viewport, and make sure to account for rotated video orientation
         // TODO: scale video to fit entire surface view, depending on app:fill in widget attributes
-        glViewport(0, 0, surfaceWidth, surfaceHeight);
-        if (glGetError() != 0) {
-            throw new RuntimeException("Failed to set up viewport");
-        }
-
-        // Set up rotation matrix if the camera orientation is greater than 0 degrees
-        if (videoRotation > 0) {
-            Log.d(TAG, "rotation: " + videoRotation);
-            Matrix.setRotateM(
-                    uMatrix,
-                    /* rmOffset = */ 0,
-                    /* a = */ -videoRotation,  // original video rotation is stored clockwise
-                    /* x = */ 0,
-                    /* y = */ 0,
-                    /* z = */ 1
-            );
-        }
+        setViewport();
 
         glUseProgram(program);
 
@@ -241,6 +229,62 @@ class TextureRender {
 
         if (glGetError() != 0) {
             throw new RuntimeException("Failed to get texture unit");
+        }
+    }
+
+    private void setViewport() {
+        Log.d(TAG, "Setting frame transform, fill = " + fill);
+        // Rotate video dimensions dimensions if necessary
+        int newVideoWidth = videoWidth;
+        int newVideoHeight = videoHeight;
+        if (videoRotation > 0) {
+            newVideoWidth = videoHeight;
+            newVideoHeight = videoWidth;
+        }
+
+        // Create matrix to scale the video based on fill mode
+        double aspectRatio = (float) newVideoWidth / newVideoHeight;
+        int viewportWidth, viewportHeight;
+        int translateOffsetX = 0;
+        int translateOffsetY = 0;
+        if (surfaceWidth / aspectRatio > surfaceHeight) {
+            // Video is "narrower" than display surface (limited by height)
+            if (fill) {
+                viewportWidth = surfaceWidth;
+                viewportHeight = (int) (surfaceWidth / aspectRatio);
+            } else {
+                viewportWidth = (int) (surfaceHeight * aspectRatio);
+                viewportHeight = surfaceHeight;
+                translateOffsetX = (surfaceWidth - viewportWidth) / 2;
+            }
+        } else {
+            // Video is "wider" than display surface (limited by width)
+            if (fill) {
+                viewportWidth = (int) (surfaceHeight * aspectRatio);
+                viewportHeight = surfaceHeight;
+            } else {
+                viewportWidth = surfaceWidth;
+                viewportHeight = (int) (surfaceWidth / aspectRatio);
+                translateOffsetY = (surfaceHeight - viewportHeight) / 2;
+            }
+        }
+
+        glViewport(translateOffsetX, translateOffsetY, viewportWidth, viewportHeight);
+        if (glGetError() != 0) {
+            throw new RuntimeException("Failed to set up viewport");
+        }
+
+        // Set up rotation matrix if the camera orientation is greater than 0 degrees
+        if (videoRotation > 0) {
+            Log.d(TAG, "rotation: " + videoRotation);
+            Matrix.rotateM(
+                    uMatrix,
+                    /* rmOffset = */ 0,
+                    /* a = */ -videoRotation,  // Original video rotation is stored clockwise
+                    /* x = */ 0,
+                    /* y = */ 0,
+                    /* z = */ 1
+            );
         }
     }
 
@@ -307,7 +351,7 @@ class TextureRender {
     public void drawFrame(SurfaceTexture surfaceTexture) {
         Log.d(TAG, "Drawing frame");
 
-        // Get the transform matrix of the surface texture
+        // Set the transform matrix of the surface texture
         surfaceTexture.getTransformMatrix(uMatrix);
 
         glClear(/* mask = */ GL_COLOR_BUFFER_BIT);

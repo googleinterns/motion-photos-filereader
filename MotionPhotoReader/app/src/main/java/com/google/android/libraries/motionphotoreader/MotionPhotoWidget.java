@@ -260,7 +260,12 @@ public class MotionPhotoWidget extends SurfaceView {
         if (reader != null) {
             pause();
             reader.close();
-            reader = MotionPhotoReader.open(file, surfaceHolder.getSurface(), surfaceWidth, surfaceHeight);
+            reader = MotionPhotoReader.open(
+                    file,
+                    surfaceHolder.getSurface(),
+                    surfaceWidth,
+                    surfaceHeight
+            );
             // Show the first frame
             if (reader.hasNextFrame()) {
                 reader.nextFrame();
