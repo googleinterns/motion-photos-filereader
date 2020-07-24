@@ -25,7 +25,7 @@ import java.util.concurrent.ExecutionException;
  * SurfaceTexture from a TextureRender object to hold frames from the decoder. The TextureRender
  * draws frames to the EGL surface.
  */
-class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
+public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private static final String TAG = "OutputSurface";
 
     private final Object frameSyncObject = new Object();

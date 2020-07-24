@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <declare-styleable name="MotionPhotoWidget">
-        <attr name="timeline_base_color" format="color" />
-        <attr name="timeline_fill_color" format="color" />
+        <attr name="background_color" format="color" />
         <attr name="autoloop" format="boolean" />
         <attr name="fill" format="boolean" />
     </declare-styleable>
