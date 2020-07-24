@@ -2,9 +2,9 @@ package com.google.android.libraries.motionphotoreader;
 
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
+import android.media.MediaFormat;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.HandlerThread;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -31,8 +31,13 @@ import static org.mockito.Mockito.verify;
  */
 public class BufferProcessorTest {
 
-    private final static int WIDTH = 4032;
-    private final static int HEIGHT = 3024;
+    // define a mock media format for motion photo v1 format
+    private final static int KEY_WIDTH = 4032;
+    private final static int KEY_HEIGHT = 3024;
+    private final static long KEY_DURATION = 1499400;
+    private final static int KEY_ROTATION = 90;
+    private final static String KEY_MIME = "video/avc";
+    private final static int VIDEO_OFFSET = 2592317;
 
     private OutputSurface outputSurface;
     private MediaExtractor lowResExtractor;
@@ -42,11 +47,21 @@ public class BufferProcessorTest {
 
     @Before
     public void setUp() {
-        outputSurface = new OutputSurface(mock(Handler.class), WIDTH, HEIGHT);
+        // Set up mock objects
         lowResExtractor = mock(MediaExtractor.class);
         lowResDecoder = mock(MediaCodec.class);
         availableInputBuffers = new LinkedBlockingQueue<>();
         availableOutputBuffers = new LinkedBlockingQueue<>();
+
+        MediaFormat mediaFormat = createFakeVideoFormat(
+                KEY_WIDTH,
+                KEY_HEIGHT,
+                KEY_ROTATION,
+                KEY_ROTATION,
+                KEY_MIME
+        );
+        MotionPhotoInfo motionPhotoInfo = new MotionPhotoInfo(mediaFormat, VIDEO_OFFSET);
+        outputSurface = new OutputSurface(mock(Handler.class), motionPhotoInfo);
 
         availableInputBuffers.offer(1);
         availableInputBuffers.offer(2);
@@ -56,6 +71,40 @@ public class BufferProcessorTest {
         doAnswer((Answer<Long>) invocation -> 1_000L).when(bundle).getLong(eq("TIMESTAMP_US"));
         doAnswer((Answer<Integer>) invocation -> 0).when(bundle).getInt(eq("BUFFER_INDEX"));
         availableOutputBuffers.offer(bundle);
+    }
+
+    /**
+     * Creates a mock media format object. Used to represent video formats of motion photo files.
+     * @param width The width of the motion photo video, in pixels.
+     * @param height The height of the motion photo video, in pixels.
+     * @param duration The duration of the motion photo video, in microseconds.
+     * @param rotation The rotation applied to the motion photo, in degrees.
+     * @param mime The mime type of the motion photo video track.
+     * @return a mock MediaFormat object.
+     */
+    private MediaFormat createFakeVideoFormat(int width,
+                                              int height,
+                                              long duration,
+                                              int rotation,
+                                              String mime) {
+        MediaFormat videoFormat = mock(MediaFormat.class);
+        doAnswer((Answer<Integer>) invocation -> width)
+                .when(videoFormat)
+                .getInteger(eq(MediaFormat.KEY_WIDTH));
+        doAnswer((Answer<Integer>) invocation -> height)
+                .when(videoFormat)
+                .getInteger(eq(MediaFormat.KEY_HEIGHT));
+        doAnswer((Answer<Long>) invocation -> duration)
+                .when(videoFormat)
+                .getLong(eq(MediaFormat.KEY_DURATION));
+        doAnswer((Answer<Integer>) invocation -> rotation)
+                .when(videoFormat)
+                .getInteger(eq(MediaFormat.KEY_ROTATION));
+        doAnswer((Answer<String>) invocation -> mime)
+                .when(videoFormat)
+                .getString(eq(MediaFormat.KEY_MIME));
+
+        return videoFormat;
     }
 
     @Test

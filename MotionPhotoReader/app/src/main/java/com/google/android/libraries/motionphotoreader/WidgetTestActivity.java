@@ -9,13 +9,8 @@ import android.view.View;
 import androidx.annotation.RequiresApi;
 
 import com.adobe.internal.xmp.XMPException;
-import com.google.common.io.ByteStreams;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 
 public class WidgetTestActivity extends Activity {
 
@@ -33,7 +28,13 @@ public class WidgetTestActivity extends Activity {
         MotionPhotoWidget motionPhotoWidget = findViewById(R.id.motion_photo_widget);
         Log.d(TAG, "Motion photo widget set up");
         try {
-            motionPhotoWidget.setFile(fetchRawFile(R.raw.v1, "motionPhotoV1", "jpg"));
+            motionPhotoWidget.setFile(
+                    ResourceFetcher.fetchRawFile(
+                            this.getApplicationContext(),
+                            R.raw.v1,
+                            "motionPhotoV1", "jpg"
+                    )
+            );
             isV1 = true;
         } catch (IOException | XMPException e) {
             Log.e(TAG, "Unable to set widget file", e);
@@ -54,10 +55,13 @@ public class WidgetTestActivity extends Activity {
             if (isV1) {
                 Log.d(TAG, "Is V1");
                 try {
-                    motionPhotoWidget.setFile(fetchRawFile(
-                            R.raw.v2,
-                            /* prefix = */ "motionPhotoV2",
-                            /* suffix = */ ".jpg")
+                    motionPhotoWidget.setFile(
+                            ResourceFetcher.fetchRawFile(
+                                    this.getApplicationContext(),
+                                    R.raw.v2,
+                                    /* prefix = */ "motionPhotoV2",
+                                    /* suffix = */ ".jpg"
+                            )
                     );
                     isV1 = false;
                     return true;
@@ -66,10 +70,13 @@ public class WidgetTestActivity extends Activity {
                 }
             } else {
                 try {
-                    motionPhotoWidget.setFile(fetchRawFile(
-                            R.raw.v1,
-                            /* prefix = */ "motionPhotoV1",
-                            /* suffix = */ ".jpg")
+                    motionPhotoWidget.setFile(
+                            ResourceFetcher.fetchRawFile(
+                                    this.getApplicationContext(),
+                                    R.raw.v1,
+                                    /* prefix = */ "motionPhotoV1",
+                                    /* suffix = */ ".jpg"
+                            )
                     );
                     isV1 = true;
                     return true;
@@ -79,33 +86,5 @@ public class WidgetTestActivity extends Activity {
             }
             return false;
         });
-    }
-
-    /**
-     * Fetches a resource from the res/raw folder and creates a temporary file holding the resource.
-     * Used to fetch motion photo files.
-     * @param id The id of the file.
-     * @param prefix The name of the temporary file to create from the raw resource.
-     * @param suffix The extension of the temporary file to create from the raw resource.
-     * @return a File object containing the raw resource file.
-     */
-    private File fetchRawFile(int id, String prefix, String suffix) {
-        InputStream input = getResources().openRawResource(id);
-        File file = null;
-        try {
-            file = File.createTempFile(prefix, suffix);
-        } catch (IOException e) {
-            Log.e(TAG, "Error fetching raw file", e);
-        }
-        writeBytesToFile(input, file);
-        return file;
-    }
-
-    private static void writeBytesToFile(InputStream input, File file) {
-        try (OutputStream output = new FileOutputStream(file)) {
-            ByteStreams.copy(input, output);
-        } catch (IOException e) {
-            Log.e(TAG, "Error writing file", e);
-        }
     }
 }
