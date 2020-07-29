@@ -15,7 +15,6 @@ import androidx.annotation.RequiresApi;
 
 import com.google.common.util.concurrent.SettableFuture;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
@@ -30,6 +29,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private static final String TAG = "OutputSurface";
 
     private final Object frameSyncObject = new Object();
+    private final Object surfaceSyncObject = new Object();
 
     private EGLDisplay eglDisplay;
     private EGLContext eglContext;
@@ -80,9 +80,11 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
 
             // After the motion photo texture has been created, the motion photo surface can be
             // initialized
-            surfaceTexture = new SurfaceTexture(surfaceTextureHandle);
-            surfaceTexture.setOnFrameAvailableListener(this);
-            decodeSurface = new Surface(surfaceTexture);
+            synchronized (surfaceSyncObject) {
+                surfaceTexture = new SurfaceTexture(surfaceTextureHandle);
+                surfaceTexture.setOnFrameAvailableListener(this);
+                decodeSurface = new Surface(surfaceTexture);
+            }
         });
     }
 
@@ -267,9 +269,9 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
      * Draw the image to the final display Surface.
      */
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
-    public void drawImage(List<Float> stabilizationMatrices) {
+    public void drawImage() {
         renderHandler.post(() -> {
-            textureRender.drawFrame(surfaceTexture, stabilizationMatrices);
+            textureRender.drawFrame(surfaceTexture);
             EGL14.eglSwapBuffers(eglDisplay, eglSurface);
         });
     }

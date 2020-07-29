@@ -7,12 +7,8 @@ import android.util.Log;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 import static android.opengl.GLES11Ext.GL_TEXTURE_EXTERNAL_OES;
-import static android.opengl.GLES20.glUniformMatrix3fv;
 import static android.opengl.GLES30.GL_COLOR_BUFFER_BIT;
 import static android.opengl.GLES30.GL_COMPILE_STATUS;
 import static android.opengl.GLES30.GL_FLOAT;
@@ -63,18 +59,16 @@ class TextureRender {
 
     private static final int FLOAT_SIZE_BYTES = 4;
     private static final int TRIANGLE_VERTICES_DATA_POS_OFFSET = 0;
-    private static final int TRIANGLE_VERTICES_DATA_STRIDE_BYTES = 3 * FLOAT_SIZE_BYTES;
+    private static final int TRIANGLE_VERTICES_DATA_STRIDE_BYTES = 2 * FLOAT_SIZE_BYTES;
 
     private static final String VERTEX_SHADER =
             "#version 300 es\n" +
             "uniform mat4 uMatrix;\n" +
-            "uniform mat3 uStabMatrix;\n" +
-            "in vec3 aPosition;\n" +
+            "in vec2 aPosition;\n" +
             "out vec2 TexCoord;\n" +
             "void main() {\n" +
-            "  TexCoord = 0.5 * aPosition.xy + vec2(0.5, 0.5);\n" +
-            "  vec3 hPos = uStabMatrix * aPosition;\n" +
-            "  gl_Position = uMatrix * vec4(hPos.x / hPos.z, hPos.y / hPos.z, 0.0, 1.0);\n" +
+            "  TexCoord = 0.5 * (vec2(1.0, 1.0) + aPosition);\n" +
+            "  gl_Position = uMatrix * vec4(aPosition, 0.0, 1.0);\n" +
             "}";
 
     private static final String FRAGMENT_SHADER =
@@ -89,22 +83,20 @@ class TextureRender {
             "}";
 
     // A single plane comprised of two triangles to hold the image texture
-    private float[] triangleVerticesData = {
+    private final float[] triangleVerticesData = {
             // positions (x,y)
-            -1.0f, -1.0f, 1.0f,   // bottom left
-             1.0f, -1.0f, 1.0f,   // bottom right
-            -1.0f,  1.0f, 1.0f,   // top left
-             1.0f,  1.0f, 1.0f    // top right
+            -1.0f, -1.0f,   // bottom left
+             1.0f, -1.0f,   // bottom right
+            -1.0f,  1.0f,   // top left
+             1.0f,  1.0f    // top right
     };
 
     private float[] uMatrix = new float[16];
-    private float[] uStabMatrix = new float[9];
 
     private int textureID;
     private int program;
     private int aPositionHandle;
     private int uMatrixHandle;
-    private int uStabMatrixHandle;
     private int uTextureUnitHandle;
 
     private int videoWidth = 0;
@@ -196,7 +188,7 @@ class TextureRender {
         glEnableVertexAttribArray(aPositionHandle);
         glVertexAttribPointer(
                 aPositionHandle,
-                /* size = */ 3,
+                /* size = */ 2,
                 /* type = */ GL_FLOAT,
                 /* normalized = */ false,
                 TRIANGLE_VERTICES_DATA_STRIDE_BYTES,
@@ -214,6 +206,7 @@ class TextureRender {
                 uMatrix,
                 /* offset = */ 0
         );
+
         if (glGetError() != 0) {
             throw new RuntimeException("Failed to get matrix");
         }
@@ -269,7 +262,6 @@ class TextureRender {
                     /* z = */ 1
             );
         }
-//        Matrix.scaleM(uMatrix, 0, 0.5f, 0.5f, 0);
     }
 
     private static int linkProgram(int vertexShader, int fragmentShader) {
@@ -328,175 +320,22 @@ class TextureRender {
         return shader;
     }
 
-    public void transformVertices(List<Float> stabilizationMatrices) {
-        // Reset triangle vertices data
-        triangleVerticesData[0] = -1.0f;
-        triangleVerticesData[1] = -1.0f;
-        triangleVerticesData[2] = 0.0f;
-        triangleVerticesData[3] = 1.0f;
-        triangleVerticesData[4] = -1.0f;
-        triangleVerticesData[5] = 0.0f;
-        triangleVerticesData[6] = -1.0f;
-        triangleVerticesData[7] = 1.0f;
-        triangleVerticesData[8] = 0.0f;
-        triangleVerticesData[9] = 1.0f;
-        triangleVerticesData[10] = 1.0f;
-        triangleVerticesData[11] = 0.0f;
-
-        // Transform the triangle vertices according to the stabilization matrices
-        // TODO: add multiple strips
-        List<Float> stabilizationMatrix = new ArrayList<>(stabilizationMatrices.subList(0, 9));
-        for (int i = 1; i < 12; i++) {
-            for (int j = 0; j < 9; j++) {
-                stabilizationMatrix.set(
-                        j,
-                        stabilizationMatrix.get(j) + stabilizationMatrices.get(9 * i + j)
-                );
-            }
-        }
-        for (int i = 0; i < 9; i++) {
-            stabilizationMatrix.set(
-                    i,
-                    stabilizationMatrix.get(i) / 12
-            );
-        }
-
-        Log.d(TAG, "Matrix: " + Arrays.toString(stabilizationMatrix.toArray()));
-        for (int i = 0; i < triangleVerticesData.length / 12; i++) {
-            // bottom left
-            triangleVerticesData[4 * i] = stabilizationMatrix.get(0) * triangleVerticesData[4 * i] +
-                    stabilizationMatrix.get(1) * triangleVerticesData[4 * i + 1] +
-                    stabilizationMatrix.get(2) * triangleVerticesData[4 * i + 2];
-            triangleVerticesData[4 * i + 1] = stabilizationMatrix.get(3) * triangleVerticesData[4 * i] +
-                    stabilizationMatrix.get(4) * triangleVerticesData[4 * i + 1] +
-                    stabilizationMatrix.get(5) * triangleVerticesData[4 * i + 2];
-            triangleVerticesData[4 * i + 2] = stabilizationMatrix.get(6) * triangleVerticesData[4 * i] +
-                    stabilizationMatrix.get(7) * triangleVerticesData[4 * i + 1] +
-                    stabilizationMatrix.get(8) * triangleVerticesData[4 * i + 2];
-
-            // bottom right
-            triangleVerticesData[4 * i + 3] = stabilizationMatrix.get(0) * triangleVerticesData[4 * i + 3] +
-                    stabilizationMatrix.get(1) * triangleVerticesData[4 * i + 4] +
-                    stabilizationMatrix.get(2) * triangleVerticesData[4 * i + 5];
-            triangleVerticesData[4 * i + 4] = stabilizationMatrix.get(3) * triangleVerticesData[4 * i + 3] +
-                    stabilizationMatrix.get(4) * triangleVerticesData[4 * i + 4] +
-                    stabilizationMatrix.get(5) * triangleVerticesData[4 * i + 5];
-            triangleVerticesData[4 * i + 5] = stabilizationMatrix.get(6) * triangleVerticesData[4 * i + 3] +
-                    stabilizationMatrix.get(7) * triangleVerticesData[4 * i + 4] +
-                    stabilizationMatrix.get(8) * triangleVerticesData[4 * i + 5];
-
-            // top left
-            triangleVerticesData[4 * i + 6] = stabilizationMatrix.get(0) * triangleVerticesData[4 * i + 6] +
-                    stabilizationMatrix.get(1) * triangleVerticesData[4 * i + 7] +
-                    stabilizationMatrix.get(2) * triangleVerticesData[4 * i + 2];
-            triangleVerticesData[4 * i + 7] = stabilizationMatrix.get(3) * triangleVerticesData[4 * i + 6] +
-                    stabilizationMatrix.get(4) * triangleVerticesData[4 * i + 7] +
-                    stabilizationMatrix.get(5) * triangleVerticesData[4 * i + 8];
-            triangleVerticesData[4 * i + 8] = stabilizationMatrix.get(6) * triangleVerticesData[4 * i + 6] +
-                    stabilizationMatrix.get(7) * triangleVerticesData[4 * i + 7] +
-                    stabilizationMatrix.get(8) * triangleVerticesData[4 * i + 8];
-
-            // top right
-            triangleVerticesData[4 * i + 9] = stabilizationMatrix.get(0) * triangleVerticesData[4 * i + 9] +
-                    stabilizationMatrix.get(1) * triangleVerticesData[4 * i + 10] +
-                    stabilizationMatrix.get(2) * triangleVerticesData[4 * i + 11];
-            triangleVerticesData[4 * i + 10] = stabilizationMatrix.get(3) * triangleVerticesData[4 * i + 9] +
-                    stabilizationMatrix.get(4) * triangleVerticesData[4 * i + 10] +
-                    stabilizationMatrix.get(5) * triangleVerticesData[4 * i + 11];
-            triangleVerticesData[4 * i + 11] = stabilizationMatrix.get(6) * triangleVerticesData[4 * i + 9] +
-                    stabilizationMatrix.get(7) * triangleVerticesData[4 * i + 10] +
-                    stabilizationMatrix.get(8) * triangleVerticesData[4 * i + 11];
-        }
-
-        triangleVertices.put(triangleVerticesData).position(/* newPosition = */ 0);
-        Log.d(TAG, "Triangle vertices:\n" + Arrays.toString(triangleVerticesData));
-    }
-
     /**
      * Render the curremt frame.
      * @param surfaceTexture The surface texture containing the texture of the current frame.
      */
-    public void drawFrame(SurfaceTexture surfaceTexture, List<Float> stabilizationMatrices) {
+    public void drawFrame(SurfaceTexture surfaceTexture) {
         Log.d(TAG, "Drawing frame");
 
-//        transformVertices(stabilizationMatrices);
-//        // TODO: Switch to VBOs and VAOs
-//        aPositionHandle = glGetAttribLocation(program, "aPosition");
-//        glEnableVertexAttribArray(aPositionHandle);
-//        glVertexAttribPointer(
-//                aPositionHandle,
-//                /* size = */ 3,
-//                /* type = */ GL_FLOAT,
-//                /* normalized = */ false,
-//                TRIANGLE_VERTICES_DATA_STRIDE_BYTES,
-//                triangleVertices.position(TRIANGLE_VERTICES_DATA_POS_OFFSET)
-//        );
-//        if (glGetError() != 0) {
-//            throw new RuntimeException("Failed to get vertex position");
-//        }
-
         // Set the transform matrix of the surface texture
-//        surfaceTexture.getTransformMatrix(uMatrix);
-
-        // Transform the triangle vertices according to the stabilization matrices
-        // TODO: add multiple strips
-        List<Float> stabilizationMatrix = new ArrayList<>(stabilizationMatrices.subList(45, 54));
-        for (int i = 1; i < 12; i++) {
-            for (int j = 0; j < 9; j++) {
-                stabilizationMatrix.set(
-                        j,
-                        stabilizationMatrix.get(j) + stabilizationMatrices.get(9 * i + j)
-                );
-            }
-        }
-        for (int i = 0; i < 9; i++) {
-            stabilizationMatrix.set(
-                    i,
-                    stabilizationMatrix.get(i) / 12
-            );
-        }
-
-//        Matrix.setIdentityM(uStabMatrix, 0);
-//        uStabMatrix[0] = stabilizationMatrix.get(0);
-//        uStabMatrix[4] = stabilizationMatrix.get(1);
-//        uStabMatrix[8] = stabilizationMatrix.get(2);
-//        uStabMatrix[1] = stabilizationMatrix.get(3);
-//        uStabMatrix[5] = stabilizationMatrix.get(4);
-//        uStabMatrix[9] = stabilizationMatrix.get(5);
-//        uStabMatrix[2] = stabilizationMatrix.get(6);
-//        uStabMatrix[6] = stabilizationMatrix.get(7);
-//        uStabMatrix[10] = stabilizationMatrix.get(8);
-//        Matrix.translateM(uStabMatrix, 0, 0.5f, 0.5f, 0);
-
-        uStabMatrix[0] = stabilizationMatrix.get(0);
-        uStabMatrix[3] = stabilizationMatrix.get(1);
-        uStabMatrix[6] = stabilizationMatrix.get(2);
-        uStabMatrix[1] = stabilizationMatrix.get(3);
-        uStabMatrix[4] = stabilizationMatrix.get(4);
-        uStabMatrix[7] = stabilizationMatrix.get(5);
-        uStabMatrix[2] = stabilizationMatrix.get(6);
-        uStabMatrix[5] = stabilizationMatrix.get(7);
-        uStabMatrix[8] = stabilizationMatrix.get(8);
-
-        Log.d(TAG, "uStabMatrix: " + Arrays.toString(uStabMatrix));
-
-        uStabMatrixHandle = glGetUniformLocation(program, "uStabMatrix");
-        glUniformMatrix3fv(
-                uStabMatrixHandle,
-                /* count = */ 1,
-                /* transpose = */ false,
-                uStabMatrix,
-                /* offset = */ 0
-        );
-        if (glGetError() != 0) {
-            throw new RuntimeException("Failed to get matrix");
-        }
+        surfaceTexture.getTransformMatrix(uMatrix);
 
         glClear(/* mask = */ GL_COLOR_BUFFER_BIT);
         glDrawArrays(GL_TRIANGLE_STRIP, /* first = */ 0, /* count = */ 4);
         if (glGetError() != 0) {
             throw new RuntimeException("Failed to draw to frame");
         }
+
     }
 
     /**

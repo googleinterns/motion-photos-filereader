@@ -31,7 +31,7 @@ public class WidgetTestActivity extends Activity {
             motionPhotoWidget.setFile(
                     ResourceFetcher.fetchRawFile(
                             this.getApplicationContext(),
-                            R.raw.v1b,
+                            R.raw.v1,
                             "motionPhotoV1", "jpg"
                     )
             );
@@ -73,7 +73,7 @@ public class WidgetTestActivity extends Activity {
                     motionPhotoWidget.setFile(
                             ResourceFetcher.fetchRawFile(
                                     this.getApplicationContext(),
-                                    R.raw.v1b,
+                                    R.raw.v1,
                                     /* prefix = */ "motionPhotoV1",
                                     /* suffix = */ ".jpg"
                             )
