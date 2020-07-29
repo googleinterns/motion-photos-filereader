@@ -58,7 +58,7 @@ public class WidgetTestActivity extends Activity {
                     motionPhotoWidget.setFile(
                             ResourceFetcher.fetchRawFile(
                                     this.getApplicationContext(),
-                                    R.raw.v2,
+                                    R.raw.v1,
                                     /* prefix = */ "motionPhotoV2",
                                     /* suffix = */ ".jpg"
                             )
