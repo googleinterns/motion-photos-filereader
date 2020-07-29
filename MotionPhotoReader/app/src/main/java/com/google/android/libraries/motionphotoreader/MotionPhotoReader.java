@@ -229,7 +229,6 @@ public class MotionPhotoReader {
         lowResExtractor.setDataSource(fd, file.length() - videoOffset, videoOffset);
 
         // Find the video track and create an appropriate media decoder
-        // TODO: Initialize high resolution media decoder (for stabilization)
         for (int i = 0; i < lowResExtractor.getTrackCount(); i++) {
             MediaFormat format = lowResExtractor.getTrackFormat(i);
             String mime = format.getString(MediaFormat.KEY_MIME);
