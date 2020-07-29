@@ -269,7 +269,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     public void drawImage(List<Float> stabilizationMatrices) {
         renderHandler.post(() -> {
-            textureRender.drawFrame(surfaceTexture, stabilizationMatrices);
+            textureRender.drawFrame(stabilizationMatrices);
             EGL14.eglSwapBuffers(eglDisplay, eglSurface);
         });
     }

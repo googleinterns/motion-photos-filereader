@@ -12,7 +12,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static android.opengl.GLES11Ext.GL_TEXTURE_EXTERNAL_OES;
-import static android.opengl.GLES20.glUniformMatrix3fv;
+import static android.opengl.GLES30.glUniformMatrix3fv;
 import static android.opengl.GLES30.GL_COLOR_BUFFER_BIT;
 import static android.opengl.GLES30.GL_COMPILE_STATUS;
 import static android.opengl.GLES30.GL_FLOAT;
@@ -269,7 +269,6 @@ class TextureRender {
                     /* z = */ 1
             );
         }
-//        Matrix.scaleM(uMatrix, 0, 0.5f, 0.5f, 0);
     }
 
     private static int linkProgram(int vertexShader, int fragmentShader) {
@@ -328,146 +327,28 @@ class TextureRender {
         return shader;
     }
 
-    public void transformVertices(List<Float> stabilizationMatrices) {
-        // Reset triangle vertices data
-        triangleVerticesData[0] = -1.0f;
-        triangleVerticesData[1] = -1.0f;
-        triangleVerticesData[2] = 0.0f;
-        triangleVerticesData[3] = 1.0f;
-        triangleVerticesData[4] = -1.0f;
-        triangleVerticesData[5] = 0.0f;
-        triangleVerticesData[6] = -1.0f;
-        triangleVerticesData[7] = 1.0f;
-        triangleVerticesData[8] = 0.0f;
-        triangleVerticesData[9] = 1.0f;
-        triangleVerticesData[10] = 1.0f;
-        triangleVerticesData[11] = 0.0f;
+    /**
+     * Render the curremt frame.
+     */
+    public void drawFrame(List<Float> stabilizationMatrices) {
+        Log.d(TAG, "Drawing frame");
 
         // Transform the triangle vertices according to the stabilization matrices
         // TODO: add multiple strips
         List<Float> stabilizationMatrix = new ArrayList<>(stabilizationMatrices.subList(0, 9));
-        for (int i = 1; i < 12; i++) {
-            for (int j = 0; j < 9; j++) {
-                stabilizationMatrix.set(
-                        j,
-                        stabilizationMatrix.get(j) + stabilizationMatrices.get(9 * i + j)
-                );
-            }
-        }
-        for (int i = 0; i < 9; i++) {
-            stabilizationMatrix.set(
-                    i,
-                    stabilizationMatrix.get(i) / 12
-            );
-        }
-
-        Log.d(TAG, "Matrix: " + Arrays.toString(stabilizationMatrix.toArray()));
-        for (int i = 0; i < triangleVerticesData.length / 12; i++) {
-            // bottom left
-            triangleVerticesData[4 * i] = stabilizationMatrix.get(0) * triangleVerticesData[4 * i] +
-                    stabilizationMatrix.get(1) * triangleVerticesData[4 * i + 1] +
-                    stabilizationMatrix.get(2) * triangleVerticesData[4 * i + 2];
-            triangleVerticesData[4 * i + 1] = stabilizationMatrix.get(3) * triangleVerticesData[4 * i] +
-                    stabilizationMatrix.get(4) * triangleVerticesData[4 * i + 1] +
-                    stabilizationMatrix.get(5) * triangleVerticesData[4 * i + 2];
-            triangleVerticesData[4 * i + 2] = stabilizationMatrix.get(6) * triangleVerticesData[4 * i] +
-                    stabilizationMatrix.get(7) * triangleVerticesData[4 * i + 1] +
-                    stabilizationMatrix.get(8) * triangleVerticesData[4 * i + 2];
-
-            // bottom right
-            triangleVerticesData[4 * i + 3] = stabilizationMatrix.get(0) * triangleVerticesData[4 * i + 3] +
-                    stabilizationMatrix.get(1) * triangleVerticesData[4 * i + 4] +
-                    stabilizationMatrix.get(2) * triangleVerticesData[4 * i + 5];
-            triangleVerticesData[4 * i + 4] = stabilizationMatrix.get(3) * triangleVerticesData[4 * i + 3] +
-                    stabilizationMatrix.get(4) * triangleVerticesData[4 * i + 4] +
-                    stabilizationMatrix.get(5) * triangleVerticesData[4 * i + 5];
-            triangleVerticesData[4 * i + 5] = stabilizationMatrix.get(6) * triangleVerticesData[4 * i + 3] +
-                    stabilizationMatrix.get(7) * triangleVerticesData[4 * i + 4] +
-                    stabilizationMatrix.get(8) * triangleVerticesData[4 * i + 5];
-
-            // top left
-            triangleVerticesData[4 * i + 6] = stabilizationMatrix.get(0) * triangleVerticesData[4 * i + 6] +
-                    stabilizationMatrix.get(1) * triangleVerticesData[4 * i + 7] +
-                    stabilizationMatrix.get(2) * triangleVerticesData[4 * i + 2];
-            triangleVerticesData[4 * i + 7] = stabilizationMatrix.get(3) * triangleVerticesData[4 * i + 6] +
-                    stabilizationMatrix.get(4) * triangleVerticesData[4 * i + 7] +
-                    stabilizationMatrix.get(5) * triangleVerticesData[4 * i + 8];
-            triangleVerticesData[4 * i + 8] = stabilizationMatrix.get(6) * triangleVerticesData[4 * i + 6] +
-                    stabilizationMatrix.get(7) * triangleVerticesData[4 * i + 7] +
-                    stabilizationMatrix.get(8) * triangleVerticesData[4 * i + 8];
-
-            // top right
-            triangleVerticesData[4 * i + 9] = stabilizationMatrix.get(0) * triangleVerticesData[4 * i + 9] +
-                    stabilizationMatrix.get(1) * triangleVerticesData[4 * i + 10] +
-                    stabilizationMatrix.get(2) * triangleVerticesData[4 * i + 11];
-            triangleVerticesData[4 * i + 10] = stabilizationMatrix.get(3) * triangleVerticesData[4 * i + 9] +
-                    stabilizationMatrix.get(4) * triangleVerticesData[4 * i + 10] +
-                    stabilizationMatrix.get(5) * triangleVerticesData[4 * i + 11];
-            triangleVerticesData[4 * i + 11] = stabilizationMatrix.get(6) * triangleVerticesData[4 * i + 9] +
-                    stabilizationMatrix.get(7) * triangleVerticesData[4 * i + 10] +
-                    stabilizationMatrix.get(8) * triangleVerticesData[4 * i + 11];
-        }
-
-        triangleVertices.put(triangleVerticesData).position(/* newPosition = */ 0);
-        Log.d(TAG, "Triangle vertices:\n" + Arrays.toString(triangleVerticesData));
-    }
-
-    /**
-     * Render the curremt frame.
-     * @param surfaceTexture The surface texture containing the texture of the current frame.
-     */
-    public void drawFrame(SurfaceTexture surfaceTexture, List<Float> stabilizationMatrices) {
-        Log.d(TAG, "Drawing frame");
-
-//        transformVertices(stabilizationMatrices);
-//        // TODO: Switch to VBOs and VAOs
-//        aPositionHandle = glGetAttribLocation(program, "aPosition");
-//        glEnableVertexAttribArray(aPositionHandle);
-//        glVertexAttribPointer(
-//                aPositionHandle,
-//                /* size = */ 3,
-//                /* type = */ GL_FLOAT,
-//                /* normalized = */ false,
-//                TRIANGLE_VERTICES_DATA_STRIDE_BYTES,
-//                triangleVertices.position(TRIANGLE_VERTICES_DATA_POS_OFFSET)
-//        );
-//        if (glGetError() != 0) {
-//            throw new RuntimeException("Failed to get vertex position");
+//        for (int i = 1; i < 12; i++) {
+//            for (int j = 0; j < 9; j++) {
+//                stabilizationMatrix.set(
+//                        j,
+//                        stabilizationMatrix.get(j) + stabilizationMatrices.get(9 * i + j)
+//                );
+//            }
+//        }
+//        for (int i = 0; i < 9; i++) {
+//            stabilizationMatrix.set(i, stabilizationMatrix.get(i) / 12);
 //        }
 
-        // Set the transform matrix of the surface texture
-//        surfaceTexture.getTransformMatrix(uMatrix);
-
-        // Transform the triangle vertices according to the stabilization matrices
-        // TODO: add multiple strips
-        List<Float> stabilizationMatrix = new ArrayList<>(stabilizationMatrices.subList(45, 54));
-        for (int i = 1; i < 12; i++) {
-            for (int j = 0; j < 9; j++) {
-                stabilizationMatrix.set(
-                        j,
-                        stabilizationMatrix.get(j) + stabilizationMatrices.get(9 * i + j)
-                );
-            }
-        }
-        for (int i = 0; i < 9; i++) {
-            stabilizationMatrix.set(
-                    i,
-                    stabilizationMatrix.get(i) / 12
-            );
-        }
-
-//        Matrix.setIdentityM(uStabMatrix, 0);
-//        uStabMatrix[0] = stabilizationMatrix.get(0);
-//        uStabMatrix[4] = stabilizationMatrix.get(1);
-//        uStabMatrix[8] = stabilizationMatrix.get(2);
-//        uStabMatrix[1] = stabilizationMatrix.get(3);
-//        uStabMatrix[5] = stabilizationMatrix.get(4);
-//        uStabMatrix[9] = stabilizationMatrix.get(5);
-//        uStabMatrix[2] = stabilizationMatrix.get(6);
-//        uStabMatrix[6] = stabilizationMatrix.get(7);
-//        uStabMatrix[10] = stabilizationMatrix.get(8);
-//        Matrix.translateM(uStabMatrix, 0, 0.5f, 0.5f, 0);
-
+        // Store matrix in column-major order
         uStabMatrix[0] = stabilizationMatrix.get(0);
         uStabMatrix[3] = stabilizationMatrix.get(1);
         uStabMatrix[6] = stabilizationMatrix.get(2);
@@ -477,7 +358,6 @@ class TextureRender {
         uStabMatrix[2] = stabilizationMatrix.get(6);
         uStabMatrix[5] = stabilizationMatrix.get(7);
         uStabMatrix[8] = stabilizationMatrix.get(8);
-
         Log.d(TAG, "uStabMatrix: " + Arrays.toString(uStabMatrix));
 
         uStabMatrixHandle = glGetUniformLocation(program, "uStabMatrix");

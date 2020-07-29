@@ -5,11 +5,11 @@ import android.media.MediaExtractor;
 import android.os.Bundle;
 import android.util.Log;
 
+import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,12 +28,20 @@ class BufferProcessor {
     private static final long TIMEOUT_US = 1000L;
     private static final long US_TO_NS = 1000L;
     private static final long FALLBACK_FRAME_DELTA_NS = 1_000_000_000L / 30;
+    private static final int NUM_OF_STRIPS = 12;
+
+    private static final float[] IDENTITY_THREE = {
+            1.0f, 0.0f, 0.0f,
+            0.0f, 1.0f, 0.0f,
+            0.0f, 0.0f, 1.0f
+    };
 
     private long prevRenderTimestampNs;
     private long prevTimestampUs;
 
     private int videoTrackIndex;
     private int motionTrackIndex;
+    private List<Float> stabilizationMatrices;
 
     /**
      * Fields shared with motion photo reader.
@@ -63,6 +71,14 @@ class BufferProcessor {
         this.availableOutputBuffers = availableOutputBuffers;
         prevRenderTimestampNs = 0;
         prevTimestampUs = 0;
+
+        // Set the stabilization matrices to the identity for each strip
+        stabilizationMatrices = new ArrayList<>();
+        for (int i = 0; i < NUM_OF_STRIPS; i++) {
+            for (float f : IDENTITY_THREE) {
+                stabilizationMatrices.add(f);
+            }
+        }
     }
 
     public void setVideoTrackIndex(int videoTrackIndex) {
@@ -131,7 +147,8 @@ class BufferProcessor {
         return bufferData;
     }
 
-    private List<Float> getStabilizationMatrices(ByteBuffer inputBuffer) {
+    @Nullable
+    private Stabilization.Data getStabilizationData(ByteBuffer inputBuffer) {
         int sampleSize = extractor.readSampleData(inputBuffer, 0);
         if (sampleSize >= 0) {
             // Deserialize data
@@ -143,9 +160,9 @@ class BufferProcessor {
             }
 
             // Get first stabilization matrix
-            return stabilizationData.getMotionHomographyDataList();
+            return stabilizationData;
         }
-        return new ArrayList<>();
+        return null;
     }
 
     /**
@@ -169,7 +186,8 @@ class BufferProcessor {
         long timestampUs = -1;
         switch (key) {
             case MotionPhotoReader.MSG_NEXT_FRAME:
-                List<Float> stabilizationMatrices = new ArrayList<>();
+                Stabilization.Data stabilizationData;
+                List<Float> newStabilizationMatrices;
                 boolean videoTrackVisited = false;
                 boolean motionTrackVisited = false;
                 while (!(videoTrackVisited && motionTrackVisited)) {
@@ -192,7 +210,30 @@ class BufferProcessor {
                     } else if (trackIndex == motionTrackIndex) {
                         // Get stabilization data from the high resolution extractor
                         inputBuffer = ByteBuffer.allocateDirect((int) extractor.getSampleSize());
-                        stabilizationMatrices = getStabilizationMatrices(inputBuffer);
+                        stabilizationData = getStabilizationData(inputBuffer);
+                        newStabilizationMatrices = stabilizationData.getMotionHomographyDataList();
+                        Log.d(TAG, "newStabMatrix: " + Arrays.toString(newStabilizationMatrices.subList(0, 9).toArray()));
+
+                        // Multiply previous stabilization matrices by new stabilization matrices
+                        // (Assume MOTION_TYPE_INTERFRAME for now)
+                        List<Float> tempStabilizationMatrices = new ArrayList<>();
+                        for (int i = 0; i < NUM_OF_STRIPS; i++) {
+                            for (int r = 0; r < 3; r++) {
+                                for (int c = 0; c < 3; c++) {
+                                    // Perform matrix multiplication for index (9 * i + 3 * r + c)
+                                    // (Left multiply cumulative matrix products by new matrices)
+                                    float matrixElement =
+                                            newStabilizationMatrices.get(9 * i + 3 * r) *
+                                                    stabilizationMatrices.get(9 * i + c) +
+                                                    newStabilizationMatrices.get(9 * i + 3 * r + 1) *
+                                                            stabilizationMatrices.get(9 * i + c + 3) +
+                                                    newStabilizationMatrices.get(9 * i + 3 * r + 2) *
+                                                            stabilizationMatrices.get(9 * i + c + 6);
+                                    tempStabilizationMatrices.add(matrixElement);
+                                }
+                            }
+                        }
+                        stabilizationMatrices = tempStabilizationMatrices;
                         motionTrackVisited = true;
                     } else {
                         Log.e(TAG, "Unexpected track sample");
@@ -257,18 +298,22 @@ class BufferProcessor {
                         timestampUs = bufferData.getLong("TIMESTAMP_US");
                         bufferIndex = bufferData.getInt("BUFFER_INDEX");
                         videoTrackVisited = true;
-                        extractor.advance();
                     } else if (trackIndex == motionTrackIndex) {
-                        // Get stabilization data from the high resolution extractor
-                        inputBuffer = ByteBuffer.allocateDirect((int) extractor.getSampleSize());
-                        stabilizationMatrices = getStabilizationMatrices(inputBuffer);
+                        // Set the stabilization matrices to the identity for each strip
+                        stabilizationMatrices = new ArrayList<>();
+                        for (int i = 0; i < NUM_OF_STRIPS; i++) {
+                            for (float f : IDENTITY_THREE) {
+                                stabilizationMatrices.add(f);
+                            }
+                        }
+                        Log.d(TAG, "newStabMatrix: " + Arrays.toString(stabilizationMatrices.subList(0, 9).toArray()));
                         motionTrackVisited = true;
-                        extractor.advance();
                     } else if (trackIndex == -1) {
                         break;
                     } else {
                         Log.e(TAG, "Unexpected track sample");
                     }
+                    extractor.advance();
                 }
 
                 renderTimestampNs = prevRenderTimestampNs;
