@@ -7,7 +7,13 @@ import android.util.Log;
 
 import androidx.annotation.RequiresApi;
 
+import com.google.protobuf.InvalidProtocolBufferException;
+
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -26,34 +32,45 @@ class BufferProcessor {
     private long prevRenderTimestampNs;
     private long prevTimestampUs;
 
+    private int videoTrackIndex;
+    private int motionTrackIndex;
+
     /**
      * Fields shared with motion photo reader.
      */
     private final OutputSurface outputSurface;
-    private final MediaExtractor lowResExtractor;
-    private final MediaCodec lowResDecoder;
-    private final BlockingQueue<Integer> availableInputBuffers;
+    private final MediaExtractor extractor;
+    private final MediaCodec decoder;private final BlockingQueue<Integer> availableInputBuffers;
     private final BlockingQueue<Bundle> availableOutputBuffers;
 
     /**
      * Constructor for setting up a buffer processor from a motion photo reader.
-     * @param lowResExtractor The low resolution channel MediaExtractor from the motion photo reader.
-     * @param lowResDecoder The low resolution MediaCodec from the motion photo reader.
+     * @param extractor The MediaExtractor from the motion photo reader that reads the video
+     *                        track.
+     * @param decoder The low resolution MediaCodec from the motion photo reader.
      * @param availableInputBuffers The queue of available input buffers.
      * @param availableOutputBuffers The queue of available output buffers.
      */
     public BufferProcessor(OutputSurface outputSurface,
-                           MediaExtractor lowResExtractor,
-                           MediaCodec lowResDecoder,
+                           MediaExtractor extractor,
+                           MediaCodec decoder,
                            BlockingQueue<Integer> availableInputBuffers,
                            BlockingQueue<Bundle> availableOutputBuffers) {
         this.outputSurface = outputSurface;
-        this.lowResExtractor = lowResExtractor;
-        this.lowResDecoder = lowResDecoder;
+        this.extractor = extractor;
+        this.decoder = decoder;
         this.availableInputBuffers = availableInputBuffers;
         this.availableOutputBuffers = availableOutputBuffers;
         prevRenderTimestampNs = 0;
         prevTimestampUs = 0;
+    }
+
+    public void setVideoTrackIndex(int videoTrackIndex) {
+        this.videoTrackIndex = videoTrackIndex;
+    }
+
+    public void setMotionTrackIndex(int motionTrackIndex) {
+        this.motionTrackIndex = motionTrackIndex;
     }
 
     /**
@@ -78,10 +95,10 @@ class BufferProcessor {
      * @param inputBuffer The input buffer to read samples to and queue to the MediaCodec.
      * @param bufferIndex The index of the input buffer.
      */
-    private void readFromExtractor(ByteBuffer inputBuffer, int bufferIndex) {
-        int sampleSize = lowResExtractor.readSampleData(inputBuffer, 0);
+    private void readFromVideoTrack(ByteBuffer inputBuffer, int bufferIndex) {
+        int sampleSize = extractor.readSampleData(inputBuffer, 0);
         if (sampleSize < 0) {
-            lowResDecoder.queueInputBuffer(
+            decoder.queueInputBuffer(
                     bufferIndex,
                     /* offset = */ 0,
                     /* size = */ 0,
@@ -89,14 +106,13 @@ class BufferProcessor {
                     MediaCodec.BUFFER_FLAG_END_OF_STREAM
             );
         } else {
-            lowResDecoder.queueInputBuffer(
+            decoder.queueInputBuffer(
                     bufferIndex,
                     /* offset = */ 0,
                     sampleSize,
-                    lowResExtractor.getSampleTime(),
+                    extractor.getSampleTime(),
                     /* flags = */ 0
             );
-            lowResExtractor.advance();
         }
     }
 
@@ -115,6 +131,23 @@ class BufferProcessor {
         return bufferData;
     }
 
+    private List<Float> getStabilizationMatrices(ByteBuffer inputBuffer) {
+        int sampleSize = extractor.readSampleData(inputBuffer, 0);
+        if (sampleSize >= 0) {
+            // Deserialize data
+            Stabilization.Data stabilizationData = null;
+            try {
+                stabilizationData = Stabilization.Data.parseFrom(inputBuffer);
+            } catch (InvalidProtocolBufferException e) {
+                Log.e(TAG, "Could not parse from protocol buffer");
+            }
+
+            // Get first stabilization matrix
+            return stabilizationData.getMotionHomographyDataList();
+        }
+        return new ArrayList<>();
+    }
+
     /**
      * Handle calls to nextFrame() and seekTo() by the MotionPhotoReader.
      * The fields in the message bundle are:
@@ -128,26 +161,44 @@ class BufferProcessor {
      *     - BUFFER_INDEX: an int containing the index of the output buffer.
      * @param messageData A Bundle containing relevant fields from a call to nextFrame(), seekTo().
      */
-    @RequiresApi(api = LOLLIPOP)
+    @RequiresApi(api = 28)
     public void process(Bundle messageData) {
         int key = messageData.getInt("MESSAGE_KEY");
         Bundle bufferData;
-        int bufferIndex;
-        long timestampUs;
+        int bufferIndex = -1;
+        long timestampUs = -1;
         switch (key) {
             case MotionPhotoReader.MSG_NEXT_FRAME:
-                // Get the next available input buffer and read frame data
-                // TODO: Consider the case when this call times out and returns -1
-                bufferIndex = getAvailableInputBufferIndex();
-                // TODO: Consider the case when this call returns null
-                ByteBuffer inputBuffer = lowResDecoder.getInputBuffer(bufferIndex);
-                readFromExtractor(inputBuffer, bufferIndex);
+                List<Float> stabilizationMatrices = new ArrayList<>();
+                boolean videoTrackVisited = false;
+                boolean motionTrackVisited = false;
+                while (!(videoTrackVisited && motionTrackVisited)) {
+                    int trackIndex = extractor.getSampleTrackIndex();
+                    ByteBuffer inputBuffer;
+                    if (trackIndex == videoTrackIndex) {
+                        // Get the next available input buffer and read frame data
+                        // TODO: Consider the case when this call times out and returns -1
+                        bufferIndex = getAvailableInputBufferIndex();
+                        // TODO: Consider the case when this call returns null
+                        inputBuffer = decoder.getInputBuffer(bufferIndex);
+                        readFromVideoTrack(inputBuffer, bufferIndex);
 
-                // Get the next available output buffer and release frame data
-                // TODO: Consider the case when this call times out and returns null
-                bufferData = getAvailableOutputBufferData();
-                timestampUs = bufferData.getLong("TIMESTAMP_US");
-                bufferIndex = bufferData.getInt("BUFFER_INDEX");
+                        // Get the next available output buffer and release frame data
+                        // TODO: Consider the case when this call times out and returns null
+                        bufferData = getAvailableOutputBufferData();
+                        timestampUs = bufferData.getLong("TIMESTAMP_US");
+                        bufferIndex = bufferData.getInt("BUFFER_INDEX");
+                        videoTrackVisited = true;
+                    } else if (trackIndex == motionTrackIndex) {
+                        // Get stabilization data from the high resolution extractor
+                        inputBuffer = ByteBuffer.allocateDirect((int) extractor.getSampleSize());
+                        stabilizationMatrices = getStabilizationMatrices(inputBuffer);
+                        motionTrackVisited = true;
+                    } else {
+                        Log.e(TAG, "Unexpected track sample");
+                    }
+                    extractor.advance();
+                }
 
                 // Compute the delay in render timestamp between the current frame and the previous
                 // frame.
@@ -168,33 +219,60 @@ class BufferProcessor {
                 if (renderTimestampNs < currentTimestampNs) {
                     renderTimestampNs = currentTimestampNs + frameDeltaNs;
                 }
-                lowResDecoder.releaseOutputBuffer(bufferIndex, renderTimestampNs);
+                decoder.releaseOutputBuffer(bufferIndex, renderTimestampNs);
                 prevTimestampUs = timestampUs;
                 prevRenderTimestampNs = renderTimestampNs;
 
                 // Wait for the image and render it after it arrives
                 if (outputSurface != null) {
                     outputSurface.awaitNewImage();
-                    outputSurface.drawImage();
+                    outputSurface.drawImage(stabilizationMatrices);
+                } else {
+                    Log.d(TAG, "Sample data has size zero");
                 }
                 break;
 
             case MotionPhotoReader.MSG_SEEK_TO_FRAME:
+                // Seek extractor to correct location
+                extractor.seekTo(messageData.getLong("TIME_US"), messageData.getInt("MODE"));
+
                 // TODO: Same considerations as MSG_NEXT_FRAME
-                // Get the next available input buffer and read frame data
-                lowResExtractor.seekTo(messageData.getLong("TIME_US"), messageData.getInt("MODE"));
+                stabilizationMatrices = new ArrayList<>();
+                videoTrackVisited = false;
+                motionTrackVisited = false;
+                while (!(videoTrackVisited && motionTrackVisited)) {
+                    int trackIndex = extractor.getSampleTrackIndex();
+                    ByteBuffer inputBuffer;
+                    if (trackIndex == videoTrackIndex) {
+                        // Get the next available input buffer and read frame data
+                        // TODO: Consider the case when this call times out and returns -1
+                        bufferIndex = getAvailableInputBufferIndex();
+                        // TODO: Consider the case when this call returns null
+                        inputBuffer = decoder.getInputBuffer(bufferIndex);
+                        readFromVideoTrack(inputBuffer, bufferIndex);
 
-                bufferIndex = getAvailableInputBufferIndex();
-                inputBuffer = lowResDecoder.getInputBuffer(bufferIndex);
-                readFromExtractor(inputBuffer, bufferIndex);
-
-                // Get the next available output buffer and release frame data
-                bufferData = getAvailableOutputBufferData();
-                timestampUs = bufferData.getLong("TIMESTAMP_US");
-                bufferIndex = bufferData.getInt("BUFFER_INDEX");
+                        // Get the next available output buffer and release frame data
+                        // TODO: Consider the case when this call times out and returns null
+                        bufferData = getAvailableOutputBufferData();
+                        timestampUs = bufferData.getLong("TIMESTAMP_US");
+                        bufferIndex = bufferData.getInt("BUFFER_INDEX");
+                        videoTrackVisited = true;
+                        extractor.advance();
+                    } else if (trackIndex == motionTrackIndex) {
+                        // Get stabilization data from the high resolution extractor
+                        inputBuffer = ByteBuffer.allocateDirect((int) extractor.getSampleSize());
+                        stabilizationMatrices = getStabilizationMatrices(inputBuffer);
+                        motionTrackVisited = true;
+                        extractor.advance();
+                    } else if (trackIndex == -1) {
+                        break;
+                    } else {
+                        Log.e(TAG, "Unexpected track sample");
+                    }
+                }
 
                 renderTimestampNs = prevRenderTimestampNs;
-                lowResDecoder.releaseOutputBuffer(bufferIndex, renderTimestampNs);
+                decoder.releaseOutputBuffer(bufferIndex, renderTimestampNs);
 
                 // Reset the previous timestamp and previous render timestamp
                 prevTimestampUs = timestampUs;
@@ -202,7 +280,9 @@ class BufferProcessor {
                 // Wait for the image and render it after it arrives
                 if (outputSurface != null) {
                     outputSurface.awaitNewImage();
-                    outputSurface.drawImage();
+                    outputSurface.drawImage(stabilizationMatrices);
+                } else {
+                    Log.d(TAG, "Sample data has size zero");
                 }
                 break;
 

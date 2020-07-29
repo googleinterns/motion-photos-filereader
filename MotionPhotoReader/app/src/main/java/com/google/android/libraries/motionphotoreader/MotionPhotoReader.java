@@ -36,14 +36,24 @@ public class MotionPhotoReader {
 
     private static final String TAG = "MotionPhotoReader";
 
+    /**
+     * String representing the MIME type for the track that contains information about the video
+     * portion of the microvideo.
+     */
+    public static final String MICROVIDEO_META_MIMETYPE = "application/microvideo-meta-stream";
+
+    /**
+     * Prefix for MIME type that represents video.
+     */
+    public static final String VIDEO_MIME_PREFIX = "video/";
+
     private final File file;
     private final Surface surface;
     private final MotionPhotoInfo motionPhotoInfo;
+    private final int version;
 
-    private MediaExtractor lowResExtractor;
-    private MediaCodec lowResDecoder;
-    private MediaExtractor highResExtractor;
-    private MediaCodec highResDecoder;
+    private MediaExtractor extractor;
+    private MediaCodec decoder;
     private MediaFormat videoFormat;
     private FileInputStream fileInputStream;
 
@@ -83,11 +93,11 @@ public class MotionPhotoReader {
         this.surface = surface;
         this.surfaceWidth = surfaceWidth;
         this.surfaceHeight = surfaceHeight;
-        this.lowResExtractor = new MediaExtractor();
-        this.highResExtractor = new MediaExtractor();
+        this.extractor = new MediaExtractor();
         this.availableInputBuffers = availableInputBuffers;
         this.availableOutputBuffers = availableOutputBuffers;
         this.motionPhotoInfo = motionPhotoInfo;
+        this.version = motionPhotoInfo.getVersion();
     }
 
     /**
@@ -169,13 +179,6 @@ public class MotionPhotoReader {
                 motionPhotoInfo
         );
         reader.startRenderThread(motionPhotoInfo);
-        reader.bufferProcessor = new BufferProcessor(
-                reader.outputSurface,
-                reader.lowResExtractor,
-                reader.lowResDecoder,
-                availableInputBuffers,
-                availableOutputBuffers
-        );
         return reader;
     }
 
@@ -197,13 +200,6 @@ public class MotionPhotoReader {
                 motionPhotoInfo
         );
         reader.startRenderThread(motionPhotoInfo);
-        reader.bufferProcessor = new BufferProcessor(
-                reader.outputSurface,
-                reader.lowResExtractor,
-                reader.lowResDecoder,
-                availableInputBuffers,
-                availableOutputBuffers
-        );
         return reader;
     }
 
@@ -226,20 +222,44 @@ public class MotionPhotoReader {
         fileInputStream = new FileInputStream(file);
         FileDescriptor fd = fileInputStream.getFD();
         int videoOffset = motionPhotoInfo.getVideoOffset();
-        lowResExtractor.setDataSource(fd, file.length() - videoOffset, videoOffset);
+        extractor.setDataSource(fd, file.length() - videoOffset, videoOffset);
+
+        // Update these as we find the appropriate tracks (need to set these in buffer processor)
+        int videoTrackIndex = -1;
+        int motionTrackIndex = -1;
 
         // Find the video track and create an appropriate media decoder
-        // TODO: Initialize high resolution media decoder (for stabilization)
-        for (int i = 0; i < lowResExtractor.getTrackCount(); i++) {
-            MediaFormat format = lowResExtractor.getTrackFormat(i);
+        for (int i = 0; i < extractor.getTrackCount(); i++) {
+            MediaFormat format = extractor.getTrackFormat(i);
             String mime = format.getString(MediaFormat.KEY_MIME);
             assert mime != null;
-            if (mime.startsWith("video/")) {
-                lowResExtractor.selectTrack(i);
+            if (mime.startsWith(VIDEO_MIME_PREFIX)) {
+                Log.d(TAG, "selected video track: " + i);
+                extractor.selectTrack(i);
+                videoTrackIndex = i;
                 videoFormat = format;
-                lowResDecoder = MediaCodec.createDecoderByType(mime);
+                decoder = MediaCodec.createDecoderByType(mime);
                 break;
             }
+        }
+
+        // Find the stabilization metadata track (for v1 formats)
+        switch (version) {
+            case MotionPhotoInfo.MOTION_PHOTO_VERSION_V1:
+                for (int i = 0; i < extractor.getTrackCount(); i++) {
+                    MediaFormat format = extractor.getTrackFormat(i);
+                    String mime = format.getString(MediaFormat.KEY_MIME);
+                    assert mime != null;
+                    if (mime.startsWith(MICROVIDEO_META_MIMETYPE)) {
+                        Log.d(TAG, "selected motion track: " + i);
+                        extractor.selectTrack(i);
+                        motionTrackIndex = i;
+                        break;
+                    }
+                }
+                break;
+            default:
+                throw new RuntimeException("Unexpected motion photo format: " + version);
         }
 
         // Make sure the Android version is capable of supporting MediaCodec callbacks
@@ -247,7 +267,7 @@ public class MotionPhotoReader {
             Log.e("MotionPhotoReader", "Insufficient Android build version");
             return;
         }
-        lowResDecoder.setCallback(new MediaCodec.Callback() {
+        decoder.setCallback(new MediaCodec.Callback() {
 
             @Override
             public void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
@@ -282,11 +302,22 @@ public class MotionPhotoReader {
         if (surface != null) {
             outputSurface = new OutputSurface(renderHandler, motionPhotoInfo);
             outputSurface.setSurface(surface, surfaceWidth, surfaceHeight);
-            lowResDecoder.configure(videoFormat, outputSurface.getDecodeSurface(), null, 0);
+            decoder.configure(videoFormat, outputSurface.getDecodeSurface(), null, 0);
         } else {
-            lowResDecoder.configure(videoFormat, null, null, 0);
+            decoder.configure(videoFormat, null, null, 0);
         }
-        lowResDecoder.start();
+        decoder.start();
+
+        // Configure the buffer processor
+        bufferProcessor = new BufferProcessor(
+                outputSurface,
+                extractor,
+                decoder,
+                availableInputBuffers,
+                availableOutputBuffers
+        );
+        bufferProcessor.setVideoTrackIndex(videoTrackIndex);
+        bufferProcessor.setMotionTrackIndex(motionTrackIndex);
     }
 
     /**
@@ -309,8 +340,8 @@ public class MotionPhotoReader {
         } else {
             renderHandler.getLooper().quit();
         }
-        lowResDecoder.release();
-        lowResExtractor.release();
+        decoder.release();
+        extractor.release();
     }
 
     /**
@@ -321,14 +352,14 @@ public class MotionPhotoReader {
     public boolean hasNextFrame() {
         Log.d("HasNextFrame", "Running");
         // Read the next packet and check if it shows a full frame
-        long sampleSize = lowResExtractor.getSampleSize();
+        long sampleSize = extractor.getSampleSize();
         return (sampleSize >= 0);
     }
 
     /**
      * Advances the decoder and extractor by one frame.
      */
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    @RequiresApi(api = 28)
     public void nextFrame() {
         Bundle messageData = new Bundle();
         messageData.putInt("MESSAGE_KEY", MSG_NEXT_FRAME);
@@ -340,7 +371,7 @@ public class MotionPhotoReader {
      * @param timeUs The desired timestamp of the video.
      * @param mode The sync mode of the extractor.
      */
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    @RequiresApi(api = 28)
     public void seekTo(long timeUs, int mode) {
         Bundle messageData = new Bundle();
         messageData.putInt("MESSAGE_KEY", MSG_SEEK_TO_FRAME);
@@ -354,7 +385,7 @@ public class MotionPhotoReader {
      * @return a long representing the current timestamp of the video that the reader is at.
      */
     public long getCurrentTimestampUs() {
-        return lowResExtractor.getSampleTime();
+        return extractor.getSampleTime();
     }
 
     /**

@@ -96,7 +96,7 @@ public class MotionPhotoWidget extends SurfaceView {
                 Log.d(TAG, "Surface created");
             }
 
-            @RequiresApi(api = 23)
+            @RequiresApi(api = 28)
             @Override
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
                 Log.d(TAG, "Surface changed");
@@ -220,7 +220,7 @@ public class MotionPhotoWidget extends SurfaceView {
     /**
      * Reset the motion photo video to beginning.
      */
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    @RequiresApi(api = 28)
     public void restart() {
         reader.seekTo(0L, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
     }

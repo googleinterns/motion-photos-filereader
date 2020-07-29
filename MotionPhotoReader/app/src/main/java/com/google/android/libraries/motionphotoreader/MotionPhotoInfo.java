@@ -32,8 +32,8 @@ public class MotionPhotoInfo {
 
     private final static String TAG = "MotionPhotoInfo";
 
-    private final static int MOTION_PHOTO_VERSION_V1 = 1;
-    private final static int MOTION_PHOTO_VERSION_V2 = 2;
+    public final static int MOTION_PHOTO_VERSION_V1 = 1;
+    public final static int MOTION_PHOTO_VERSION_V2 = 2;
     private static final String CAMERA_XMP_NAMESPACE = "http://ns.google.com/photos/1.0/camera/";
 
     private final int width;
@@ -41,13 +41,14 @@ public class MotionPhotoInfo {
     private final long durationUs;
     private final int rotation;
     private final int videoOffset;
+    private final int version;
 
     /**
      * Creates a MotionPhotoInfo object associated with a given file.
      */
     @RequiresApi(api = Build.VERSION_CODES.M)
     @VisibleForTesting
-    MotionPhotoInfo(MediaFormat mediaFormat, int videoOffset) {
+    MotionPhotoInfo(MediaFormat mediaFormat, int videoOffset, int version) {
         width = mediaFormat.getInteger(MediaFormat.KEY_WIDTH);
         height = mediaFormat.getInteger(MediaFormat.KEY_HEIGHT);
         durationUs = mediaFormat.getLong(MediaFormat.KEY_DURATION);
@@ -55,6 +56,7 @@ public class MotionPhotoInfo {
                 ? mediaFormat.getInteger(MediaFormat.KEY_ROTATION)
                 : 0;
         this.videoOffset = videoOffset;
+        this.version = version;
     }
 
     /**
@@ -65,9 +67,10 @@ public class MotionPhotoInfo {
         MediaExtractor extractor = new MediaExtractor();
         try {
             XMPMeta meta = getFileXmp(file);
-            int videoOffset = getVideoOffset(meta);
+            int version = getMotionPhotoVersion(meta);
+            int videoOffset = getVideoOffset(meta, version);
             MediaFormat mediaFormat = getFileMediaFormat(file, new MediaExtractor(), videoOffset);
-            return new MotionPhotoInfo(mediaFormat, videoOffset);
+            return new MotionPhotoInfo(mediaFormat, videoOffset, version);
         } finally {
             extractor.release();
         }
@@ -85,8 +88,7 @@ public class MotionPhotoInfo {
      * video track.
      * @throws XMPException when parsing invalid XMP metadata.
      */
-    private static int getVideoOffset(XMPMeta meta) throws XMPException {
-        int version = getMotionPhotoVersion(meta);
+    private static int getVideoOffset(XMPMeta meta, int version) throws XMPException {
         int videoOffset = 0;
         switch (version) {
             case MOTION_PHOTO_VERSION_V1:
@@ -206,4 +208,7 @@ public class MotionPhotoInfo {
     public int getRotation() {
         return rotation;
     }
+
+    // TODO: Add unit test
+    public int getVersion() { return version; }
 }
