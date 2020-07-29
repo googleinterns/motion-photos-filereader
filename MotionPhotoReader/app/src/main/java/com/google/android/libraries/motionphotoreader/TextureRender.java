@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static android.opengl.GLES11Ext.GL_TEXTURE_EXTERNAL_OES;
+import static android.opengl.GLES20.GL_NUM_COMPRESSED_TEXTURE_FORMATS;
 import static android.opengl.GLES30.glUniformMatrix3fv;
 import static android.opengl.GLES30.GL_COLOR_BUFFER_BIT;
 import static android.opengl.GLES30.GL_COMPILE_STATUS;
@@ -68,12 +69,12 @@ class TextureRender {
     private static final String VERTEX_SHADER =
             "#version 300 es\n" +
             "uniform mat4 uMatrix;\n" +
-            "uniform mat3 uStabMatrix;\n" +
+            "uniform mat4 uStabMatrix;\n" +
             "in vec3 aPosition;\n" +
             "out vec2 TexCoord;\n" +
             "void main() {\n" +
             "  TexCoord = 0.5 * aPosition.xy + vec2(0.5, 0.5);\n" +
-            "  vec3 hPos = uStabMatrix * aPosition;\n" +
+            "  vec4 hPos = uStabMatrix * vec4(aPosition, 0.1);\n" +
             "  gl_Position = uMatrix * vec4(hPos.x / hPos.z, hPos.y / hPos.z, 0.0, 1.0);\n" +
             "}";
 
@@ -98,7 +99,7 @@ class TextureRender {
     };
 
     private float[] uMatrix = new float[16];
-    private float[] uStabMatrix = new float[9];
+    private float[] uStabMatrix = new float[16];
 
     private int textureID;
     private int program;
@@ -257,6 +258,15 @@ class TextureRender {
             throw new RuntimeException("Failed to set up viewport");
         }
 
+        Matrix.rotateM(
+                uMatrix,
+                /* rmOffset = */ 0,
+                /* a = */ 180,  // Original video is flipped about the y-axis
+                /* x = */ 0,
+                /* y = */ 1,
+                /* z = */ 0
+        );
+
         // Set up rotation matrix if the camera orientation is greater than 0 degrees
         if (videoRotation > 0) {
             Log.d(TAG, "rotation: " + videoRotation);
@@ -328,43 +338,40 @@ class TextureRender {
     }
 
     /**
-     * Render the curremt frame.
+     * Render the current frame.
      */
-    public void drawFrame(List<Float> stabilizationMatrices) {
+    public void drawFrame(List<HomographyMatrix> homographyList) {
         Log.d(TAG, "Drawing frame");
 
         // Transform the triangle vertices according to the stabilization matrices
         // TODO: add multiple strips
-        List<Float> stabilizationMatrix = new ArrayList<>(stabilizationMatrices.subList(0, 9));
-//        for (int i = 1; i < 12; i++) {
-//            for (int j = 0; j < 9; j++) {
-//                stabilizationMatrix.set(
-//                        j,
-//                        stabilizationMatrix.get(j) + stabilizationMatrices.get(9 * i + j)
-//                );
-//            }
-//        }
-//        for (int i = 0; i < 9; i++) {
-//            stabilizationMatrix.set(i, stabilizationMatrix.get(i) / 12);
-//        }
+        HomographyMatrix homography = homographyList.get(0);
+        homography = homography.convertFromImageToGl(videoWidth, videoHeight);
+        for (int i = 1; i < homographyList.size(); i++) {
+            homography = homography.add(homographyList.get(i).convertFromImageToGl(videoWidth, videoHeight));
+        }
+        homography = homography.multiplyScalar(1.0f / homographyList.size());
 
-        // Store matrix in column-major order
-        uStabMatrix[0] = stabilizationMatrix.get(0);
-        uStabMatrix[3] = stabilizationMatrix.get(1);
-        uStabMatrix[6] = stabilizationMatrix.get(2);
-        uStabMatrix[1] = stabilizationMatrix.get(3);
-        uStabMatrix[4] = stabilizationMatrix.get(4);
-        uStabMatrix[7] = stabilizationMatrix.get(5);
-        uStabMatrix[2] = stabilizationMatrix.get(6);
-        uStabMatrix[5] = stabilizationMatrix.get(7);
-        uStabMatrix[8] = stabilizationMatrix.get(8);
+        // Invert the matrix (store matrix in row-major order, which we will then transpose)
+        float[] uStabMatrixInv = new float[16];
+        Matrix.setIdentityM(uStabMatrixInv, 0);
+        uStabMatrixInv[0] = homography.get(0, 0);
+        uStabMatrixInv[1] = homography.get(0, 1);
+        uStabMatrixInv[2] = homography.get(0, 2);
+        uStabMatrixInv[4] = homography.get(1, 0);
+        uStabMatrixInv[5] = homography.get(1, 1);
+        uStabMatrixInv[6] = homography.get(1, 2);
+        uStabMatrixInv[8] = homography.get(2, 0);
+        uStabMatrixInv[9] = homography.get( 2, 1);
+        uStabMatrixInv[10] = homography.get(2, 2);
+        Matrix.invertM(uStabMatrix, 0, uStabMatrixInv, 0);
         Log.d(TAG, "uStabMatrix: " + Arrays.toString(uStabMatrix));
 
         uStabMatrixHandle = glGetUniformLocation(program, "uStabMatrix");
-        glUniformMatrix3fv(
+        glUniformMatrix4fv(
                 uStabMatrixHandle,
                 /* count = */ 1,
-                /* transpose = */ false,
+                /* transpose = */ true,
                 uStabMatrix,
                 /* offset = */ 0
         );

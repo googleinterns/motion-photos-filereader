@@ -313,6 +313,7 @@ public class MotionPhotoReader {
                 outputSurface,
                 extractor,
                 decoder,
+                motionPhotoInfo,
                 availableInputBuffers,
                 availableOutputBuffers
         );

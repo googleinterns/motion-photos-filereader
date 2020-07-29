@@ -30,25 +30,27 @@ class BufferProcessor {
     private static final long FALLBACK_FRAME_DELTA_NS = 1_000_000_000L / 30;
     private static final int NUM_OF_STRIPS = 12;
 
-    private static final float[] IDENTITY_THREE = {
-            1.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f,
-            0.0f, 0.0f, 1.0f
-    };
+//    private static final float[] IDENTITY_THREE = {
+//            1.0f, 0.0f, 0.0f,
+//            0.0f, 1.0f, 0.0f,
+//            0.0f, 0.0f, 1.0f
+//    };
 
     private long prevRenderTimestampNs;
     private long prevTimestampUs;
 
     private int videoTrackIndex;
     private int motionTrackIndex;
-    private List<Float> stabilizationMatrices;
+    private List<HomographyMatrix> homographyList;
 
     /**
      * Fields shared with motion photo reader.
      */
     private final OutputSurface outputSurface;
     private final MediaExtractor extractor;
-    private final MediaCodec decoder;private final BlockingQueue<Integer> availableInputBuffers;
+    private final MediaCodec decoder;
+    private final MotionPhotoInfo motionPhotoInfo;
+    private final BlockingQueue<Integer> availableInputBuffers;
     private final BlockingQueue<Bundle> availableOutputBuffers;
 
     /**
@@ -62,22 +64,22 @@ class BufferProcessor {
     public BufferProcessor(OutputSurface outputSurface,
                            MediaExtractor extractor,
                            MediaCodec decoder,
+                           MotionPhotoInfo motionPhotoInfo,
                            BlockingQueue<Integer> availableInputBuffers,
                            BlockingQueue<Bundle> availableOutputBuffers) {
         this.outputSurface = outputSurface;
         this.extractor = extractor;
         this.decoder = decoder;
+        this.motionPhotoInfo = motionPhotoInfo;
         this.availableInputBuffers = availableInputBuffers;
         this.availableOutputBuffers = availableOutputBuffers;
         prevRenderTimestampNs = 0;
         prevTimestampUs = 0;
 
         // Set the stabilization matrices to the identity for each strip
-        stabilizationMatrices = new ArrayList<>();
+        homographyList = new ArrayList<>();
         for (int i = 0; i < NUM_OF_STRIPS; i++) {
-            for (float f : IDENTITY_THREE) {
-                stabilizationMatrices.add(f);
-            }
+            homographyList.add(new HomographyMatrix());
         }
     }
 
@@ -147,8 +149,8 @@ class BufferProcessor {
         return bufferData;
     }
 
-    @Nullable
-    private Stabilization.Data getStabilizationData(ByteBuffer inputBuffer) {
+    private List<HomographyMatrix> getHomographies(ByteBuffer inputBuffer) {
+        List<HomographyMatrix> homographyList = new ArrayList<>();
         int sampleSize = extractor.readSampleData(inputBuffer, 0);
         if (sampleSize >= 0) {
             // Deserialize data
@@ -159,10 +161,17 @@ class BufferProcessor {
                 Log.e(TAG, "Could not parse from protocol buffer");
             }
 
-            // Get first stabilization matrix
-            return stabilizationData;
+            // Add homography for each strip to the homography list
+            List<Float> homographyDataList = stabilizationData.getMotionHomographyDataList();
+            for (int i = 0; i < NUM_OF_STRIPS; i++) {
+                homographyList.add(
+                        new HomographyMatrix(
+                                homographyDataList.subList(9 * i, 9 * (i + 1))
+                        )
+                );
+            }
         }
-        return null;
+        return homographyList;
     }
 
     /**
@@ -186,7 +195,6 @@ class BufferProcessor {
         long timestampUs = -1;
         switch (key) {
             case MotionPhotoReader.MSG_NEXT_FRAME:
-                Stabilization.Data stabilizationData;
                 List<Float> newStabilizationMatrices;
                 boolean videoTrackVisited = false;
                 boolean motionTrackVisited = false;
@@ -210,30 +218,17 @@ class BufferProcessor {
                     } else if (trackIndex == motionTrackIndex) {
                         // Get stabilization data from the high resolution extractor
                         inputBuffer = ByteBuffer.allocateDirect((int) extractor.getSampleSize());
-                        stabilizationData = getStabilizationData(inputBuffer);
-                        newStabilizationMatrices = stabilizationData.getMotionHomographyDataList();
-                        Log.d(TAG, "newStabMatrix: " + Arrays.toString(newStabilizationMatrices.subList(0, 9).toArray()));
+                        List<HomographyMatrix> newHomographyList = getHomographies(inputBuffer);
+                        Log.d(TAG, "newStabMatrix: " + newHomographyList.get(0).toString());
 
                         // Multiply previous stabilization matrices by new stabilization matrices
                         // (Assume MOTION_TYPE_INTERFRAME for now)
-                        List<Float> tempStabilizationMatrices = new ArrayList<>();
+                        List<HomographyMatrix> tempHomographyList = new ArrayList<>();
                         for (int i = 0; i < NUM_OF_STRIPS; i++) {
-                            for (int r = 0; r < 3; r++) {
-                                for (int c = 0; c < 3; c++) {
-                                    // Perform matrix multiplication for index (9 * i + 3 * r + c)
-                                    // (Left multiply cumulative matrix products by new matrices)
-                                    float matrixElement =
-                                            newStabilizationMatrices.get(9 * i + 3 * r) *
-                                                    stabilizationMatrices.get(9 * i + c) +
-                                                    newStabilizationMatrices.get(9 * i + 3 * r + 1) *
-                                                            stabilizationMatrices.get(9 * i + c + 3) +
-                                                    newStabilizationMatrices.get(9 * i + 3 * r + 2) *
-                                                            stabilizationMatrices.get(9 * i + c + 6);
-                                    tempStabilizationMatrices.add(matrixElement);
-                                }
-                            }
+                            HomographyMatrix newStripMatrix = homographyList.get(i).leftMultiply(newHomographyList.get(i));
+                            tempHomographyList.add(newStripMatrix);
                         }
-                        stabilizationMatrices = tempStabilizationMatrices;
+                        homographyList = tempHomographyList;
                         motionTrackVisited = true;
                     } else {
                         Log.e(TAG, "Unexpected track sample");
@@ -267,7 +262,7 @@ class BufferProcessor {
                 // Wait for the image and render it after it arrives
                 if (outputSurface != null) {
                     outputSurface.awaitNewImage();
-                    outputSurface.drawImage(stabilizationMatrices);
+                    outputSurface.drawImage(homographyList);
                 } else {
                     Log.d(TAG, "Sample data has size zero");
                 }
@@ -278,7 +273,7 @@ class BufferProcessor {
                 extractor.seekTo(messageData.getLong("TIME_US"), messageData.getInt("MODE"));
 
                 // TODO: Same considerations as MSG_NEXT_FRAME
-                stabilizationMatrices = new ArrayList<>();
+                homographyList = new ArrayList<>();
                 videoTrackVisited = false;
                 motionTrackVisited = false;
                 while (!(videoTrackVisited && motionTrackVisited)) {
@@ -300,13 +295,11 @@ class BufferProcessor {
                         videoTrackVisited = true;
                     } else if (trackIndex == motionTrackIndex) {
                         // Set the stabilization matrices to the identity for each strip
-                        stabilizationMatrices = new ArrayList<>();
+                        homographyList = new ArrayList<>();
                         for (int i = 0; i < NUM_OF_STRIPS; i++) {
-                            for (float f : IDENTITY_THREE) {
-                                stabilizationMatrices.add(f);
-                            }
+                            homographyList.add(new HomographyMatrix());
                         }
-                        Log.d(TAG, "newStabMatrix: " + Arrays.toString(stabilizationMatrices.subList(0, 9).toArray()));
+                        Log.d(TAG, "newStabMatrix: " + Arrays.toString(homographyList.subList(0, 9).toArray()));
                         motionTrackVisited = true;
                     } else if (trackIndex == -1) {
                         break;
@@ -325,7 +318,7 @@ class BufferProcessor {
                 // Wait for the image and render it after it arrives
                 if (outputSurface != null) {
                     outputSurface.awaitNewImage();
-                    outputSurface.drawImage(stabilizationMatrices);
+                    outputSurface.drawImage(homographyList);
                 } else {
                     Log.d(TAG, "Sample data has size zero");
                 }

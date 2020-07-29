@@ -267,9 +267,9 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
      * Draw the image to the final display Surface.
      */
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
-    public void drawImage(List<Float> stabilizationMatrices) {
+    public void drawImage(List<HomographyMatrix> homographyList) {
         renderHandler.post(() -> {
-            textureRender.drawFrame(stabilizationMatrices);
+            textureRender.drawFrame(homographyList);
             EGL14.eglSwapBuffers(eglDisplay, eglSurface);
         });
     }
