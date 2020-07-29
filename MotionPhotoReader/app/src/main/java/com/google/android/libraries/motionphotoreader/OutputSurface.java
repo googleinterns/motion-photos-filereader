@@ -15,6 +15,7 @@ import androidx.annotation.RequiresApi;
 
 import com.google.common.util.concurrent.SettableFuture;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
@@ -266,9 +267,9 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
      * Draw the image to the final display Surface.
      */
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
-    public void drawImage() {
+    public void drawImage(List<Float> stabilizationMatrices) {
         renderHandler.post(() -> {
-            textureRender.drawFrame(surfaceTexture);
+            textureRender.drawFrame(surfaceTexture, stabilizationMatrices);
             EGL14.eglSwapBuffers(eglDisplay, eglSurface);
         });
     }
