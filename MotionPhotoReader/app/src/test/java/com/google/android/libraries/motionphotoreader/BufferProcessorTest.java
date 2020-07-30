@@ -32,6 +32,7 @@ import static org.mockito.Mockito.verify;
 public class BufferProcessorTest {
 
     // define a mock media format for motion photo v1 format
+    private final static int V1 = 1;
     private final static int KEY_WIDTH = 4032;
     private final static int KEY_HEIGHT = 3024;
     private final static long KEY_DURATION = 1499400;
@@ -42,6 +43,7 @@ public class BufferProcessorTest {
     private OutputSurface outputSurface;
     private MediaExtractor lowResExtractor;
     private MediaCodec lowResDecoder;
+    MotionPhotoInfo motionPhotoInfo;
     private BlockingQueue<Integer> availableInputBuffers;
     private BlockingQueue<Bundle> availableOutputBuffers;
 
@@ -60,7 +62,7 @@ public class BufferProcessorTest {
                 KEY_ROTATION,
                 KEY_MIME
         );
-        MotionPhotoInfo motionPhotoInfo = new MotionPhotoInfo(mediaFormat, VIDEO_OFFSET);
+         motionPhotoInfo = new MotionPhotoInfo(mediaFormat, VIDEO_OFFSET, V1);
         outputSurface = new OutputSurface(mock(Handler.class), motionPhotoInfo);
 
         availableInputBuffers.offer(1);
@@ -113,6 +115,7 @@ public class BufferProcessorTest {
                 outputSurface,
                 lowResExtractor,
                 lowResDecoder,
+                motionPhotoInfo,
                 availableInputBuffers,
                 availableOutputBuffers
         ));
@@ -144,6 +147,7 @@ public class BufferProcessorTest {
                 outputSurface,
                 lowResExtractor,
                 lowResDecoder,
+                motionPhotoInfo,
                 availableInputBuffers,
                 availableOutputBuffers
         ));
@@ -178,6 +182,7 @@ public class BufferProcessorTest {
                 outputSurface,
                 lowResExtractor,
                 lowResDecoder,
+                motionPhotoInfo,
                 availableInputBuffers,
                 availableOutputBuffers
         ));
@@ -198,6 +203,7 @@ public class BufferProcessorTest {
                 outputSurface,
                 lowResExtractor,
                 lowResDecoder,
+                motionPhotoInfo,
                 availableInputBuffers,
                 availableOutputBuffers
         ));

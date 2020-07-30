@@ -28,6 +28,9 @@ import static org.mockito.Mockito.when;
  * Local unit test for MotionPhotoInfo class.
  */
 public class MotionPhotoInfoTest {
+    private final static int V1 = 1;
+    private final static int V2 = 2;
+
     // define a mock media format for motion photo v1 format
     private final static String FILENAME_V1 = "MVIMG_20200621_200240.jpg";
     private final static int KEY_WIDTH_V1 = 4032;
@@ -74,7 +77,7 @@ public class MotionPhotoInfoTest {
         );
 
         // create motion photo info objects from a string filename and a file object
-        motionPhotoInfoV1 = new MotionPhotoInfo(videoFormatV1, VIDEO_OFFSET_V1);
+        motionPhotoInfoV1 = new MotionPhotoInfo(videoFormatV1, VIDEO_OFFSET_V1, V1);
         assertNotNull(motionPhotoInfoV1);
         verify(videoFormatV1, times(2)).getInteger(anyString());
         verify(videoFormatV1, times(1)).getLong(anyString());
@@ -96,7 +99,7 @@ public class MotionPhotoInfoTest {
         );
 
         // create motion photo info object
-        motionPhotoInfoV2 = new MotionPhotoInfo(videoFormatV2, VIDEO_OFFSET_V2);
+        motionPhotoInfoV2 = new MotionPhotoInfo(videoFormatV2, VIDEO_OFFSET_V2, V2);
         assertNotNull(motionPhotoInfoV2);
         verify(videoFormatV2, times(2)).getInteger(anyString());
         verify(videoFormatV2, times(1)).getLong(anyString());
@@ -194,7 +197,7 @@ public class MotionPhotoInfoTest {
     public void getRotation_whenKeyExists_v1_isCorrect() {
         // set up the media format so that it has a rotation
         doReturn(true).when(videoFormatV1).containsKey(eq(MediaFormat.KEY_ROTATION));
-        motionPhotoInfoV1 = new MotionPhotoInfo(videoFormatV1, VIDEO_OFFSET_V1);
+        motionPhotoInfoV1 = new MotionPhotoInfo(videoFormatV1, VIDEO_OFFSET_V1, V1);
         // Number of invocations includes those in setUp()
         verify(videoFormatV1, times(5)).getInteger(anyString());
         verify(videoFormatV1, times(2)).getLong(anyString());
@@ -205,7 +208,7 @@ public class MotionPhotoInfoTest {
     public void getRotation_whenKeyExists_v2_isCorrect() {
         // set up the media format so that it has a rotation
         doReturn(true).when(videoFormatV2).containsKey(eq(MediaFormat.KEY_ROTATION));
-        motionPhotoInfoV2 = new MotionPhotoInfo(videoFormatV2, VIDEO_OFFSET_V2);
+        motionPhotoInfoV2 = new MotionPhotoInfo(videoFormatV2, VIDEO_OFFSET_V2, V2);
         // Number of invocations includes those in setUp()
         verify(videoFormatV2, times(5)).getInteger(anyString());
         verify(videoFormatV2, times(2)).getLong(anyString());

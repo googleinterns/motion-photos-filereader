@@ -6,6 +6,8 @@ import java.util.List;
 
 /**
  * Represents a 3x3 homography transformation in row-major matrix form.
+ *
+ * TODO: write unit test
  */
 class HomographyMatrix {
 
@@ -14,6 +16,8 @@ class HomographyMatrix {
             0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 1.0f
     };
+
+    private static final float EPS = 1E-3f;
 
     private List<Float> matrix = new ArrayList<>();
 
@@ -31,7 +35,17 @@ class HomographyMatrix {
         }
     }
 
-    public HomographyMatrix leftMultiply(HomographyMatrix otherMatrix) {
+    public HomographyMatrix(float[] matrix) {
+        if (matrix.length != 9) {
+            throw new RuntimeException("List has incorrect number of elements: " + matrix.length);
+        } else {
+            for (float f : matrix) {
+                this.matrix.add(f);
+            }
+        }
+    }
+
+    public HomographyMatrix leftMultiplyBy(HomographyMatrix otherMatrix) {
         List<Float> product = new ArrayList<>();
         for (int r = 0; r < 3; r++) {
             for (int c = 0; c < 3; c++) {
@@ -44,7 +58,7 @@ class HomographyMatrix {
         return new HomographyMatrix(product);
     }
 
-    public HomographyMatrix rightMultiply(HomographyMatrix otherMatrix) {
+    public HomographyMatrix rightMultiplyBy(HomographyMatrix otherMatrix) {
         List<Float> product = new ArrayList<>();
         for (int r = 0; r < 3; r++) {
             for (int c = 0; c < 3; c++) {
@@ -57,18 +71,12 @@ class HomographyMatrix {
         return new HomographyMatrix(product);
     }
 
-    public HomographyMatrix transpose() {
-        List<Float> transpose = new ArrayList<>();
-        for (int c = 0; c < 3; c++) {
-            for (int r = 0; r < 3; r++) {
-                transpose.add(this.get(r, c));
-            }
-        }
-        return new HomographyMatrix(transpose);
-    }
-
     public float get(int r, int c) {
         return matrix.get(3 * r + c);
+    }
+
+    public void set(int r, int c, float val) {
+        matrix.set(3 * r + c, val);
     }
 
     public HomographyMatrix add(HomographyMatrix otherMatrix) {
@@ -94,7 +102,7 @@ class HomographyMatrix {
 
     }
 
-    public HomographyMatrix convertFromImageToGl(int imageWidth, int imageHeight) {
+    public HomographyMatrix convertFromImageToGL(int imageWidth, int imageHeight) {
         float halfW = imageWidth * 1.0f / 2.0f;
         float halfH = imageHeight * 1.0f / 2.0f;
 
@@ -119,7 +127,18 @@ class HomographyMatrix {
         HomographyMatrix h1 = new HomographyMatrix(l1);
         HomographyMatrix h2 = new HomographyMatrix(l2);
 
-        return this.rightMultiply(h1).leftMultiply(h2);
+        return this.rightMultiplyBy(h1).leftMultiplyBy(h2);
+    }
+
+    public boolean equals(HomographyMatrix otherMatrix) {
+        for (int r = 0; r < 3; r++) {
+            for (int c = 0; c < 3; c++) {
+                if (Math.abs(this.get(r, c) - otherMatrix.get(r, c)) > EPS) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     public String toString() {

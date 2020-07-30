@@ -1,56 +1,16 @@
 package com.google.android.libraries.motionphotoreader;
 
-import android.graphics.SurfaceTexture;
 import android.opengl.Matrix;
 import android.util.Log;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import static android.opengl.GLES11Ext.GL_TEXTURE_EXTERNAL_OES;
-import static android.opengl.GLES20.GL_NUM_COMPRESSED_TEXTURE_FORMATS;
-import static android.opengl.GLES30.glUniformMatrix3fv;
-import static android.opengl.GLES30.GL_COLOR_BUFFER_BIT;
-import static android.opengl.GLES30.GL_COMPILE_STATUS;
-import static android.opengl.GLES30.GL_FLOAT;
-import static android.opengl.GLES30.GL_FRAGMENT_SHADER;
-import static android.opengl.GLES30.GL_LINK_STATUS;
-import static android.opengl.GLES30.GL_TEXTURE0;
-import static android.opengl.GLES30.GL_TRIANGLE_STRIP;
-import static android.opengl.GLES30.GL_VALIDATE_STATUS;
-import static android.opengl.GLES30.GL_VERTEX_SHADER;
-import static android.opengl.GLES30.glActiveTexture;
-import static android.opengl.GLES30.glAttachShader;
-import static android.opengl.GLES30.glBindTexture;
-import static android.opengl.GLES30.glClear;
-import static android.opengl.GLES30.glClearColor;
-import static android.opengl.GLES30.glCompileShader;
-import static android.opengl.GLES30.glCreateProgram;
-import static android.opengl.GLES30.glCreateShader;
-import static android.opengl.GLES30.glDeleteProgram;
-import static android.opengl.GLES30.glDeleteShader;
-import static android.opengl.GLES30.glDrawArrays;
-import static android.opengl.GLES30.glEnableVertexAttribArray;
-import static android.opengl.GLES30.glGenTextures;
-import static android.opengl.GLES30.glGetAttribLocation;
-import static android.opengl.GLES30.glGetError;
-import static android.opengl.GLES30.glGetProgramInfoLog;
-import static android.opengl.GLES30.glGetProgramiv;
-import static android.opengl.GLES30.glGetShaderiv;
-import static android.opengl.GLES30.glGetUniformLocation;
-import static android.opengl.GLES30.glLinkProgram;
-import static android.opengl.GLES30.glShaderSource;
-import static android.opengl.GLES30.glUniform1i;
-import static android.opengl.GLES30.glUniformMatrix4fv;
-import static android.opengl.GLES30.glUseProgram;
-import static android.opengl.GLES30.glValidateProgram;
-import static android.opengl.GLES30.glVertexAttribPointer;
-import static android.opengl.GLES30.glViewport;
-
+import static android.opengl.GLES30.*;
 /**
  * Renders frames from a MediaCodec decoder onto an EGL surface.
  *
@@ -75,7 +35,7 @@ class TextureRender {
             "void main() {\n" +
             "  TexCoord = 0.5 * aPosition.xy + vec2(0.5, 0.5);\n" +
             "  vec4 hPos = uStabMatrix * vec4(aPosition, 0.1);\n" +
-            "  gl_Position = uMatrix * vec4(hPos.x / hPos.z, hPos.y / hPos.z, 0.0, 1.0);\n" +
+            "  gl_Position = uMatrix * vec4(hPos.x, hPos.y, 0.0, hPos.z);\n" +
             "}";
 
     private static final String FRAGMENT_SHADER =
@@ -126,6 +86,7 @@ class TextureRender {
                 .asFloatBuffer();
         triangleVertices.put(triangleVerticesData).position(/* newPosition = */ 0);
         Matrix.setIdentityM(uMatrix, /* smOffset = */ 0);
+        Matrix.setIdentityM(uStabMatrix, /* smOffset = */ 0);
     }
 
     /**
@@ -258,10 +219,11 @@ class TextureRender {
             throw new RuntimeException("Failed to set up viewport");
         }
 
+        // Original video is flipped about the y-axis
         Matrix.rotateM(
                 uMatrix,
                 /* rmOffset = */ 0,
-                /* a = */ 180,  // Original video is flipped about the y-axis
+                /* a = */ 180,
                 /* x = */ 0,
                 /* y = */ 1,
                 /* z = */ 0
@@ -346,9 +308,9 @@ class TextureRender {
         // Transform the triangle vertices according to the stabilization matrices
         // TODO: add multiple strips
         HomographyMatrix homography = homographyList.get(0);
-        homography = homography.convertFromImageToGl(videoWidth, videoHeight);
+        homography = homography.convertFromImageToGL(videoWidth, videoHeight);
         for (int i = 1; i < homographyList.size(); i++) {
-            homography = homography.add(homographyList.get(i).convertFromImageToGl(videoWidth, videoHeight));
+            homography = homography.add(homographyList.get(i).convertFromImageToGL(videoWidth, videoHeight));
         }
         homography = homography.multiplyScalar(1.0f / homographyList.size());
 
@@ -365,6 +327,16 @@ class TextureRender {
         uStabMatrixInv[9] = homography.get( 2, 1);
         uStabMatrixInv[10] = homography.get(2, 2);
         Matrix.invertM(uStabMatrix, 0, uStabMatrixInv, 0);
+
+//        uStabMatrix[0] = homography.get(0, 0);
+//        uStabMatrix[1] = homography.get(0, 1);
+//        uStabMatrix[2] = homography.get(0, 2);
+//        uStabMatrix[4] = homography.get(1, 0);
+//        uStabMatrix[5] = homography.get(1, 1);
+//        uStabMatrix[6] = homography.get(1, 2);
+//        uStabMatrix[8] = homography.get(2, 0);
+//        uStabMatrix[9] = homography.get( 2, 1);
+//        uStabMatrix[10] = homography.get(2, 2);
         Log.d(TAG, "uStabMatrix: " + Arrays.toString(uStabMatrix));
 
         uStabMatrixHandle = glGetUniformLocation(program, "uStabMatrix");

@@ -5,7 +5,6 @@ import android.media.MediaExtractor;
 import android.os.Bundle;
 import android.util.Log;
 
-import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -29,12 +28,6 @@ class BufferProcessor {
     private static final long US_TO_NS = 1000L;
     private static final long FALLBACK_FRAME_DELTA_NS = 1_000_000_000L / 30;
     private static final int NUM_OF_STRIPS = 12;
-
-//    private static final float[] IDENTITY_THREE = {
-//            1.0f, 0.0f, 0.0f,
-//            0.0f, 1.0f, 0.0f,
-//            0.0f, 0.0f, 1.0f
-//    };
 
     private long prevRenderTimestampNs;
     private long prevTimestampUs;
@@ -225,7 +218,12 @@ class BufferProcessor {
                         // (Assume MOTION_TYPE_INTERFRAME for now)
                         List<HomographyMatrix> tempHomographyList = new ArrayList<>();
                         for (int i = 0; i < NUM_OF_STRIPS; i++) {
-                            HomographyMatrix newStripMatrix = homographyList.get(i).leftMultiply(newHomographyList.get(i));
+//                            HomographyMatrix scaleMatrix = new HomographyMatrix();
+//                            scaleMatrix.set(0, 0, 2.0f);
+//                            scaleMatrix.set(1, 1, 2.0f);
+                            HomographyMatrix newStripMatrix = homographyList
+                                    .get(i)
+                                    .leftMultiplyBy(newHomographyList.get(i));
                             tempHomographyList.add(newStripMatrix);
                         }
                         homographyList = tempHomographyList;
@@ -297,6 +295,7 @@ class BufferProcessor {
                         // Set the stabilization matrices to the identity for each strip
                         homographyList = new ArrayList<>();
                         for (int i = 0; i < NUM_OF_STRIPS; i++) {
+                            HomographyMatrix firstMatrix = new HomographyMatrix();
                             homographyList.add(new HomographyMatrix());
                         }
                         Log.d(TAG, "newStabMatrix: " + Arrays.toString(homographyList.subList(0, 9).toArray()));
