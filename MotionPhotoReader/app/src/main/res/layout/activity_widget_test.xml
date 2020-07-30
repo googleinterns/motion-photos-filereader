@@ -10,6 +10,7 @@
     <com.google.android.libraries.motionphotoreader.MotionPhotoWidget
         android:id="@+id/motion_photo_widget"
         app:autoloop="true"
+        app:stabilizationOn="true"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:layout_constraintHorizontal_bias="0.5"

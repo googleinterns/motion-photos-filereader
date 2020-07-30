@@ -2,6 +2,7 @@
 <resources>
     <declare-styleable name="MotionPhotoWidget">
         <attr name="autoloop" format="boolean" />
+        <attr name="stabilizationOn" format="boolean" />
     </declare-styleable>
 
 </resources>

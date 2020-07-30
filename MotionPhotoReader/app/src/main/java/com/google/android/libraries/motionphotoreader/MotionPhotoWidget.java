@@ -40,6 +40,7 @@ public class MotionPhotoWidget extends SurfaceView {
 
     /** Customizable attribute fields. */
     private final boolean autoloop;
+    private final boolean stabilizationOn;
 
     private ExecutorService executor;
     private MotionPhotoReader reader;
@@ -57,6 +58,7 @@ public class MotionPhotoWidget extends SurfaceView {
     public MotionPhotoWidget(Context context) {
         super(context);
         autoloop = true;
+        stabilizationOn = true;
         initialize();
     }
 
@@ -74,6 +76,9 @@ public class MotionPhotoWidget extends SurfaceView {
 
         // Fetch value of “custom:autoloop”
         autoloop = ta.getBoolean(R.styleable.MotionPhotoWidget_autoloop, true);
+
+        // Fetch value of “custom:stabilizationOn”
+        stabilizationOn = ta.getBoolean(R.styleable.MotionPhotoWidget_stabilizationOn, true);
 
         ta.recycle();
         initialize();
@@ -109,7 +114,7 @@ public class MotionPhotoWidget extends SurfaceView {
                     reader.close();
                 }
                 try {
-                    reader = MotionPhotoReader.open(file, holder.getSurface(), surfaceWidth, surfaceHeight);
+                    reader = MotionPhotoReader.open(file, holder.getSurface(), surfaceWidth, surfaceHeight, stabilizationOn);
                     Log.d(TAG, "New motion photo reader created");
                 } catch (IOException | XMPException e) {
                     Log.e(TAG, "Exception occurred while opening file", e);
@@ -257,7 +262,8 @@ public class MotionPhotoWidget extends SurfaceView {
                     file,
                     surfaceHolder.getSurface(),
                     surfaceWidth,
-                    surfaceHeight
+                    surfaceHeight,
+                    stabilizationOn
             );
             // Show the first frame
             if (reader.hasNextFrame()) {

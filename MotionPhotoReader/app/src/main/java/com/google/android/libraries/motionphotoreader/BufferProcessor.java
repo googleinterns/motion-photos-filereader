@@ -20,6 +20,16 @@ import static android.os.Build.VERSION_CODES.LOLLIPOP;
 
 /**
  * A processor specifically used to handle nextFrame() and seekTo() calls from MotionPhotoReader.
+ *
+ * In a call to nextFrame(), the buffer processor decodes the next frame an output buffer and
+ * renders it to a surface texture. The buffer processor also extracts a set of stabilization
+ * homographies for the next frame. The rendered frame and the stabilization homographies are passed
+ * to a texture renderer which stabilizes the frame and draws it to the final output surface.
+ *
+ * In a call to seekTo(), the buffer processor decodes the frame specified by the seeking timestamp
+ * and renders it to the surface texture. The texture renderer then displays the frame to the output
+ * surface. No stabilization is needed, as this frame will be used as the base frame against which
+ * subsequent frames are stabilized.
  */
 class BufferProcessor {
     private static final String TAG = "BufferProcessor";
@@ -32,9 +42,13 @@ class BufferProcessor {
     private long prevRenderTimestampNs;
     private long prevTimestampUs;
 
+    /**
+     * Fields used for extracting stabilization data.
+     */
     private int videoTrackIndex;
     private int motionTrackIndex;
     private List<HomographyMatrix> homographyList;
+    private boolean stabilizationIsOn;
 
     /**
      * Fields shared with motion photo reader.
@@ -42,7 +56,6 @@ class BufferProcessor {
     private final OutputSurface outputSurface;
     private final MediaExtractor extractor;
     private final MediaCodec decoder;
-    private final MotionPhotoInfo motionPhotoInfo;
     private final BlockingQueue<Integer> availableInputBuffers;
     private final BlockingQueue<Bundle> availableOutputBuffers;
 
@@ -51,23 +64,24 @@ class BufferProcessor {
      * @param extractor The MediaExtractor from the motion photo reader that reads the video
      *                        track.
      * @param decoder The low resolution MediaCodec from the motion photo reader.
+     * @param stabilizationIsOn If true, the buffer processor will also extract stabilization data.
      * @param availableInputBuffers The queue of available input buffers.
      * @param availableOutputBuffers The queue of available output buffers.
      */
     public BufferProcessor(OutputSurface outputSurface,
                            MediaExtractor extractor,
                            MediaCodec decoder,
-                           MotionPhotoInfo motionPhotoInfo,
+                           boolean stabilizationIsOn,
                            BlockingQueue<Integer> availableInputBuffers,
                            BlockingQueue<Bundle> availableOutputBuffers) {
         this.outputSurface = outputSurface;
         this.extractor = extractor;
         this.decoder = decoder;
-        this.motionPhotoInfo = motionPhotoInfo;
         this.availableInputBuffers = availableInputBuffers;
         this.availableOutputBuffers = availableOutputBuffers;
         prevRenderTimestampNs = 0;
         prevTimestampUs = 0;
+        this.stabilizationIsOn = stabilizationIsOn;
 
         // Set the stabilization matrices to the identity for each strip
         homographyList = new ArrayList<>();
@@ -76,10 +90,20 @@ class BufferProcessor {
         }
     }
 
+    /**
+     * Indicate what track index represents the video track for the extractor. Must be set after an
+     * instance is constructed.
+     * @param videoTrackIndex The index of the video track.
+     */
     public void setVideoTrackIndex(int videoTrackIndex) {
         this.videoTrackIndex = videoTrackIndex;
     }
 
+    /**
+     * Indicate what track index represents the motion track for the extractor. Must be set after an
+     * instance is constructed.
+     * @param motionTrackIndex The index of the video track.
+     */
     public void setMotionTrackIndex(int motionTrackIndex) {
         this.motionTrackIndex = motionTrackIndex;
     }
@@ -142,6 +166,10 @@ class BufferProcessor {
         return bufferData;
     }
 
+    /**
+     * Retrieve the stabilization homographies from the motion track.
+     * @return a List of HomographyMatrix objects.
+     */
     private List<HomographyMatrix> getHomographies(ByteBuffer inputBuffer) {
         List<HomographyMatrix> homographyList = new ArrayList<>();
         int sampleSize = extractor.readSampleData(inputBuffer, 0);
@@ -212,19 +240,19 @@ class BufferProcessor {
                         // Get stabilization data from the high resolution extractor
                         inputBuffer = ByteBuffer.allocateDirect((int) extractor.getSampleSize());
                         List<HomographyMatrix> newHomographyList = getHomographies(inputBuffer);
-                        Log.d(TAG, "newStabMatrix: " + newHomographyList.get(0).toString());
 
                         // Multiply previous stabilization matrices by new stabilization matrices
                         // (Assume MOTION_TYPE_INTERFRAME for now)
                         List<HomographyMatrix> tempHomographyList = new ArrayList<>();
                         for (int i = 0; i < NUM_OF_STRIPS; i++) {
-//                            HomographyMatrix scaleMatrix = new HomographyMatrix();
-//                            scaleMatrix.set(0, 0, 2.0f);
-//                            scaleMatrix.set(1, 1, 2.0f);
-                            HomographyMatrix newStripMatrix = homographyList
-                                    .get(i)
-                                    .leftMultiplyBy(newHomographyList.get(i));
-                            tempHomographyList.add(newStripMatrix);
+                            if (stabilizationIsOn) {
+                                HomographyMatrix newStripMatrix = homographyList
+                                        .get(i)
+                                        .leftMultiplyBy(newHomographyList.get(i));
+                                tempHomographyList.add(newStripMatrix);
+                            } else {
+                                tempHomographyList.add(new HomographyMatrix());
+                            }
                         }
                         homographyList = tempHomographyList;
                         motionTrackVisited = true;
@@ -295,7 +323,6 @@ class BufferProcessor {
                         // Set the stabilization matrices to the identity for each strip
                         homographyList = new ArrayList<>();
                         for (int i = 0; i < NUM_OF_STRIPS; i++) {
-                            HomographyMatrix firstMatrix = new HomographyMatrix();
                             homographyList.add(new HomographyMatrix());
                         }
                         Log.d(TAG, "newStabMatrix: " + Arrays.toString(homographyList.subList(0, 9).toArray()));

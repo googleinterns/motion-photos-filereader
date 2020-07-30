@@ -25,7 +25,10 @@ class TextureRender {
     private static final int FLOAT_SIZE_BYTES = 4;
     private static final int TRIANGLE_VERTICES_DATA_POS_OFFSET = 0;
     private static final int TRIANGLE_VERTICES_DATA_STRIDE_BYTES = 3 * FLOAT_SIZE_BYTES;
+    private static final int NUM_OF_STRIPS = 12;
 
+    // The vertex shader applies a stabilization homography (uStabMatrix) to the boundaries of each
+    // strip, and also flips the image about the y-axis
     private static final String VERTEX_SHADER =
             "#version 300 es\n" +
             "uniform mat4 uMatrix;\n" +
@@ -33,11 +36,12 @@ class TextureRender {
             "in vec3 aPosition;\n" +
             "out vec2 TexCoord;\n" +
             "void main() {\n" +
-            "  TexCoord = 0.5 * aPosition.xy + vec2(0.5, 0.5);\n" +
-            "  vec4 hPos = uStabMatrix * vec4(aPosition, 0.1);\n" +
+            "  TexCoord = 0.5 * vec2(aPosition.x, -aPosition.y) + vec2(0.5, 0.5);\n" +
+            "  vec4 hPos = uStabMatrix * vec4(aPosition, 1.0);\n" +
             "  gl_Position = uMatrix * vec4(hPos.x, hPos.y, 0.0, hPos.z);\n" +
             "}";
 
+    // The fragment shader maps an external texture (the frame image) to each strip
     private static final String FRAGMENT_SHADER =
             "#version 300 es\n" +
             "#extension GL_OES_EGL_image_external_essl3 : require\n" +
@@ -48,15 +52,6 @@ class TextureRender {
             "void main() {\n" +
             "  FragColor = texture(uTexUnit, TexCoord);\n" +
             "}";
-
-    // A single plane comprised of two triangles to hold the image texture
-    private float[] triangleVerticesData = {
-            // positions (x,y)
-            -1.0f, -1.0f, 1.0f,   // bottom left
-             1.0f, -1.0f, 1.0f,   // bottom right
-            -1.0f,  1.0f, 1.0f,   // top left
-             1.0f,  1.0f, 1.0f    // top right
-    };
 
     private float[] uMatrix = new float[16];
     private float[] uStabMatrix = new float[16];
@@ -80,11 +75,6 @@ class TextureRender {
      * Create a TextureRender instance and allocate memory for image data.
      */
     public TextureRender() {
-        triangleVertices = ByteBuffer
-                .allocateDirect(triangleVerticesData.length * FLOAT_SIZE_BYTES)
-                .order(ByteOrder.nativeOrder())
-                .asFloatBuffer();
-        triangleVertices.put(triangleVerticesData).position(/* newPosition = */ 0);
         Matrix.setIdentityM(uMatrix, /* smOffset = */ 0);
         Matrix.setIdentityM(uStabMatrix, /* smOffset = */ 0);
     }
@@ -136,10 +126,7 @@ class TextureRender {
         Log.v(TAG, "Program validation results: " + validateStatus[0]
                 + "\nLog: " + glGetProgramInfoLog(program));
 
-        // Set up viewport, and make sure to account for rotated video orientation
-        // TODO: scale video to fit entire surface view, depending on app:fill in widget attributes
         setViewport();
-
         glUseProgram(program);
 
         // Create and bind textures
@@ -154,20 +141,6 @@ class TextureRender {
         }
 
         // TODO: Switch to VBOs and VAOs
-        aPositionHandle = glGetAttribLocation(program, "aPosition");
-        glEnableVertexAttribArray(aPositionHandle);
-        glVertexAttribPointer(
-                aPositionHandle,
-                /* size = */ 3,
-                /* type = */ GL_FLOAT,
-                /* normalized = */ false,
-                TRIANGLE_VERTICES_DATA_STRIDE_BYTES,
-                triangleVertices.position(TRIANGLE_VERTICES_DATA_POS_OFFSET)
-        );
-        if (glGetError() != 0) {
-            throw new RuntimeException("Failed to get vertex position");
-        }
-
         uMatrixHandle = glGetUniformLocation(program, "uMatrix");
         glUniformMatrix4fv(
                 uMatrixHandle,
@@ -197,7 +170,7 @@ class TextureRender {
             newVideoHeight = videoWidth;
         }
 
-        // Create matrix to scale the video based on fill mode
+        // Set the viewport dimensions
         double aspectRatio = (float) newVideoWidth / newVideoHeight;
         int viewportWidth, viewportHeight;
         int translateOffsetX = 0;
@@ -218,16 +191,6 @@ class TextureRender {
         if (glGetError() != 0) {
             throw new RuntimeException("Failed to set up viewport");
         }
-
-        // Original video is flipped about the y-axis
-        Matrix.rotateM(
-                uMatrix,
-                /* rmOffset = */ 0,
-                /* a = */ 180,
-                /* x = */ 0,
-                /* y = */ 1,
-                /* z = */ 0
-        );
 
         // Set up rotation matrix if the camera orientation is greater than 0 degrees
         if (videoRotation > 0) {
@@ -300,21 +263,45 @@ class TextureRender {
     }
 
     /**
-     * Render the current frame.
+     * Stabilize and render a single strip of the frame.
+     * @param stripIndex The index (from 0 to NUM_OF_STRIPS - 1) of the current strip to render.
+     * @param homography The homography matrix to stabilize this strip.
      */
-    public void drawFrame(List<HomographyMatrix> homographyList) {
-        Log.d(TAG, "Drawing frame");
+    public void drawStrip(int stripIndex, HomographyMatrix homography) {
+        // Set up and store strip vertices
+        float[] triangleVerticesData = {
+            // positions in homogeneous 2D coordinates (x,y,1)
+            -1.0f, -1.0f + 1.0f * stripIndex / (float) (NUM_OF_STRIPS / 2), 1.0f,    // bottom left
+             1.0f, -1.0f + 1.0f * stripIndex / (float) (NUM_OF_STRIPS / 2), 1.0f,    // bottom right
+            -1.0f, -1.0f + (stripIndex + 1.0f) / (float) (NUM_OF_STRIPS / 2), 1.0f,  // top left
+             1.0f, -1.0f + (stripIndex + 1.0f) / (float) (NUM_OF_STRIPS / 2), 1.0f   // top right
+        };
+        triangleVertices = ByteBuffer
+                .allocateDirect(triangleVerticesData.length * FLOAT_SIZE_BYTES)
+                .order(ByteOrder.nativeOrder())
+                .asFloatBuffer();
+        triangleVertices.put(triangleVerticesData).position(/* newPosition = */ 0);
 
-        // Transform the triangle vertices according to the stabilization matrices
-        // TODO: add multiple strips
-        HomographyMatrix homography = homographyList.get(0);
-        homography = homography.convertFromImageToGL(videoWidth, videoHeight);
-        for (int i = 1; i < homographyList.size(); i++) {
-            homography = homography.add(homographyList.get(i).convertFromImageToGL(videoWidth, videoHeight));
+        // Set up pointers to strip vertices for the GL program
+        aPositionHandle = glGetAttribLocation(program, "aPosition");
+        glEnableVertexAttribArray(aPositionHandle);
+        glVertexAttribPointer(
+                aPositionHandle,
+                /* size = */ 3,
+                /* type = */ GL_FLOAT,
+                /* normalized = */ false,
+                TRIANGLE_VERTICES_DATA_STRIDE_BYTES,
+                triangleVertices.position(TRIANGLE_VERTICES_DATA_POS_OFFSET)
+        );
+        if (glGetError() != 0) {
+            throw new RuntimeException("Failed to get vertex position");
         }
-        homography = homography.multiplyScalar(1.0f / homographyList.size());
 
-        // Invert the matrix (store matrix in row-major order, which we will then transpose)
+        // Create the homography matrix for this strip
+        // 1. Store the matrix in row-major order
+        // 2. Invert the matrix
+        // 3. Store a pointer to the matrix (mark the matrix as transposed, since GL stores matrices
+        //    in column-major order
         float[] uStabMatrixInv = new float[16];
         Matrix.setIdentityM(uStabMatrixInv, 0);
         uStabMatrixInv[0] = homography.get(0, 0);
@@ -328,17 +315,6 @@ class TextureRender {
         uStabMatrixInv[10] = homography.get(2, 2);
         Matrix.invertM(uStabMatrix, 0, uStabMatrixInv, 0);
 
-//        uStabMatrix[0] = homography.get(0, 0);
-//        uStabMatrix[1] = homography.get(0, 1);
-//        uStabMatrix[2] = homography.get(0, 2);
-//        uStabMatrix[4] = homography.get(1, 0);
-//        uStabMatrix[5] = homography.get(1, 1);
-//        uStabMatrix[6] = homography.get(1, 2);
-//        uStabMatrix[8] = homography.get(2, 0);
-//        uStabMatrix[9] = homography.get( 2, 1);
-//        uStabMatrix[10] = homography.get(2, 2);
-        Log.d(TAG, "uStabMatrix: " + Arrays.toString(uStabMatrix));
-
         uStabMatrixHandle = glGetUniformLocation(program, "uStabMatrix");
         glUniformMatrix4fv(
                 uStabMatrixHandle,
@@ -351,10 +327,21 @@ class TextureRender {
             throw new RuntimeException("Failed to get matrix");
         }
 
-        glClear(/* mask = */ GL_COLOR_BUFFER_BIT);
+        // Draw the strip
         glDrawArrays(GL_TRIANGLE_STRIP, /* first = */ 0, /* count = */ 4);
         if (glGetError() != 0) {
-            throw new RuntimeException("Failed to draw to frame");
+            throw new RuntimeException("Failed to draw to strip" + stripIndex);
+        }
+    }
+
+    /**
+     * Render the current frame.
+     */
+    public void drawFrame(List<HomographyMatrix> homographyList) {
+        Log.d(TAG, "Drawing frame");
+        glClear(/* mask = */ GL_COLOR_BUFFER_BIT);
+        for (int i = 0; i < NUM_OF_STRIPS; i++) {
+            drawStrip(/* stripIndex = */ i, homographyList.get(i).convertFromImageToGL(videoWidth, videoHeight));
         }
     }
 
