@@ -101,12 +101,10 @@ public class MotionPhotoReader {
      * @throws XMPException when parsing invalid XML syntax.
      */
     @RequiresApi(api = M)
-    public static MotionPhotoReader open(
-            File file,
-            Surface surface,
-            int surfaceWidth,
-            int surfaceHeight
-    ) throws IOException, XMPException {
+    public static MotionPhotoReader open(File file,
+                                         Surface surface,
+                                         int surfaceWidth,
+                                         int surfaceHeight) throws IOException, XMPException {
         return open(
                 file,
                 surface,
@@ -211,9 +209,9 @@ public class MotionPhotoReader {
      * Sets up and starts a new handler thread for the rendering pipeline and media decoders and
      * extractors.
      *
-     * A low resolution decoder and extractor are set up for the video track which holds frame data.
-     * If applicable, a high resolution decoder and extractor are set up for the motion track, which
-     * contains video stabilization data.
+     * An extractor is set up for both the video and motion track (if applicable). The extractor
+     * reads samples for both tracks and passes the information to a buffer processor. A decoder is
+     * set up for the video track to read frame data.
      */
     @RequiresApi(api = 23)
     private void startRenderThread(MotionPhotoInfo motionPhotoInfo) throws IOException {

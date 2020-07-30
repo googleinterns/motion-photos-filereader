@@ -5,8 +5,6 @@ import android.util.Log;
 
 import com.google.common.io.ByteStreams;
 
-import org.junit.rules.TemporaryFolder;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -31,15 +29,16 @@ class ResourceFetcher {
     public static File fetchRawFile(Context context,
                                     int id, String prefix,
                                     String suffix) throws IOException {
-        InputStream input = context.getResources().openRawResource(id);
-        File file = null;
-        try {
-            file = File.createTempFile(prefix, suffix);
-        } catch (IOException e) {
-            Log.e(TAG, "Error fetching raw file", e);
+        try (InputStream input = context.getResources().openRawResource(id)) {
+            File file = null;
+            try {
+                file = File.createTempFile(prefix, suffix);
+            } catch (IOException e) {
+                Log.e(TAG, "Error fetching raw file", e);
+            }
+            writeBytesToFile(input, file);
+            return file;
         }
-        writeBytesToFile(input, file);
-        return file;
     }
 
     /**
@@ -58,20 +57,20 @@ class ResourceFetcher {
      * Gets a resource from the assets folder of a given context and creates a temporary file
      * holding the resource. Used in instrumentation tests to fetch motion photo files.
      * @param context The context containing the asset file.
-     * @param temporaryFolder The temporary folder to which the file should be written.
      * @param filename The name of the asset file.
      * @return a File object containing the raw resource file.
      * @throws IOException if an error occurs while creating the new file
      */
     public static File fetchAssetFile(Context context,
-                                      TemporaryFolder temporaryFolder,
-                                      String filename) throws IOException {
-        InputStream input = context.getResources().getAssets().open(filename);
-
-        // Write file to temporary folder for instrumentation test access
-        File f = temporaryFolder.newFile(filename);
-        writeBytesToFile(input, f);
-        return f;
+                                      String filename,
+                                      String prefix,
+                                      String suffix) throws IOException {
+        try (InputStream input = context.getResources().getAssets().open(filename)) {
+            // Write file to temporary folder for instrumentation test access
+            File f = File.createTempFile(prefix, suffix);
+            writeBytesToFile(input, f);
+            return f;
+        }
     }
 
     private static void writeBytesToFile(InputStream input, File file) throws IOException {
@@ -79,5 +78,4 @@ class ResourceFetcher {
             ByteStreams.copy(input, fos);
         }
     }
-
 }

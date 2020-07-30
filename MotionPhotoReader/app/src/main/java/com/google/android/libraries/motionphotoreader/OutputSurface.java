@@ -215,8 +215,10 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             eglSurface = EGL14.EGL_NO_SURFACE;
 
             textureRender = null;
-            surfaceTexture.release();
-            surfaceTexture = null;
+            if (surfaceTexture != null) {
+                surfaceTexture.release();
+                surfaceTexture = null;
+            }
             try {
                 decodeSurfaceFuture.get().release();
             } catch (InterruptedException | ExecutionException e) {

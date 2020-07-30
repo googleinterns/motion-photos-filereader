@@ -25,6 +25,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Local unit test for the BufferHandler class.
@@ -40,16 +41,16 @@ public class BufferProcessorTest {
     private final static int VIDEO_OFFSET = 2592317;
 
     private OutputSurface outputSurface;
-    private MediaExtractor lowResExtractor;
-    private MediaCodec lowResDecoder;
+    private MediaExtractor extractor;
+    private MediaCodec decoder;
     private BlockingQueue<Integer> availableInputBuffers;
     private BlockingQueue<Bundle> availableOutputBuffers;
 
     @Before
     public void setUp() {
         // Set up mock objects
-        lowResExtractor = mock(MediaExtractor.class);
-        lowResDecoder = mock(MediaCodec.class);
+        extractor = mock(MediaExtractor.class);
+        decoder = mock(MediaCodec.class);
         availableInputBuffers = new LinkedBlockingQueue<>();
         availableOutputBuffers = new LinkedBlockingQueue<>();
 
@@ -88,21 +89,11 @@ public class BufferProcessorTest {
                                               int rotation,
                                               String mime) {
         MediaFormat videoFormat = mock(MediaFormat.class);
-        doAnswer((Answer<Integer>) invocation -> width)
-                .when(videoFormat)
-                .getInteger(eq(MediaFormat.KEY_WIDTH));
-        doAnswer((Answer<Integer>) invocation -> height)
-                .when(videoFormat)
-                .getInteger(eq(MediaFormat.KEY_HEIGHT));
-        doAnswer((Answer<Long>) invocation -> duration)
-                .when(videoFormat)
-                .getLong(eq(MediaFormat.KEY_DURATION));
-        doAnswer((Answer<Integer>) invocation -> rotation)
-                .when(videoFormat)
-                .getInteger(eq(MediaFormat.KEY_ROTATION));
-        doAnswer((Answer<String>) invocation -> mime)
-                .when(videoFormat)
-                .getString(eq(MediaFormat.KEY_MIME));
+        when(videoFormat.getInteger(MediaFormat.KEY_WIDTH)).thenReturn(width);
+        when(videoFormat.getInteger(MediaFormat.KEY_HEIGHT)).thenReturn(height);
+        when(videoFormat.getLong(MediaFormat.KEY_DURATION)).thenReturn(duration);
+        when(videoFormat.getInteger(MediaFormat.KEY_ROTATION)).thenReturn(rotation);
+        when(videoFormat.getString(MediaFormat.KEY_MIME)).thenReturn(mime);
 
         return videoFormat;
     }
@@ -111,102 +102,89 @@ public class BufferProcessorTest {
     public void handleNextFrameMsg_hasNextFrameTrue_isCorrect() {
         BufferProcessor bufferProcessor = spy(new BufferProcessor(
                 outputSurface,
-                lowResExtractor,
-                lowResDecoder,
+                extractor,
+                decoder,
                 availableInputBuffers,
                 availableOutputBuffers
         ));
 
-        doAnswer((Answer<Integer>) invocation -> 16)
-                .when(lowResExtractor)
-                .readSampleData(any(ByteBuffer.class), anyInt());
-        doAnswer((Answer<ByteBuffer>) invocation -> mock(ByteBuffer.class))
-                .when(lowResDecoder)
-                .getInputBuffer(anyInt());
+        when(extractor.readSampleData(any(ByteBuffer.class), anyInt())).thenReturn(16);
+        when(decoder.getInputBuffer(anyInt())).thenReturn(mock(ByteBuffer.class));
 
         Bundle messageData = mock(Bundle.class);
-        doAnswer((Answer<Integer>) invocation -> MotionPhotoReader.MSG_NEXT_FRAME)
-                .when(messageData)
-                .getInt(anyString());
+        when(messageData.getInt(anyString())).thenReturn(MotionPhotoReader.MSG_NEXT_FRAME);
         bufferProcessor.process(messageData);
 
-        verify(lowResExtractor).readSampleData(any(ByteBuffer.class), eq(0));
-        verify(lowResDecoder, times(1))
+        verify(extractor).readSampleData(any(ByteBuffer.class), eq(0));
+        verify(decoder, times(1))
                 .queueInputBuffer(eq(1), eq(0), anyInt(), anyLong(), eq(0));
-        verify(lowResExtractor, times(1)).advance();
-        verify(lowResExtractor, never()).seekTo(anyLong(), anyInt());
-        verify(lowResDecoder).releaseOutputBuffer(anyInt(), anyLong());
+        verify(extractor, times(1)).advance();
+        verify(extractor, never()).seekTo(anyLong(), anyInt());
+        verify(decoder).releaseOutputBuffer(anyInt(), anyLong());
     }
 
     @Test
     public void handleNextFrameMsg_hasNextFrameFalse_isCorrect() {
         BufferProcessor bufferProcessor = spy(new BufferProcessor(
                 outputSurface,
-                lowResExtractor,
-                lowResDecoder,
+                extractor,
+                decoder,
                 availableInputBuffers,
                 availableOutputBuffers
         ));
 
-        doAnswer((Answer<Integer>) invocation -> -1)
-                .when(lowResExtractor)
-                .readSampleData(any(ByteBuffer.class), anyInt());
-        doAnswer((Answer<ByteBuffer>) invocation -> mock(ByteBuffer.class))
-                .when(lowResDecoder)
-                .getInputBuffer(anyInt());
+        when(extractor.readSampleData(any(ByteBuffer.class), anyInt())).thenReturn(-1);
+        when(decoder.getInputBuffer(anyInt())).thenReturn(mock(ByteBuffer.class));
 
         Bundle messageData = mock(Bundle.class);
-        doAnswer((Answer<Integer>) invocation -> MotionPhotoReader.MSG_NEXT_FRAME)
-                .when(messageData).getInt(anyString());
+        when(messageData.getInt(anyString())).thenReturn(MotionPhotoReader.MSG_NEXT_FRAME);
         bufferProcessor.process(messageData);
 
-        verify(lowResExtractor).readSampleData(any(ByteBuffer.class), anyInt());
-        verify(lowResDecoder, times(1)).queueInputBuffer(
+        verify(extractor).readSampleData(any(ByteBuffer.class), anyInt());
+        verify(decoder, times(1)).queueInputBuffer(
                 eq(1),
                 eq(0),
                 eq(0),
                 eq(0L),
                 eq(MediaCodec.BUFFER_FLAG_END_OF_STREAM)
         );
-        verify(lowResExtractor, never()).seekTo(anyLong(), anyInt());
-        verify(lowResDecoder).releaseOutputBuffer(anyInt(), anyLong());
+        verify(extractor, never()).seekTo(anyLong(), anyInt());
+        verify(decoder).releaseOutputBuffer(anyInt(), anyLong());
     }
 
     @Test
     public void handleSeekToFrameMsg_isCorrect() {
         BufferProcessor bufferProcessor = spy(new BufferProcessor(
                 outputSurface,
-                lowResExtractor,
-                lowResDecoder,
+                extractor,
+                decoder,
                 availableInputBuffers,
                 availableOutputBuffers
         ));
 
         Bundle messageData = mock(Bundle.class);
-        doAnswer((Answer<Integer>) invocation -> MotionPhotoReader.MSG_SEEK_TO_FRAME)
-                .when(messageData)
-                .getInt(anyString());
+        when(messageData.getInt(anyString())).thenReturn(MotionPhotoReader.MSG_SEEK_TO_FRAME);
         bufferProcessor.process(messageData);
 
-        verify(lowResExtractor, times(1)).seekTo(anyLong(), anyInt());
-        verify(lowResDecoder).releaseOutputBuffer(anyInt(), anyLong());
+        verify(extractor, times(1)).seekTo(anyLong(), anyInt());
+        verify(decoder).releaseOutputBuffer(anyInt(), anyLong());
     }
 
     @Test(expected = IllegalStateException.class)
     public void handleIncorrectMsg_isCorrect() {
         BufferProcessor bufferProcessor = spy(new BufferProcessor(
                 outputSurface,
-                lowResExtractor,
-                lowResDecoder,
+                extractor,
+                decoder,
                 availableInputBuffers,
                 availableOutputBuffers
         ));
 
         Bundle messageData = mock(Bundle.class);
-        doAnswer((Answer<Integer>) invocation -> 0x0100).when(messageData).getInt(anyString());
+        when(messageData.getInt(anyString())).thenReturn(0x0100);
         bufferProcessor.process(messageData);
 
-        verify(lowResExtractor, never()).seekTo(anyLong(), anyInt());
-        verify(lowResDecoder, never()).releaseOutputBuffer(anyInt(), anyLong());
+        verify(extractor, never()).seekTo(anyLong(), anyInt());
+        verify(decoder, never()).releaseOutputBuffer(anyInt(), anyLong());
     }
 }

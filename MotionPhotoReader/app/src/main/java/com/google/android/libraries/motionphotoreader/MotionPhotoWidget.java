@@ -2,7 +2,6 @@ package com.google.android.libraries.motionphotoreader;
 
 import android.content.Context;
 import android.content.res.TypedArray;
-import android.graphics.Color;
 import android.media.MediaExtractor;
 import android.os.Build;
 import android.os.Parcel;
@@ -109,7 +108,12 @@ public class MotionPhotoWidget extends SurfaceView {
                     reader.close();
                 }
                 try {
-                    reader = MotionPhotoReader.open(file, holder.getSurface(), surfaceWidth, surfaceHeight);
+                    reader = MotionPhotoReader.open(
+                            file,
+                            holder.getSurface(),
+                            surfaceWidth,
+                            surfaceHeight
+                    );
                     Log.d(TAG, "New motion photo reader created");
                 } catch (IOException | XMPException e) {
                     Log.e(TAG, "Exception occurred while opening file", e);
