@@ -67,7 +67,6 @@ public class MotionPhotoReaderTest {
                 ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
                 null
         );
-        cleanup.add(reader::close);
 
         int frameCount = 0;
         while (reader.hasNextFrame()) {
@@ -75,6 +74,7 @@ public class MotionPhotoReaderTest {
             frameCount++;
         }
         assertEquals(NUM_FRAMES, frameCount);
+        cleanup.add(reader::close);
     }
 
     @Test
@@ -83,8 +83,8 @@ public class MotionPhotoReaderTest {
                 ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
                 null
         );
-        cleanup.add(reader::close);
         assertEquals(0, reader.getCurrentTimestampUs());
+        cleanup.add(reader::close);
     }
 
     @Test
@@ -93,7 +93,6 @@ public class MotionPhotoReaderTest {
                 ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
                 null
         );
-        cleanup.add(reader::close);
 
         long currentTimestampUs = -1L;
         while (reader.hasNextFrame()) {
@@ -105,6 +104,7 @@ public class MotionPhotoReaderTest {
                     flag);
             currentTimestampUs = newTimestampUs;
         }
+        cleanup.add(reader::close);
     }
 
     @Test
@@ -113,7 +113,6 @@ public class MotionPhotoReaderTest {
                 ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
                 null
         );
-        cleanup.add(reader::close);
 
         long currentTimestampUs = -1L;
         while (reader.hasNextFrame()) {
@@ -126,6 +125,7 @@ public class MotionPhotoReaderTest {
                     flag);
             currentTimestampUs = newTimestampUs;
         }
+        cleanup.add(reader::close);
     }
 
     @Test
@@ -134,9 +134,9 @@ public class MotionPhotoReaderTest {
                 ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
                 null
         );
-        cleanup.add(reader::close);
         boolean flag = reader.hasNextFrame();
         assertTrue("No next frame", flag);
+        cleanup.add(reader::close);
     }
 
     @Test
@@ -145,12 +145,12 @@ public class MotionPhotoReaderTest {
                 ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
                 null
         );
-        cleanup.add(reader::close);
 
         long timestampUs = reader.getMotionPhotoInfo().getDurationUs();
         reader.seekTo(timestampUs, MediaExtractor.SEEK_TO_NEXT_SYNC);
         boolean flag = reader.hasNextFrame();
         assertFalse("Did not seek to end of video", flag);
+        cleanup.add(reader::close);
     }
 
     @Test
@@ -166,10 +166,9 @@ public class MotionPhotoReaderTest {
                 fakeAvailableInputBuffers,
                 fakeAvailableOutputBuffers
         );
-        cleanup.add(reader::close);
-
         assertFalse("Available input buffer queue is empty",
                 fakeAvailableInputBuffers.isEmpty());
+        cleanup.add(reader::close);
     }
 
     @Test
@@ -185,7 +184,6 @@ public class MotionPhotoReaderTest {
                 fakeAvailableInputBuffers,
                 fakeAvailableOutputBuffers
         );
-        cleanup.add(reader::close);
 
         while (reader.hasNextFrame()) {
             reader.nextFrame();
@@ -193,6 +191,7 @@ public class MotionPhotoReaderTest {
 
         assertEquals(NUM_FRAMES, fakeAvailableOutputBuffers.getOfferCount());
         assertEquals(NUM_FRAMES, fakeAvailableOutputBuffers.getPollCount());
+        cleanup.add(reader::close);
     }
 
     @Test
@@ -201,9 +200,9 @@ public class MotionPhotoReaderTest {
                 ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
                 null
         );
-        cleanup.add(reader::close);
         Bitmap bmp = reader.getMotionPhotoImageBitmap();
         assertNotNull(bmp);
+        cleanup.add(reader::close);
     }
 
     /** Mock LinkedBlockingQueue class to simulate and test input/output buffer queue behaviors. */
