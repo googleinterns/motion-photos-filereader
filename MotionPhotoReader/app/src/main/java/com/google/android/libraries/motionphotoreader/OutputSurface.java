@@ -30,6 +30,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private static final String TAG = "OutputSurface";
 
     private final Object frameSyncObject = new Object();
+    private final Object surfaceSyncObject = new Object();
 
     private EGLDisplay eglDisplay;
     private EGLContext eglContext;
@@ -38,7 +39,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
 
     private int surfaceTextureHandle;
     private SurfaceTexture surfaceTexture;
-    private Surface decodeSurface;
+    private SettableFuture<Surface> decodeSurfaceFuture = SettableFuture.create();
     private TextureRender textureRender;
     private Handler renderHandler;
     private boolean frameAvailable;
@@ -82,7 +83,8 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             // initialized
             surfaceTexture = new SurfaceTexture(surfaceTextureHandle);
             surfaceTexture.setOnFrameAvailableListener(this);
-            decodeSurface = new Surface(surfaceTexture);
+            Surface decodeSurface = new Surface(surfaceTexture);
+            decodeSurfaceFuture.set(decodeSurface);
         });
     }
 
@@ -218,10 +220,12 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
                 surfaceTexture.release();
                 surfaceTexture = null;
             }
-            if (decodeSurface != null) {
-                decodeSurface.release();
-                decodeSurface = null;
+            try {
+                decodeSurfaceFuture.get().release();
+            } catch (InterruptedException | ExecutionException e) {
+                Log.e(TAG, "Could not get decode surface");
             }
+            decodeSurfaceFuture.set(null);
         });
     }
 
@@ -232,10 +236,8 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
      * @return the intermediate decoding Surface.
      */
     public Surface getDecodeSurface() {
-        SettableFuture<Surface> surfaceFuture = SettableFuture.create();
-        renderHandler.post(() -> surfaceFuture.set(decodeSurface));
         try {
-            return surfaceFuture.get();
+            return decodeSurfaceFuture.get();
         } catch (InterruptedException | ExecutionException e) {
             Log.e(TAG, "Could not set surface texture", e);
             return null;

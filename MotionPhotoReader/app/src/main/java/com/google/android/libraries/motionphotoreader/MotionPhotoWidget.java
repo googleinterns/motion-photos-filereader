@@ -2,7 +2,6 @@ package com.google.android.libraries.motionphotoreader;
 
 import android.content.Context;
 import android.content.res.TypedArray;
-import android.graphics.Color;
 import android.media.MediaExtractor;
 import android.os.Build;
 import android.os.Parcel;
