@@ -214,10 +214,14 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             eglSurface = EGL14.EGL_NO_SURFACE;
 
             textureRender = null;
-            surfaceTexture.release();
-            surfaceTexture = null;
-            decodeSurface.release();
-            decodeSurface = null;
+            if (surfaceTexture != null) {
+                surfaceTexture.release();
+                surfaceTexture = null;
+            }
+            if (decodeSurface != null) {
+                decodeSurface.release();
+                decodeSurface = null;
+            }
         });
     }
 
@@ -267,9 +271,9 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
      * Draw the image to the final display Surface.
      */
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
-    public void drawImage(List<HomographyMatrix> homographyList) {
+    public void drawImage(List<HomographyMatrix> homographyList, long renderTimestampNs) {
         renderHandler.post(() -> {
-            textureRender.drawFrame(homographyList);
+            textureRender.drawFrame(homographyList, renderTimestampNs);
             EGL14.eglSwapBuffers(eglDisplay, eglSurface);
         });
     }

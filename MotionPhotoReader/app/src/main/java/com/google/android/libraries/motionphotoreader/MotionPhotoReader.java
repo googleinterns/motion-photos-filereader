@@ -53,25 +53,23 @@ public class MotionPhotoReader {
     private final File file;
     private final Surface surface;
     private final MotionPhotoInfo motionPhotoInfo;
-    private final int version;
 
     private MediaExtractor extractor;
     private MediaCodec decoder;
     private MediaFormat videoFormat;
     private FileInputStream fileInputStream;
+    private BufferProcessor bufferProcessor;
 
     // message keys
     static final int MSG_NEXT_FRAME = 0x0001;
     static final int MSG_SEEK_TO_FRAME = 0x0010;
 
     /**
-     * Two handlers manage the calls to play through the video. The media worker thread posts
-     * available buffers to the buffer queue. The buffer worker receives messages to process frames
-     * and uses the available buffers posted by the media worker thread.
+     * The renderWorker and renderHandler are in charge of executing all calls relevant to rendering
+     * and transforming the current frame (if stabilization is on).
      */
     private HandlerThread renderWorker;
     private Handler renderHandler;
-    private BufferProcessor bufferProcessor;
 
     /** Available buffer queues **/
     private final BlockingQueue<Integer> availableInputBuffers;
@@ -100,7 +98,6 @@ public class MotionPhotoReader {
         this.availableInputBuffers = availableInputBuffers;
         this.availableOutputBuffers = availableOutputBuffers;
         this.motionPhotoInfo = motionPhotoInfo;
-        this.version = motionPhotoInfo.getVersion();
     }
 
     /**
@@ -109,7 +106,7 @@ public class MotionPhotoReader {
      * @param surface The surface for the motion photo reader to decode.
      * @param surfaceWidth The width of the surface, in pixels.
      * @param surfaceHeight The height of the surface, in pixels.
-     * @param stabilizationIsOn If true, the video will be stabilized
+     * @param stabilizationOn If true, the video will be stabilized
      * @return a MotionPhotoReader object for the specified file.
      * @throws IOException when the file cannot be found.
      * @throws XMPException when parsing invalid XML syntax.
@@ -119,16 +116,25 @@ public class MotionPhotoReader {
                                          Surface surface,
                                          int surfaceWidth,
                                          int surfaceHeight,
-                                         boolean stabilizationIsOn
+                                         boolean stabilizationOn
     ) throws IOException, XMPException {
         return open(
                 file,
-                surface,
-                surfaceWidth,
-                surfaceHeight,
-                /* stabilizationIsOn = */ stabilizationIsOn,
+                surface, surfaceWidth, surfaceHeight,
+                /* stabilizationOn = */ stabilizationOn,
                 /* availableInputBuffers = */ new LinkedBlockingQueue<>(),
                 /* availableOutputBuffers = */ new LinkedBlockingQueue<>()
+        );
+    }
+
+    @RequiresApi(api = M)
+    public static MotionPhotoReader open(String filename, 
+                                         Surface surface, int surfaceWidth, int surfaceHeight,
+                                         boolean stabilizationOn) throws IOException, XMPException {
+        return open(
+                new File(filename),
+                surface, surfaceWidth, surfaceHeight,
+                /* stabilizationOn = */ stabilizationOn
         );
     }
 
@@ -137,24 +143,8 @@ public class MotionPhotoReader {
             throws IOException, XMPException {
         return open(
                 file,
-                surface,
-                /* surfaceWidth = */ 0,
-                /* surfaceHeight = */ 0,
-                /* stabilizationIsOn = */ true,
-                /* availableInputBuffers = */ new LinkedBlockingQueue<>(),
-                /* availableOutputBuffers = */ new LinkedBlockingQueue<>()
-        );
-    }
-
-    @RequiresApi(api = M)
-    public static MotionPhotoReader open(File file, Surface surface, boolean stabilizationIsOn)
-            throws IOException, XMPException {
-        return open(
-                file,
-                surface,
-                /* surfaceWidth = */ 0,
-                /* surfaceHeight = */ 0,
-                /* stabilizationIsOn = */ stabilizationIsOn,
+                surface, /* surfaceWidth = */ 0, /* surfaceHeight = */ 0,
+                /* stabilizationOn = */ true,
                 /* availableInputBuffers = */ new LinkedBlockingQueue<>(),
                 /* availableOutputBuffers = */ new LinkedBlockingQueue<>()
         );
@@ -175,7 +165,7 @@ public class MotionPhotoReader {
                                   Surface surface,
                                   int surfaceWidth,
                                   int surfaceHeight,
-                                  boolean stabilizationIsOn,
+                                  boolean stabilizationOn,
                                   BlockingQueue<Integer> availableInputBuffers,
                                   BlockingQueue<Bundle> availableOutputBuffers)
             throws IOException, XMPException {
@@ -189,7 +179,7 @@ public class MotionPhotoReader {
                 availableOutputBuffers,
                 motionPhotoInfo
         );
-        reader.startRenderThread(motionPhotoInfo, stabilizationIsOn);
+        reader.startRenderThread(motionPhotoInfo, stabilizationOn);
         return reader;
     }
 
@@ -197,7 +187,7 @@ public class MotionPhotoReader {
     @VisibleForTesting
     static MotionPhotoReader open(File file,
                                   Surface surface,
-                                  boolean stabilizationIsOn,
+                                  boolean stabilizationOn,
                                   BlockingQueue<Integer> availableInputBuffers,
                                   BlockingQueue<Bundle> availableOutputBuffers)
             throws IOException, XMPException {
@@ -211,7 +201,7 @@ public class MotionPhotoReader {
                 availableOutputBuffers,
                 motionPhotoInfo
         );
-        reader.startRenderThread(motionPhotoInfo, stabilizationIsOn);
+        reader.startRenderThread(motionPhotoInfo, stabilizationOn);
         return reader;
     }
 
@@ -224,7 +214,7 @@ public class MotionPhotoReader {
      * contains video stabilization data.
      */
     @RequiresApi(api = 23)
-    private void startRenderThread(MotionPhotoInfo motionPhotoInfo, boolean stabilizationIsOn) throws IOException {
+    private void startRenderThread(MotionPhotoInfo motionPhotoInfo, boolean stabilizationOn) throws IOException {
         // Set up the render handler and thread
         renderWorker = new HandlerThread("renderHandler");
         renderWorker.start();
@@ -256,37 +246,40 @@ public class MotionPhotoReader {
             }
         }
 
-        // Find the stabilization metadata trac
-        switch (version) {
-            case MotionPhotoInfo.MOTION_PHOTO_VERSION_V1:
-                for (int i = 0; i < extractor.getTrackCount(); i++) {
-                    MediaFormat format = extractor.getTrackFormat(i);
-                    String mime = format.getString(MediaFormat.KEY_MIME);
-                    assert mime != null;
-                    if (mime.startsWith(MICROVIDEO_META_MIMETYPE)) {
-                        Log.d(TAG, "selected motion track: " + i);
-                        extractor.selectTrack(i);
-                        motionTrackIndex = i;
-                        break;
+        // Find the stabilization metadata track
+        if (stabilizationOn) {
+            int version = motionPhotoInfo.getVersion();
+            switch (version) {
+                case MotionPhotoInfo.MOTION_PHOTO_VERSION_V1:
+                    for (int i = 0; i < extractor.getTrackCount(); i++) {
+                        MediaFormat format = extractor.getTrackFormat(i);
+                        String mime = format.getString(MediaFormat.KEY_MIME);
+                        assert mime != null;
+                        if (mime.startsWith(MICROVIDEO_META_MIMETYPE)) {
+                            Log.d(TAG, "selected motion track: " + i);
+                            extractor.selectTrack(i);
+                            motionTrackIndex = i;
+                            break;
+                        }
                     }
-                }
-                break;
-            // TODO: Set up v2 stabilization pipeline
-            case MotionPhotoInfo.MOTION_PHOTO_VERSION_V2:
-                for (int i = 0; i < extractor.getTrackCount(); i++) {
-                    MediaFormat format = extractor.getTrackFormat(i);
-                    String mime = format.getString(MediaFormat.KEY_MIME);
-                    assert mime != null;
-                    if (mime.startsWith(MOTION_PHOTO_IMAGE_META_MIMETYPE)) {
-                        Log.d(TAG, "selected motion track: " + i);
-                        extractor.selectTrack(i);
-                        motionTrackIndex = i;
-                        break;
+                    break;
+                // TODO: Set up v2 stabilization pipeline
+                case MotionPhotoInfo.MOTION_PHOTO_VERSION_V2:
+                    for (int i = 0; i < extractor.getTrackCount(); i++) {
+                        MediaFormat format = extractor.getTrackFormat(i);
+                        String mime = format.getString(MediaFormat.KEY_MIME);
+                        assert mime != null;
+                        if (mime.startsWith(MOTION_PHOTO_IMAGE_META_MIMETYPE)) {
+                            Log.d(TAG, "selected motion track: " + i);
+                            extractor.selectTrack(i);
+                            motionTrackIndex = i;
+                            break;
+                        }
                     }
-                }
-                break;
-            default:
-                throw new RuntimeException("Unexpected motion photo format: " + version);
+                    break;
+                default:
+                    throw new RuntimeException("Unexpected motion photo format: " + version);
+            }
         }
 
         // Make sure the Android version is capable of supporting MediaCodec callbacks
@@ -338,7 +331,7 @@ public class MotionPhotoReader {
                 outputSurface,
                 extractor,
                 decoder,
-                stabilizationIsOn,
+                stabilizationOn,
                 availableInputBuffers,
                 availableOutputBuffers
         );
@@ -376,7 +369,6 @@ public class MotionPhotoReader {
      */
     @RequiresApi(api = Build.VERSION_CODES.P)
     public boolean hasNextFrame() {
-        Log.d("HasNextFrame", "Running");
         // Read the next packet and check if it shows a full frame
         long sampleSize = extractor.getSampleSize();
         return (sampleSize >= 0);

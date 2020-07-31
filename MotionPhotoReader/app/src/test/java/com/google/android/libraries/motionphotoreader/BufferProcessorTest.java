@@ -115,7 +115,7 @@ public class BufferProcessorTest {
                 outputSurface,
                 lowResExtractor,
                 lowResDecoder,
-                motionPhotoInfo,
+                true,
                 availableInputBuffers,
                 availableOutputBuffers
         ));
@@ -147,7 +147,7 @@ public class BufferProcessorTest {
                 outputSurface,
                 lowResExtractor,
                 lowResDecoder,
-                motionPhotoInfo,
+                true,
                 availableInputBuffers,
                 availableOutputBuffers
         ));
@@ -182,7 +182,7 @@ public class BufferProcessorTest {
                 outputSurface,
                 lowResExtractor,
                 lowResDecoder,
-                motionPhotoInfo,
+                true,
                 availableInputBuffers,
                 availableOutputBuffers
         ));
@@ -203,7 +203,7 @@ public class BufferProcessorTest {
                 outputSurface,
                 lowResExtractor,
                 lowResDecoder,
-                motionPhotoInfo,
+                true,
                 availableInputBuffers,
                 availableOutputBuffers
         ));

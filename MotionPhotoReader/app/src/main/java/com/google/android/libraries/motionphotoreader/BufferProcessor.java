@@ -11,7 +11,6 @@ import com.google.protobuf.InvalidProtocolBufferException;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -48,7 +47,7 @@ class BufferProcessor {
     private int videoTrackIndex;
     private int motionTrackIndex;
     private List<HomographyMatrix> homographyList;
-    private boolean stabilizationIsOn;
+    private boolean stabilizationOn;
 
     /**
      * Fields shared with motion photo reader.
@@ -61,17 +60,18 @@ class BufferProcessor {
 
     /**
      * Constructor for setting up a buffer processor from a motion photo reader.
-     * @param extractor The MediaExtractor from the motion photo reader that reads the video
-     *                        track.
+     * @param outputSurface The output surface which connects the buffer processor and the motion
+     * photo reader to the OpenGL pipeline.
+     * @param extractor The MediaExtractor from the motion photo reader that reads the video track.
      * @param decoder The low resolution MediaCodec from the motion photo reader.
-     * @param stabilizationIsOn If true, the buffer processor will also extract stabilization data.
+     * @param stabilizationOn If true, the buffer processor will also extract stabilization data.
      * @param availableInputBuffers The queue of available input buffers.
      * @param availableOutputBuffers The queue of available output buffers.
      */
     public BufferProcessor(OutputSurface outputSurface,
                            MediaExtractor extractor,
                            MediaCodec decoder,
-                           boolean stabilizationIsOn,
+                           boolean stabilizationOn,
                            BlockingQueue<Integer> availableInputBuffers,
                            BlockingQueue<Bundle> availableOutputBuffers) {
         this.outputSurface = outputSurface;
@@ -81,7 +81,7 @@ class BufferProcessor {
         this.availableOutputBuffers = availableOutputBuffers;
         prevRenderTimestampNs = 0;
         prevTimestampUs = 0;
-        this.stabilizationIsOn = stabilizationIsOn;
+        this.stabilizationOn = stabilizationOn;
 
         // Set the stabilization matrices to the identity for each strip
         homographyList = new ArrayList<>();
@@ -216,9 +216,8 @@ class BufferProcessor {
         long timestampUs = -1;
         switch (key) {
             case MotionPhotoReader.MSG_NEXT_FRAME:
-                List<Float> newStabilizationMatrices;
                 boolean videoTrackVisited = false;
-                boolean motionTrackVisited = false;
+                boolean motionTrackVisited = !stabilizationOn;
                 while (!(videoTrackVisited && motionTrackVisited)) {
                     int trackIndex = extractor.getSampleTrackIndex();
                     ByteBuffer inputBuffer;
@@ -245,7 +244,7 @@ class BufferProcessor {
                         // (Assume MOTION_TYPE_INTERFRAME for now)
                         List<HomographyMatrix> tempHomographyList = new ArrayList<>();
                         for (int i = 0; i < NUM_OF_STRIPS; i++) {
-                            if (stabilizationIsOn) {
+                            if (stabilizationOn) {
                                 HomographyMatrix newStripMatrix = homographyList
                                         .get(i)
                                         .leftMultiplyBy(newHomographyList.get(i));
@@ -281,16 +280,14 @@ class BufferProcessor {
                 if (renderTimestampNs < currentTimestampNs) {
                     renderTimestampNs = currentTimestampNs + frameDeltaNs;
                 }
-                decoder.releaseOutputBuffer(bufferIndex, renderTimestampNs);
+                decoder.releaseOutputBuffer(bufferIndex, true);
                 prevTimestampUs = timestampUs;
                 prevRenderTimestampNs = renderTimestampNs;
 
                 // Wait for the image and render it after it arrives
                 if (outputSurface != null) {
                     outputSurface.awaitNewImage();
-                    outputSurface.drawImage(homographyList);
-                } else {
-                    Log.d(TAG, "Sample data has size zero");
+                    outputSurface.drawImage(homographyList, renderTimestampNs);
                 }
                 break;
 
@@ -325,18 +322,16 @@ class BufferProcessor {
                         for (int i = 0; i < NUM_OF_STRIPS; i++) {
                             homographyList.add(new HomographyMatrix());
                         }
-                        Log.d(TAG, "newStabMatrix: " + Arrays.toString(homographyList.subList(0, 9).toArray()));
                         motionTrackVisited = true;
-                    } else if (trackIndex == -1) {
-                        break;
                     } else {
-                        Log.e(TAG, "Unexpected track sample");
+                        Log.e(TAG, "Unexpected track index: " + trackIndex);
+                        break;
                     }
                     extractor.advance();
                 }
 
                 renderTimestampNs = prevRenderTimestampNs;
-                decoder.releaseOutputBuffer(bufferIndex, renderTimestampNs);
+                decoder.releaseOutputBuffer(bufferIndex, true);
 
                 // Reset the previous timestamp and previous render timestamp
                 prevTimestampUs = timestampUs;
@@ -344,9 +339,7 @@ class BufferProcessor {
                 // Wait for the image and render it after it arrives
                 if (outputSurface != null) {
                     outputSurface.awaitNewImage();
-                    outputSurface.drawImage(homographyList);
-                } else {
-                    Log.d(TAG, "Sample data has size zero");
+                    outputSurface.drawImage(homographyList, renderTimestampNs);
                 }
                 break;
 

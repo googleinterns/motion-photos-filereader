@@ -168,6 +168,7 @@ public class MotionPhotoReaderTest {
         MotionPhotoReader reader = MotionPhotoReader.open(
                 ResourceFetcher.fetchAssetFile(context, temporaryFolder, filename),
                 null,
+                true,
                 fakeAvailableInputBuffers,
                 fakeAvailableOutputBuffers
         );
@@ -187,6 +188,7 @@ public class MotionPhotoReaderTest {
         MotionPhotoReader reader = MotionPhotoReader.open(
                 ResourceFetcher.fetchAssetFile(context, temporaryFolder, filename),
                 null,
+                true,
                 fakeAvailableInputBuffers,
                 fakeAvailableOutputBuffers
         );

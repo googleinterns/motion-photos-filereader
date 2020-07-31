@@ -204,6 +204,9 @@ class TextureRender {
                     /* z = */ 1
             );
         }
+
+        // Zoom in slightly to hide frame edges
+        Matrix.scaleM(uMatrix, 0, 1.05f, 1.05f, 1.0f);
     }
 
     private static int linkProgram(int vertexShader, int fragmentShader) {
@@ -267,7 +270,7 @@ class TextureRender {
      * @param stripIndex The index (from 0 to NUM_OF_STRIPS - 1) of the current strip to render.
      * @param homography The homography matrix to stabilize this strip.
      */
-    public void drawStrip(int stripIndex, HomographyMatrix homography) {
+    private void drawStrip(int stripIndex, HomographyMatrix homography) {
         // Set up and store strip vertices
         float[] triangleVerticesData = {
             // positions in homogeneous 2D coordinates (x,y,1)
@@ -337,7 +340,7 @@ class TextureRender {
     /**
      * Render the current frame.
      */
-    public void drawFrame(List<HomographyMatrix> homographyList) {
+    public void drawFrame(List<HomographyMatrix> homographyList, long renderTimestampNs) {
         Log.d(TAG, "Drawing frame");
         glClear(/* mask = */ GL_COLOR_BUFFER_BIT);
         for (int i = 0; i < NUM_OF_STRIPS; i++) {
