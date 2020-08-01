@@ -1,17 +1,19 @@
 package com.google.android.libraries.motionphotoreader;
 
 import android.content.Context;
+import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.media.MediaExtractor;
 import android.os.Bundle;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.rule.ActivityTestRule;
 
 import com.adobe.internal.xmp.XMPException;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -22,28 +24,46 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTOS_DIR;
+import static com.google.android.libraries.motionphotoreader.Constants.NUM_FRAMES;
+import static com.google.android.libraries.motionphotoreader.Constants.SEEK_AMOUNT_US;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.verify;
 
 /**
  * Instrumented test for MotionPhotoReader class.
  */
 @RunWith(AndroidJUnit4.class)
 public class MotionPhotoReaderTest {
-    private static final String filename = "MVIMG_20200621_200240.jpg";
-    private static final int NUM_FRAMES = 44;
-    private static final long SEEK_AMOUNT_US = 10_000L;
-    
+
     private Context context;
+    private String[] testMotionPhotosList;
+    private String filename;
 
     /** A list of opened motion photo readers to close afterwards. */
     private final List<Runnable> cleanup = new ArrayList<>();
 
+    @Rule
+    public ActivityTestRule<MainActivity> activityRule =
+            new ActivityTestRule<>(
+                    MainActivity.class,
+                    /* initialTouchMode = */ true,
+                    /* launchActivity= */ true
+            );
+
     @Before 
     public void setUp() {
-        context = InstrumentationRegistry.getInstrumentation().getContext();
+        context = activityRule.getActivity().getApplicationContext();
+        AssetManager assetManager = context.getAssets();
+        try {
+            testMotionPhotosList = assetManager.list("motionphotos");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        filename = MOTION_PHOTOS_DIR + testMotionPhotosList[0];
     }
 
     @After
@@ -167,8 +187,8 @@ public class MotionPhotoReaderTest {
                 fakeAvailableInputBuffers,
                 fakeAvailableOutputBuffers
         );
-        assertFalse("Available input buffer queue is empty",
-                fakeAvailableInputBuffers.isEmpty());
+        assertGreaterOrEqual(NUM_FRAMES, fakeAvailableInputBuffers.getOfferCount());
+        assertGreaterOrEqual(NUM_FRAMES, fakeAvailableInputBuffers.getPollCount());
         cleanup.add(reader::close);
     }
 
@@ -207,6 +227,10 @@ public class MotionPhotoReaderTest {
         cleanup.add(reader::close);
     }
 
+    private static boolean assertGreaterOrEqual(int expected, int actual) {
+        return actual >= expected;
+    }
+
     /** Mock LinkedBlockingQueue class to simulate and test input/output buffer queue behaviors. */
     private static class TrackedLinkedBlockingQueue<E> extends LinkedBlockingQueue<E> {
 
@@ -241,6 +265,10 @@ public class MotionPhotoReaderTest {
 
         public int getPollCount() {
             return pollCount.get();
+        }
+
+        public int size() {
+            return size.get();
         }
 
         public boolean isEmpty() {
