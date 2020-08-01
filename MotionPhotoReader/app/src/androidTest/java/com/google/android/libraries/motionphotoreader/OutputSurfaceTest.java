@@ -1,12 +1,13 @@
 package com.google.android.libraries.motionphotoreader;
 
+import android.content.Context;
+import android.content.res.AssetManager;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.view.Surface;
 import android.view.SurfaceView;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.rule.ActivityTestRule;
 
 import com.adobe.internal.xmp.XMPException;
@@ -28,20 +29,21 @@ import static org.junit.Assert.assertNotNull;
  */
 @RunWith(AndroidJUnit4.class)
 public class OutputSurfaceTest {
-    private static final String filename = "MVIMG_20200621_200240.jpg";
 
     private HandlerThread renderThread;
     private Handler renderHandler;
     private Surface surface;
     private MotionPhotoInfo motionPhotoInfo;
+    private String[] testMotionPhotosList;
+    private String filename;
 
     /** A list of output surfaces to release afterwards. */
     private final List<Runnable> cleanup = new ArrayList<>();
 
     @Rule
-    public ActivityTestRule<OutputSurfaceTestActivity> activityRule =
+    public ActivityTestRule<MainActivity> activityRule =
             new ActivityTestRule<>(
-                    OutputSurfaceTestActivity.class,
+                    MainActivity.class,
                     /* initialTouchMode = */ true,
                     /* launchActivity= */ true
             );
@@ -53,13 +55,24 @@ public class OutputSurfaceTest {
         renderThread.start();
         renderHandler = new Handler(renderThread.getLooper());
 
+        // Set up the display surface
         SurfaceView surfaceView = activityRule.getActivity().findViewById(R.id.surface_view);
         surface = new Surface(surfaceView.getSurfaceControl());
+
+        // Get motion photo from assets folder
+        Context context = activityRule.getActivity().getApplicationContext();
+        AssetManager assetManager = context.getAssets();
+        try {
+            testMotionPhotosList = assetManager.list("motionphotos");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        filename = Constants.MOTION_PHOTOS_DIR + testMotionPhotosList[0];
 
         // Get motion photo info
         motionPhotoInfo = MotionPhotoInfo.newInstance(
                 ResourceFetcher.fetchAssetFile(
-                        InstrumentationRegistry.getInstrumentation().getContext(),
+                        context,
                         filename,
                         /* prefix = */ "test_photo",
                         /* suffix = */ ".jpg"

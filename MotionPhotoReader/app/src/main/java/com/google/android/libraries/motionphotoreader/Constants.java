@@ -1,5 +1,8 @@
 package com.google.android.libraries.motionphotoreader;
 
+/**
+ * All internal constant values used within the MotionPhotoReader API.
+ */
 class Constants {
 
     /* *********************************************************************************************
@@ -27,9 +30,12 @@ class Constants {
      * MotionPhotoInfo.java
      * ********************************************************************************************/
 
-    static final int MOTION_PHOTO_VERSION_V1 = 1;
-    static final int MOTION_PHOTO_VERSION_V2 = 2;
+    static final int MOTION_PHOTO_V1 = 1;
+    static final int MOTION_PHOTO_V2 = 2;
     static final String CAMERA_XMP_NAMESPACE = "http://ns.google.com/photos/1.0/camera/";
+    static final String V2_XMP_PROP_PREFIX = "Container:Directory[";
+    static final String V2_XMP_PROP_LENGTH_SUFFIX = "]/Container:Item/Item:Length";
+    static final String V2_XMP_PROP_PADDING_SUFFIX = "]/Container:Item/Item:Length";
 
     /* *********************************************************************************************
      * MotionPhotoReader.java
@@ -63,4 +69,47 @@ class Constants {
 
     static final byte[] OPEN_ARR = "<x:xmpmeta".getBytes();          /* Start of XMP metadata tag */
     static final byte[] CLOSE_ARR = "</x:xmpmeta>".getBytes();       /* End of XMP metadata tag   */
+
+    /* *********************************************************************************************
+     * Tests
+     * ********************************************************************************************/
+
+    /**
+     * MotionPhotoReaderTest.java
+     */
+    static final int NUM_FRAMES = 43;
+    static final long SEEK_AMOUNT_US = 10_000L;
+
+    /**
+     * MotionPhotoInfoTest.java
+     */
+    static final int KEY_WIDTH = 4032;
+    static final int KEY_HEIGHT = 3024;
+    static final String KEY_MIME = "video/avc";
+
+    // Define a mock media format for motion photo v1 format
+    static final String FILENAME_V1 = "MVIMG_20200621_200240.jpg";
+    static final long KEY_DURATION_V1 = 1499400;
+    static final int KEY_ROTATION_V1 = 90;
+    static final int VIDEO_OFFSET_V1 = 2592317;
+
+    // Define a mock media format for motion photo v2 format
+    static final String FILENAME_V2 = "PXL_20200710_061629144.MP.jpg";
+    static final long KEY_DURATION_V2 = 763422;
+    static final int KEY_ROTATION_V2 = 0;
+    static final int VIDEO_OFFSET_V2 = 1317283;
+
+    /**
+     * HomographyMatrix.java
+     */
+    static final double THETA_DEGREES_A = 45.0;
+    static final double THETA_DEGREES_B = 60.0;
+    static final int VIDEO_WIDTH_PIXELS = 4032;
+    static final int VIDEO_HEIGHT_PIXELS = 3024;
+
+    /* *********************************************************************************************
+     * Directory names.
+     * ********************************************************************************************/
+
+    static final String MOTION_PHOTOS_DIR = "motionphotos/";
 }

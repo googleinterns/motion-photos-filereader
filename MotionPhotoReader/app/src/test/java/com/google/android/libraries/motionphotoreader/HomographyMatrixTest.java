@@ -3,15 +3,14 @@ package com.google.android.libraries.motionphotoreader;
 import org.junit.Before;
 import org.junit.Test;
 
+import static com.google.android.libraries.motionphotoreader.Constants.THETA_DEGREES_A;
+import static com.google.android.libraries.motionphotoreader.Constants.THETA_DEGREES_B;
+import static com.google.android.libraries.motionphotoreader.Constants.VIDEO_HEIGHT_PIXELS;
+import static com.google.android.libraries.motionphotoreader.Constants.VIDEO_WIDTH_PIXELS;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class HomographyMatrixTest {
-    
-    private static final double THETA_DEGREES_A = 45.0;
-    private static final double THETA_DEGREES_B = 60.0;
-    private static final int VIDEO_WIDTH_PIXELS = 4032;
-    private static final int VIDEO_HEIGHT_PIXELS = 3024;
 
     private static final HomographyMatrix I = new HomographyMatrix();
     

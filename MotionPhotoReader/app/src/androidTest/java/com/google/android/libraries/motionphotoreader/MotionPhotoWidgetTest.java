@@ -26,15 +26,9 @@ import static androidx.test.espresso.matcher.ViewMatchers.withId;
  */
 @RunWith(AndroidJUnit4.class)
 public class MotionPhotoWidgetTest {
-    private static final String filename = "MVIMG_20200621_200240.jpg";
-    private static final int NUM_FRAMES = 44;
-    private static final long SEEK_AMOUNT_US = 10_000L;
 
     /** A list of opened motion photo readers to close afterwards. */
     private final List<Runnable> cleanup = new ArrayList<>();
-
-    @Rule
-    public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
     @Rule
     public ActivityTestRule<WidgetTestActivity> activityRule = new ActivityTestRule<>(
