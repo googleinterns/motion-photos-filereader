@@ -22,10 +22,17 @@ import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static android.os.Build.VERSION_CODES.M;
+import static android.os.Build.VERSION_CODES.P;
+import static com.google.android.libraries.motionphotoreader.Constants.MICROVIDEO_META_MIMETYPE;
+import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_IMAGE_META_MIMETYPE;
+import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V1;
+import static com.google.android.libraries.motionphotoreader.Constants.VIDEO_MIME_PREFIX;
 
 /**
  * The MotionPhotoReader API allows developers to read through the video portion of Motion Photos in
@@ -35,20 +42,6 @@ import static android.os.Build.VERSION_CODES.M;
 public class MotionPhotoReader {
 
     private static final String TAG = "MotionPhotoReader";
-
-    /**
-     * String representing the MIME type for the track that contains information about the video
-     * portion of the video.
-     */
-    public static final String MICROVIDEO_META_MIMETYPE =
-            "application/microvideo-meta-stream";
-    public static final String MOTION_PHOTO_IMAGE_META_MIMETYPE =
-            "application/motionphoto-image-meta";
-
-    /**
-     * Prefix for MIME type that represents video.
-     */
-    public static final String VIDEO_MIME_PREFIX = "video/";
 
     private final File file;
     private final Surface surface;
@@ -111,7 +104,7 @@ public class MotionPhotoReader {
      * @throws IOException when the file cannot be found.
      * @throws XMPException when parsing invalid XML syntax.
      */
-    @RequiresApi(api = M)
+    @RequiresApi(api = P)
     public static MotionPhotoReader open(File file,
                                          Surface surface,
                                          int surfaceWidth,
@@ -127,18 +120,18 @@ public class MotionPhotoReader {
         );
     }
 
-    @RequiresApi(api = M)
-    public static MotionPhotoReader open(String filename, 
-                                         Surface surface, int surfaceWidth, int surfaceHeight,
-                                         boolean stabilizationOn) throws IOException, XMPException {
-        return open(
-                new File(filename),
-                surface, surfaceWidth, surfaceHeight,
-                /* stabilizationOn = */ stabilizationOn
-        );
-    }
+//    @RequiresApi(api = P)
+//    public static MotionPhotoReader open(String filename,
+//                                         Surface surface, int surfaceWidth, int surfaceHeight,
+//                                         boolean stabilizationOn) throws IOException, XMPException {
+//        return open(
+//                new File(filename),
+//                surface, surfaceWidth, surfaceHeight,
+//                /* stabilizationOn = */ stabilizationOn
+//        );
+//    }
 
-    @RequiresApi(api = M)
+    @RequiresApi(api = P)
     public static MotionPhotoReader open(File file, Surface surface)
             throws IOException, XMPException {
         return open(
@@ -150,7 +143,7 @@ public class MotionPhotoReader {
         );
     }
 
-    @RequiresApi(api = M)
+    @RequiresApi(api = P)
     public static MotionPhotoReader open(String filename, Surface surface)
             throws IOException, XMPException {
         return open(new File(filename), surface);
@@ -159,7 +152,7 @@ public class MotionPhotoReader {
     /**
      * Opens and prepares a new MotionPhotoReader for testing.
      */
-    @RequiresApi(api = M)
+    @RequiresApi(api = P)
     @VisibleForTesting
     static MotionPhotoReader open(File file,
                                   Surface surface,
@@ -183,7 +176,7 @@ public class MotionPhotoReader {
         return reader;
     }
 
-    @RequiresApi(api = M)
+    @RequiresApi(api = P)
     @VisibleForTesting
     static MotionPhotoReader open(File file,
                                   Surface surface,
@@ -213,12 +206,13 @@ public class MotionPhotoReader {
      * reads samples for both tracks and passes the information to a buffer processor. A decoder is
      * set up for the video track to read frame data.
      */
-    @RequiresApi(api = 23)
+    @RequiresApi(api = 28)
     private void startRenderThread(MotionPhotoInfo motionPhotoInfo, boolean stabilizationOn) throws IOException {
         // Set up the render handler and thread
         renderWorker = new HandlerThread("renderHandler");
         renderWorker.start();
         renderHandler = new Handler(renderWorker.getLooper());
+        bufferProcessor = new BufferProcessor(availableInputBuffers, availableOutputBuffers);
 
         // Set up input stream from Motion Photo file for media extractor
         fileInputStream = new FileInputStream(file);
@@ -226,63 +220,69 @@ public class MotionPhotoReader {
         int videoOffset = motionPhotoInfo.getVideoOffset();
         extractor.setDataSource(fd, file.length() - videoOffset, videoOffset);
 
-        // Update these as we find the appropriate tracks, as we will need to pass these to the
-        // buffer processor later
-        int videoTrackIndex = -1;
-        int motionTrackIndex = -1;
+        // Find the do_not_stabilize bit in the image metadata track and set stabilizationOn
+        // 1. Check if the bit exists
+        //   a. If the bit exists, set stabilizationOn to true if it was originally true
+        //   b. If the bit does not exist, override stabilizationOn and set it to false
+        // 2. If the bit does not exist, then override stabilizationOn and set it to false
+        int version = motionPhotoInfo.getVersion();
+        if (version == MOTION_PHOTO_V1) {
+            for (int i = 0; i < extractor.getTrackCount(); i++) {
+                MediaFormat format = extractor.getTrackFormat(i);
+                String mime = format.getString(MediaFormat.KEY_MIME);
+                assert mime != null;
+                if (mime.startsWith(MOTION_PHOTO_IMAGE_META_MIMETYPE)) {
+                    Log.d(TAG, "selected image meta track: " + i);
+                    extractor.selectTrack(i);
+                    ByteBuffer inputBuffer = ByteBuffer.allocateDirect((int) extractor.getSampleSize());
+                    int sampleSize = extractor.readSampleData(inputBuffer, 0);
+                    if (sampleSize >= 0) {
+                        // The do_not_stabilize bit is available
+                        ImageMeta.ImageData imageData = ImageMeta.ImageData.parseFrom(inputBuffer);
+                        if (imageData.hasDoNotStabilize()) {
+                            stabilizationOn = stabilizationOn && !imageData.getDoNotStabilize();
+                        } else {
+                            stabilizationOn = false;
+                        }
+                    } else {
+                        // The do_not_stabilize bit is unavailable
+                        stabilizationOn = false;
+                    }
+                    extractor.unselectTrack(i);
+                    break;
+                }
+            }
+        }
 
-        // Find the video track and create an appropriate media decoder
+        // Find the appropriate tracks (motion and video) and configure them
+        boolean videoTrackSelected = false;
         for (int i = 0; i < extractor.getTrackCount(); i++) {
             MediaFormat format = extractor.getTrackFormat(i);
             String mime = format.getString(MediaFormat.KEY_MIME);
             assert mime != null;
-            if (mime.startsWith(VIDEO_MIME_PREFIX)) {
+            // Set the video track (which should be the first video track) and create an
+            // appropriate media decoder
+            if (mime.startsWith(VIDEO_MIME_PREFIX) && !videoTrackSelected) {
                 Log.d(TAG, "selected video track: " + i);
                 extractor.selectTrack(i);
-                videoTrackIndex = i;
+                bufferProcessor.setVideoTrackIndex(i);
                 videoFormat = format;
                 decoder = MediaCodec.createDecoderByType(mime);
-                break;
+                videoTrackSelected = true;
+            }
+            // Set the motion track (if appropriate)
+            if (mime.startsWith(MICROVIDEO_META_MIMETYPE)) {
+                Log.d(TAG, "stabilizationOn: " + stabilizationOn);
+                if (stabilizationOn) {
+                    Log.d(TAG, "selected motion track: " + i);
+                    extractor.selectTrack(i);
+                    bufferProcessor.setMotionTrackIndex(i);
+                }
             }
         }
 
-        // Find the stabilization metadata track
-        if (stabilizationOn) {
-            int version = motionPhotoInfo.getVersion();
-            switch (version) {
-                case MotionPhotoInfo.MOTION_PHOTO_VERSION_V1:
-                    for (int i = 0; i < extractor.getTrackCount(); i++) {
-                        MediaFormat format = extractor.getTrackFormat(i);
-                        String mime = format.getString(MediaFormat.KEY_MIME);
-                        assert mime != null;
-                        if (mime.startsWith(MICROVIDEO_META_MIMETYPE)) {
-                            Log.d(TAG, "selected motion track: " + i);
-                            extractor.selectTrack(i);
-                            motionTrackIndex = i;
-                            break;
-                        }
-                    }
-                    break;
-                // TODO: Set up v2 stabilization pipeline
-                case MotionPhotoInfo.MOTION_PHOTO_VERSION_V2:
-                    for (int i = 0; i < extractor.getTrackCount(); i++) {
-                        MediaFormat format = extractor.getTrackFormat(i);
-                        String mime = format.getString(MediaFormat.KEY_MIME);
-                        assert mime != null;
-                        if (mime.startsWith(MOTION_PHOTO_IMAGE_META_MIMETYPE)) {
-                            Log.d(TAG, "selected motion track: " + i);
-                            extractor.selectTrack(i);
-                            motionTrackIndex = i;
-                            break;
-                        }
-                    }
-                    break;
-                default:
-                    throw new RuntimeException("Unexpected motion photo format: " + version);
-            }
-        }
-
-        // Make sure the Android version is capable of supporting MediaCodec callbacks
+        // Set the MediaCodec callback to send buffer information to the corresponding blocking
+        // queues (make sure the Android version is capable of supporting MediaCodec callbacks)
         if (Build.VERSION.SDK_INT < M) {
             Log.e("MotionPhotoReader", "Insufficient Android build version");
             return;
@@ -327,16 +327,7 @@ public class MotionPhotoReader {
         decoder.start();
 
         // Configure the buffer processor
-        bufferProcessor = new BufferProcessor(
-                outputSurface,
-                extractor,
-                decoder,
-                stabilizationOn,
-                availableInputBuffers,
-                availableOutputBuffers
-        );
-        bufferProcessor.setVideoTrackIndex(videoTrackIndex);
-        bufferProcessor.setMotionTrackIndex(motionTrackIndex);
+        bufferProcessor.configure(outputSurface, extractor, decoder, stabilizationOn);
     }
 
     /**
@@ -367,7 +358,7 @@ public class MotionPhotoReader {
      * Checks whether the Motion Photo video has a succeeding frame.
      * @return true if there is a frame, otherwise return false.
      */
-    @RequiresApi(api = Build.VERSION_CODES.P)
+    @RequiresApi(api = P)
     public boolean hasNextFrame() {
         // Read the next packet and check if it shows a full frame
         long sampleSize = extractor.getSampleSize();
