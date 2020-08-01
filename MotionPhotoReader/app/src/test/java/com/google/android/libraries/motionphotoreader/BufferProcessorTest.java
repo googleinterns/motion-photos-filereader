@@ -8,13 +8,16 @@ import android.os.Handler;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -40,6 +43,8 @@ public class BufferProcessorTest {
     private final static int KEY_ROTATION = 90;
     private final static String KEY_MIME = "video/avc";
     private final static int VIDEO_OFFSET = 2592317;
+    private final static int VIDEO_TRACK_INDEX = 0;
+    private final static int MOTION_TRACK_INDEX = 2;
 
     private OutputSurface outputSurface;
     private MediaExtractor extractor;
@@ -51,19 +56,39 @@ public class BufferProcessorTest {
     @Before
     public void setUp() {
         // Set up mock objects
-        extractor = mock(MediaExtractor.class);
-        decoder = mock(MediaCodec.class);
-        availableInputBuffers = new LinkedBlockingQueue<>();
-        availableOutputBuffers = new LinkedBlockingQueue<>();
-
-        MediaFormat mediaFormat = createFakeVideoFormat(
+        MediaFormat videoFormat = createFakeVideoFormat(
                 KEY_WIDTH,
                 KEY_HEIGHT,
                 KEY_ROTATION,
                 KEY_ROTATION,
                 KEY_MIME
         );
-        motionPhotoInfo = new MotionPhotoInfo(mediaFormat, VIDEO_OFFSET, V1);
+        MediaFormat motionFormat = createFakeMotionFormat(Constants.MICROVIDEO_META_MIMETYPE);
+        extractor = mock(MediaExtractor.class);
+
+        // The extractor should set both the video and motion track indices
+        when(extractor.getTrackFormat(eq(VIDEO_TRACK_INDEX))).thenReturn(videoFormat);
+        when(extractor.getTrackFormat(eq(MOTION_TRACK_INDEX))).thenReturn(motionFormat);
+
+        // The extractor should read samples from both the video track and the motion track
+        when(extractor.getSampleTrackIndex()).thenAnswer(new Answer<Integer>() {
+            private int count = 0;
+
+            public Integer answer(InvocationOnMock invocation) {
+                if (count == 0) {
+                    count++;
+                    return VIDEO_TRACK_INDEX;
+                } else {
+                    return MOTION_TRACK_INDEX;
+                }
+            }
+        });
+
+        decoder = mock(MediaCodec.class);
+        availableInputBuffers = new LinkedBlockingQueue<>();
+        availableOutputBuffers = new LinkedBlockingQueue<>();
+
+        motionPhotoInfo = new MotionPhotoInfo(videoFormat, VIDEO_OFFSET, V1);
         outputSurface = new OutputSurface(mock(Handler.class), motionPhotoInfo);
 
         availableInputBuffers.offer(1);
@@ -97,16 +122,30 @@ public class BufferProcessorTest {
         when(videoFormat.getInteger(MediaFormat.KEY_ROTATION)).thenReturn(rotation);
         when(videoFormat.getString(MediaFormat.KEY_MIME)).thenReturn(mime);
 
+
+        return videoFormat;
+    }
+    /**
+     * Creates a mock media format object. Used to represent the motion track media format.
+     * @param mime The mime type of the motion photo motion track.
+     * @return a mock MediaFormat object.
+     */
+    private MediaFormat createFakeMotionFormat(String mime) {
+        MediaFormat videoFormat = mock(MediaFormat.class);
+        when(videoFormat.getString(MediaFormat.KEY_MIME)).thenReturn(mime);
         return videoFormat;
     }
 
     @Test
-    public void handleNextFrameMsg_hasNextFrameTrue_isCorrect() {
+    public void handleNextFrameMsg_hasNextFrameTrue_stabilizationOff_isCorrect() {
         BufferProcessor bufferProcessor = spy(new BufferProcessor(
                 outputSurface,
                 extractor,
                 decoder,
-                true,
+                /* stabilizationOn = */ false,
+                VIDEO_TRACK_INDEX,
+                MOTION_TRACK_INDEX,
+                /* testMode = */ true,
                 availableInputBuffers,
                 availableOutputBuffers
         ));
@@ -123,16 +162,48 @@ public class BufferProcessorTest {
                 .queueInputBuffer(eq(1), eq(0), anyInt(), anyLong(), eq(0));
         verify(extractor, times(1)).advance();
         verify(extractor, never()).seekTo(anyLong(), anyInt());
-        verify(decoder).releaseOutputBuffer(anyInt(), anyLong());
+        verify(decoder).releaseOutputBuffer(anyInt(), anyBoolean());
     }
 
     @Test
-    public void handleNextFrameMsg_hasNextFrameFalse_isCorrect() {
+    public void handleNextFrameMsg_hasNextFrameTrue_stabilizationOn_isCorrect() {
         BufferProcessor bufferProcessor = spy(new BufferProcessor(
                 outputSurface,
                 extractor,
                 decoder,
-                true,
+                /* stabilizationOn = */ true,
+                VIDEO_TRACK_INDEX,
+                MOTION_TRACK_INDEX,
+                /* testMode = */ true,
+                availableInputBuffers,
+                availableOutputBuffers
+        ));
+
+        when(extractor.readSampleData(any(ByteBuffer.class), anyInt())).thenReturn(16);
+        when(decoder.getInputBuffer(anyInt())).thenReturn(mock(ByteBuffer.class));
+
+        Bundle messageData = mock(Bundle.class);
+        when(messageData.getInt(anyString())).thenReturn(MotionPhotoReader.MSG_NEXT_FRAME);
+        bufferProcessor.process(messageData);
+
+        verify(extractor).readSampleData(any(ByteBuffer.class), eq(0));
+        verify(decoder, times(1))
+                .queueInputBuffer(eq(1), eq(0), anyInt(), anyLong(), eq(0));
+        verify(extractor, times(2)).advance();
+        verify(extractor, never()).seekTo(anyLong(), anyInt());
+        verify(decoder).releaseOutputBuffer(anyInt(), anyBoolean());
+    }
+
+    @Test
+    public void handleNextFrameMsg_hasNextFrameFalse_stabilizationOff_isCorrect() {
+        BufferProcessor bufferProcessor = spy(new BufferProcessor(
+                outputSurface,
+                extractor,
+                decoder,
+                /* stabilizationOn = */ false,
+                VIDEO_TRACK_INDEX,
+                MOTION_TRACK_INDEX,
+                /* testMode = */ true,
                 availableInputBuffers,
                 availableOutputBuffers
         ));
@@ -153,15 +224,51 @@ public class BufferProcessorTest {
                 eq(MediaCodec.BUFFER_FLAG_END_OF_STREAM)
         );
         verify(extractor, never()).seekTo(anyLong(), anyInt());
-        verify(decoder).releaseOutputBuffer(anyInt(), anyLong());
+        verify(decoder).releaseOutputBuffer(anyInt(), anyBoolean());
     }
 
     @Test
-    public void handleSeekToFrameMsg_isCorrect() {
+    public void handleNextFrameMsg_hasNextFrameFalse_stabilizationOn_isCorrect() {
         BufferProcessor bufferProcessor = spy(new BufferProcessor(
                 outputSurface,
                 extractor,
                 decoder,
+                /* stabilizationOn = */ true,
+                VIDEO_TRACK_INDEX,
+                MOTION_TRACK_INDEX,
+                /* testMode = */ true,
+                availableInputBuffers,
+                availableOutputBuffers
+        ));
+
+        when(extractor.readSampleData(any(ByteBuffer.class), anyInt())).thenReturn(-1);
+        when(decoder.getInputBuffer(anyInt())).thenReturn(mock(ByteBuffer.class));
+
+        Bundle messageData = mock(Bundle.class);
+        when(messageData.getInt(anyString())).thenReturn(MotionPhotoReader.MSG_NEXT_FRAME);
+        bufferProcessor.process(messageData);
+
+        verify(extractor).readSampleData(any(ByteBuffer.class), anyInt());
+        verify(decoder, times(1)).queueInputBuffer(
+                eq(1),
+                eq(0),
+                eq(0),
+                eq(0L),
+                eq(MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+        );
+        verify(extractor, never()).seekTo(anyLong(), anyInt());
+        verify(decoder).releaseOutputBuffer(anyInt(), anyBoolean());
+    }
+
+    @Test
+    public void handleSeekToFrameMsg_stabilizationOff_isCorrect() {
+        BufferProcessor bufferProcessor = spy(new BufferProcessor(
+                outputSurface,
+                extractor,
+                decoder,
+                false,
+                VIDEO_TRACK_INDEX,
+                MOTION_TRACK_INDEX,
                 true,
                 availableInputBuffers,
                 availableOutputBuffers
@@ -172,16 +279,63 @@ public class BufferProcessorTest {
         bufferProcessor.process(messageData);
 
         verify(extractor, times(1)).seekTo(anyLong(), anyInt());
-        verify(decoder).releaseOutputBuffer(anyInt(), anyLong());
+        verify(decoder).releaseOutputBuffer(anyInt(), anyBoolean());
     }
 
-    @Test(expected = IllegalStateException.class)
-    public void handleIncorrectMsg_isCorrect() {
+    @Test
+    public void handleSeekToFrameMsg_stabilizationOn_isCorrect() {
         BufferProcessor bufferProcessor = spy(new BufferProcessor(
                 outputSurface,
                 extractor,
                 decoder,
                 true,
+                VIDEO_TRACK_INDEX,
+                MOTION_TRACK_INDEX,
+                true,
+                availableInputBuffers,
+                availableOutputBuffers
+        ));
+
+        Bundle messageData = mock(Bundle.class);
+        when(messageData.getInt(anyString())).thenReturn(MotionPhotoReader.MSG_SEEK_TO_FRAME);
+        bufferProcessor.process(messageData);
+
+        verify(extractor, times(1)).seekTo(anyLong(), anyInt());
+        verify(decoder).releaseOutputBuffer(anyInt(), anyBoolean());
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void handleIncorrectMsg_stabilizationOff_isCorrect() {
+        BufferProcessor bufferProcessor = spy(new BufferProcessor(
+                outputSurface,
+                extractor,
+                decoder,
+                /* stabilizationOn = */ false,
+                VIDEO_TRACK_INDEX,
+                MOTION_TRACK_INDEX,
+                /* testMode = */ true,
+                availableInputBuffers,
+                availableOutputBuffers
+        ));
+
+        Bundle messageData = mock(Bundle.class);
+        when(messageData.getInt(anyString())).thenReturn(0x0100);
+        bufferProcessor.process(messageData);
+
+        verify(extractor, never()).seekTo(anyLong(), anyInt());
+        verify(decoder, never()).releaseOutputBuffer(anyInt(), anyLong());
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void handleIncorrectMsg_stabilizationOn_isCorrect() {
+        BufferProcessor bufferProcessor = spy(new BufferProcessor(
+                outputSurface,
+                extractor,
+                decoder,
+                /* stabilizationOn = */ true,
+                VIDEO_TRACK_INDEX,
+                MOTION_TRACK_INDEX,
+                /* testMode = */ true,
                 availableInputBuffers,
                 availableOutputBuffers
         ));
