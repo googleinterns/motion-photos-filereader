@@ -4,20 +4,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static com.google.android.libraries.motionphotoreader.Constants.EPS;
+import static com.google.android.libraries.motionphotoreader.Constants.IDENTITY;
+
 /**
  * Represents a 3x3 homography transformation in row-major matrix form.
  *
  * TODO: write unit test
  */
 class HomographyMatrix {
-
-    public static final float[] IDENTITY = {
-            1.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f,
-            0.0f, 0.0f, 1.0f
-    };
-
-    private static final float EPS = 1E-3f;
 
     private List<Float> matrix = new ArrayList<>();
 

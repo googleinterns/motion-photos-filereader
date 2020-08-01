@@ -15,14 +15,14 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 
+import static com.google.android.libraries.motionphotoreader.Constants.CLOSE_ARR;
+import static com.google.android.libraries.motionphotoreader.Constants.OPEN_ARR;
+
 /**
  * The XmpParser class is a package-private class intended to help extract the microvideo offset
  * information from the XMP metadata of the given Motion Photo.
  */
 class XmpParser {
-
-    private static final byte[] OPEN_ARR = "<x:xmpmeta".getBytes(); /* Start of XMP metadata tag */
-    private static final byte[] CLOSE_ARR = "</x:xmpmeta>".getBytes(); /* End of XMP metadata tag */
 
     /**
      * Returns the metadata of the Motion Photo file.

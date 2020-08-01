@@ -18,6 +18,13 @@ import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.IOException;
 
+import static com.google.android.libraries.motionphotoreader.Constants.CAMERA_XMP_NAMESPACE;
+import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V1;
+import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V2;
+import static com.google.android.libraries.motionphotoreader.Constants.V2_XMP_PROP_LENGTH_SUFFIX;
+import static com.google.android.libraries.motionphotoreader.Constants.V2_XMP_PROP_PADDING_SUFFIX;
+import static com.google.android.libraries.motionphotoreader.Constants.V2_XMP_PROP_PREFIX;
+
 /**
  * Contains information relevant to extracting frames in a Motion Photo file.
  *
@@ -31,10 +38,6 @@ import java.io.IOException;
 public class MotionPhotoInfo {
 
     private final static String TAG = "MotionPhotoInfo";
-
-    public final static int MOTION_PHOTO_VERSION_V1 = 1;
-    public final static int MOTION_PHOTO_VERSION_V2 = 2;
-    private static final String CAMERA_XMP_NAMESPACE = "http://ns.google.com/photos/1.0/camera/";
 
     private final int width;
     private final int height;
@@ -91,13 +94,10 @@ public class MotionPhotoInfo {
     private static int getVideoOffset(XMPMeta meta, int version) throws XMPException {
         int videoOffset = 0;
         switch (version) {
-            case MOTION_PHOTO_VERSION_V1:
-                videoOffset = meta.getPropertyInteger(
-                        CAMERA_XMP_NAMESPACE,
-                        "MicroVideoOffset"
-                );
+            case MOTION_PHOTO_V1:
+                videoOffset = meta.getPropertyInteger(CAMERA_XMP_NAMESPACE, "MicroVideoOffset");
                 break;
-            case MOTION_PHOTO_VERSION_V2:
+            case MOTION_PHOTO_V2:
                 // Iterate through the nodes of the XMP metadata to find the desired item length
                 // and padding properties. The items we are looking for belong in an array with name
                 // "Directory" that is indexed starting at 1. We ignore the first item in the array
@@ -108,12 +108,12 @@ public class MotionPhotoInfo {
                 while (itr.hasNext()) {
                     XMPPropertyInfo property = (XMPPropertyInfo) itr.next();
                     String propertyPath = property.getPath();
-                    String lengthProperty = "Container:Directory["
+                    String lengthProperty = V2_XMP_PROP_PREFIX
                             + arrayItemIdx
-                            + "]/Container:Item/Item:Length";
-                    String paddingProperty = "Container:Directory["
+                            + V2_XMP_PROP_LENGTH_SUFFIX;
+                    String paddingProperty = V2_XMP_PROP_PREFIX
                             + arrayItemIdx
-                            + "]/Container:Item/Item:Padding";
+                            + V2_XMP_PROP_PADDING_SUFFIX;
                     if (propertyPath != null) {
                         if (propertyPath.equalsIgnoreCase(lengthProperty)) {
                             videoOffset += Integer.parseInt(property.getValue());
