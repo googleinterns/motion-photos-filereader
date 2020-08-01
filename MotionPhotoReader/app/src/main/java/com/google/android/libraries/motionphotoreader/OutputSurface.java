@@ -7,7 +7,6 @@ import android.opengl.EGLContext;
 import android.opengl.EGLDisplay;
 import android.opengl.EGLExt;
 import android.opengl.EGLSurface;
-import android.os.Build;
 import android.os.Handler;
 import android.util.Log;
 import android.view.Surface;
@@ -27,6 +26,8 @@ import java.util.concurrent.ExecutionException;
  * SurfaceTexture from a TextureRender object to hold frames from the decoder. The TextureRender
  * draws frames to the EGL surface.
  */
+
+@RequiresApi(api = 23)
 public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private static final String TAG = "OutputSurface";
 
@@ -51,7 +52,6 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
      * @param motionPhotoInfo The motion photo info associated with the video being played to this
      *                        output surface.
      */
-    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     public OutputSurface(Handler renderHandler, MotionPhotoInfo motionPhotoInfo) {
         this.renderHandler = renderHandler;
         if (motionPhotoInfo.getWidth() <= 0 || motionPhotoInfo.getHeight() <= 0) {
@@ -91,7 +91,6 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     /**
      * Configures and initializes the EGL context.
      */
-    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     private void eglSetup() {
         renderHandler.post(() -> {
             // Initialize EGL display
@@ -158,7 +157,6 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
      * @param surfaceWidth The width of the Surface object, in pixels.
      * @param surfaceHeight The height of the Surface object, in pixels.
      */
-    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     public void setSurface(Surface surface, int surfaceWidth, int surfaceHeight) {
         // Set up the texture render
         setupTextureRender(surfaceWidth, surfaceHeight);
@@ -200,7 +198,6 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     /**
      * Free up all resources associated with this OutputSurface.
      */
-    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     public void release() {
         Log.d(TAG, "Releasing output surface");
         renderHandler.post(() -> {
@@ -247,7 +244,6 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     /**
      * Wait for a new frame to be decoded to the decode Surface.
      */
-    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     public void awaitNewImage() {
         renderHandler.post(() -> {
             final int TIMEOUT_MS = 500;
@@ -272,7 +268,6 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     /**
      * Draw the image to the final display Surface.
      */
-    @RequiresApi(api = 18)
     public void drawImage(List<HomographyMatrix> homographyList, long renderTimestampNs) {
         renderHandler.post(() -> {
             EGLExt.eglPresentationTimeANDROID(eglDisplay, eglSurface, renderTimestampNs);
@@ -281,7 +276,6 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         });
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     @Override
     public void onFrameAvailable(SurfaceTexture surfaceTexture) {
         Log.d(TAG, "New frame available");

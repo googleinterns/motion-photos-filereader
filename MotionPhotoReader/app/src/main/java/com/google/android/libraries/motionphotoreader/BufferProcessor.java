@@ -12,7 +12,6 @@ import com.google.protobuf.InvalidProtocolBufferException;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -36,6 +35,7 @@ import static com.google.android.libraries.motionphotoreader.Constants.US_TO_NS;
  * surface. No stabilization is needed, as this frame will be used as the base frame against which
  * subsequent frames are stabilized.
  */
+@RequiresApi(api = 28)
 class BufferProcessor {
     private static final String TAG = "BufferProcessor";
 
@@ -150,7 +150,6 @@ class BufferProcessor {
      * @return the index of the next available input buffer, or -1 if the poll call results in a
      * timeout.
      */
-    @RequiresApi(api = LOLLIPOP)
     public int getAvailableInputBufferIndex() {
         int bufferIndex = -1;
         try {
@@ -251,7 +250,6 @@ class BufferProcessor {
      *     - BUFFER_INDEX: an int containing the index of the output buffer.
      * @param messageData A Bundle containing relevant fields from a call to nextFrame(), seekTo().
      */
-    @RequiresApi(api = 28)
     public void process(Bundle messageData) {
         int key = messageData.getInt("MESSAGE_KEY");
         Bundle bufferData;

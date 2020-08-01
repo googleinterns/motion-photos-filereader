@@ -33,6 +33,8 @@ import java.util.concurrent.Executors;
  *     display. Otherwise, scale the video to fit entirely within the surface.
  *   - backgroundColor: The color of the surface which the video does not cover.
  */
+
+@RequiresApi(api = 29)
 public class MotionPhotoWidget extends SurfaceView {
 
     private static final String TAG = "MotionPhotoWidget";
@@ -53,7 +55,6 @@ public class MotionPhotoWidget extends SurfaceView {
     private int surfaceWidth = 0;
     private int surfaceHeight = 0;
 
-    @RequiresApi(api = Build.VERSION_CODES.O)
     public MotionPhotoWidget(Context context) {
         super(context);
         autoloop = true;
@@ -66,7 +67,6 @@ public class MotionPhotoWidget extends SurfaceView {
      * @param context The context of the activity to which the widget is attached.
      * @param attrs The attributes specifying the customizable fields of the widget.
      */
-    @RequiresApi(api = Build.VERSION_CODES.O)
     public MotionPhotoWidget(Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
         TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.MotionPhotoWidget,
@@ -88,7 +88,6 @@ public class MotionPhotoWidget extends SurfaceView {
      * listener. This should only be called in a constructor, and should be called in every
      * constructor.
      */
-    @RequiresApi(api = Build.VERSION_CODES.O)
     private void initialize() {
         // Set up the executor and play/pause process to facilitate stopping and starting the video
         playProcess = new PlayProcess();
@@ -100,7 +99,6 @@ public class MotionPhotoWidget extends SurfaceView {
                 Log.d(TAG, "Surface created");
             }
 
-            @RequiresApi(api = 28)
             @Override
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
                 Log.d(TAG, "Surface changed");
@@ -134,7 +132,6 @@ public class MotionPhotoWidget extends SurfaceView {
         });
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     @Override
     protected void onVisibilityChanged(@NonNull View changedView, int visibility) {
         super.onVisibilityChanged(changedView, visibility);
@@ -224,7 +221,6 @@ public class MotionPhotoWidget extends SurfaceView {
     /**
      * Reset the motion photo video to beginning.
      */
-    @RequiresApi(api = 28)
     public void restart() {
         reader.seekTo(0L, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
     }
@@ -241,7 +237,6 @@ public class MotionPhotoWidget extends SurfaceView {
      * Set the motion photo file to a specified file.
      * @param filename is a string pointing to the motion photo file to play.
      */
-    @RequiresApi(api = Build.VERSION_CODES.P)
     public void setFile(String filename) throws IOException, XMPException {
         setFile(new File(filename));
     }
@@ -250,7 +245,6 @@ public class MotionPhotoWidget extends SurfaceView {
      * Set the motion photo file to a specified file.
      * @param file is the motion photo file to play.
      */
-    @RequiresApi(api = Build.VERSION_CODES.P)
     public void setFile(File file) throws IOException, XMPException {
         this.file = file;
         // Switch the motion photo reader if another file is already playing
@@ -285,7 +279,6 @@ public class MotionPhotoWidget extends SurfaceView {
     private class PlayProcess implements Runnable {
         private volatile boolean exit;
 
-        @RequiresApi(api = Build.VERSION_CODES.P)
         @Override
         public void run() {
             // Start playing video
@@ -320,7 +313,6 @@ public class MotionPhotoWidget extends SurfaceView {
             super(superState);
         }
 
-        @RequiresApi(api = Build.VERSION_CODES.Q)
         private SavedState(Parcel in) {
             super(in);
             savedTimestampUs = in.readLong();
@@ -330,7 +322,6 @@ public class MotionPhotoWidget extends SurfaceView {
             fileURIPath = in.readString();
         }
 
-        @RequiresApi(api = Build.VERSION_CODES.Q)
         @Override
         public void writeToParcel(Parcel out, int flags) {
             super.writeToParcel(out, flags);

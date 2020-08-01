@@ -1,7 +1,6 @@
 package com.google.android.libraries.motionphotoreader;
 
 import android.content.Context;
-import android.util.Log;
 
 import com.google.common.io.ByteStreams;
 

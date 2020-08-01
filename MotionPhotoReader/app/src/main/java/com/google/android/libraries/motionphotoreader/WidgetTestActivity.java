@@ -16,6 +16,7 @@ import java.util.Arrays;
 
 import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTOS_DIR;
 
+@RequiresApi(api = 29)
 public class WidgetTestActivity extends Activity {
 
     private static final String TAG = "MainActivity";
@@ -23,7 +24,6 @@ public class WidgetTestActivity extends Activity {
     private String[] testMotionPhotosList;
     private int currPhotoIndex = 0;
 
-    @RequiresApi(api = Build.VERSION_CODES.P)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);

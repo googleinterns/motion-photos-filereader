@@ -35,6 +35,7 @@ import static com.google.android.libraries.motionphotoreader.Constants.V2_XMP_PR
  *   - The camera orientation while the motion photo was taken, as a rotation in degrees.
  *   - The byte offset from the end of the file at which the video track begins.
  */
+@RequiresApi(api = 23)
 public class MotionPhotoInfo {
 
     private final static String TAG = "MotionPhotoInfo";
@@ -49,7 +50,6 @@ public class MotionPhotoInfo {
     /**
      * Creates a MotionPhotoInfo object associated with a given file.
      */
-    @RequiresApi(api = Build.VERSION_CODES.M)
     @VisibleForTesting
     MotionPhotoInfo(MediaFormat mediaFormat, int videoOffset, int version) {
         width = mediaFormat.getInteger(MediaFormat.KEY_WIDTH);
@@ -65,7 +65,6 @@ public class MotionPhotoInfo {
     /**
      * Returns a new instance of MotionPhotoInfo for a specified file.
      */
-    @RequiresApi(api = Build.VERSION_CODES.M)
     public static MotionPhotoInfo newInstance(File file) throws IOException, XMPException {
         MediaExtractor extractor = new MediaExtractor();
         try {
@@ -79,7 +78,6 @@ public class MotionPhotoInfo {
         }
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.M)
     public static MotionPhotoInfo newInstance(String filename) throws IOException, XMPException {
         return MotionPhotoInfo.newInstance(new File(filename));
     }
