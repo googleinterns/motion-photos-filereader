@@ -6,11 +6,50 @@ import android.util.Log;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
-import java.util.Arrays;
 import java.util.List;
 
 import static android.opengl.GLES11Ext.GL_TEXTURE_EXTERNAL_OES;
-import static android.opengl.GLES30.*;
+import static android.opengl.GLES30.GL_COLOR_BUFFER_BIT;
+import static android.opengl.GLES30.GL_COMPILE_STATUS;
+import static android.opengl.GLES30.GL_FLOAT;
+import static android.opengl.GLES30.GL_FRAGMENT_SHADER;
+import static android.opengl.GLES30.GL_LINK_STATUS;
+import static android.opengl.GLES30.GL_TEXTURE0;
+import static android.opengl.GLES30.GL_TRIANGLE_STRIP;
+import static android.opengl.GLES30.GL_VALIDATE_STATUS;
+import static android.opengl.GLES30.GL_VERTEX_SHADER;
+import static android.opengl.GLES30.glActiveTexture;
+import static android.opengl.GLES30.glAttachShader;
+import static android.opengl.GLES30.glBindTexture;
+import static android.opengl.GLES30.glClear;
+import static android.opengl.GLES30.glClearColor;
+import static android.opengl.GLES30.glCompileShader;
+import static android.opengl.GLES30.glCreateProgram;
+import static android.opengl.GLES30.glCreateShader;
+import static android.opengl.GLES30.glDeleteProgram;
+import static android.opengl.GLES30.glDeleteShader;
+import static android.opengl.GLES30.glDrawArrays;
+import static android.opengl.GLES30.glEnableVertexAttribArray;
+import static android.opengl.GLES30.glGenTextures;
+import static android.opengl.GLES30.glGetAttribLocation;
+import static android.opengl.GLES30.glGetError;
+import static android.opengl.GLES30.glGetProgramInfoLog;
+import static android.opengl.GLES30.glGetProgramiv;
+import static android.opengl.GLES30.glGetShaderiv;
+import static android.opengl.GLES30.glGetUniformLocation;
+import static android.opengl.GLES30.glLinkProgram;
+import static android.opengl.GLES30.glShaderSource;
+import static android.opengl.GLES30.glUniform1i;
+import static android.opengl.GLES30.glUniformMatrix4fv;
+import static android.opengl.GLES30.glUseProgram;
+import static android.opengl.GLES30.glValidateProgram;
+import static android.opengl.GLES30.glVertexAttribPointer;
+import static android.opengl.GLES30.glViewport;
+import static com.google.android.libraries.motionphotoreader.Constants.FLOAT_SIZE_BYTES;
+import static com.google.android.libraries.motionphotoreader.Constants.NUM_OF_STRIPS;
+import static com.google.android.libraries.motionphotoreader.Constants.TRIANGLE_VERTICES_DATA_POS_OFFSET;
+import static com.google.android.libraries.motionphotoreader.Constants.TRIANGLE_VERTICES_DATA_STRIDE_BYTES;
+
 /**
  * Renders frames from a MediaCodec decoder onto an EGL surface.
  *
@@ -21,11 +60,6 @@ import static android.opengl.GLES30.*;
 class TextureRender {
 
     private static final String TAG = "TextureRender";
-
-    private static final int FLOAT_SIZE_BYTES = 4;
-    private static final int TRIANGLE_VERTICES_DATA_POS_OFFSET = 0;
-    private static final int TRIANGLE_VERTICES_DATA_STRIDE_BYTES = 3 * FLOAT_SIZE_BYTES;
-    private static final int NUM_OF_STRIPS = 12;
 
     // The vertex shader applies a stabilization homography (uStabMatrix) to the boundaries of each
     // strip, and also flips the image about the y-axis
@@ -204,9 +238,6 @@ class TextureRender {
                     /* z = */ 1
             );
         }
-
-        // Zoom in slightly to hide frame edges
-        Matrix.scaleM(uMatrix, 0, 1.05f, 1.05f, 1.0f);
     }
 
     private static int linkProgram(int vertexShader, int fragmentShader) {
@@ -274,10 +305,10 @@ class TextureRender {
         // Set up and store strip vertices
         float[] triangleVerticesData = {
             // positions in homogeneous 2D coordinates (x,y,1)
-            -1.0f, -1.0f + 1.0f * stripIndex / (float) (NUM_OF_STRIPS / 2), 1.0f,    // bottom left
-             1.0f, -1.0f + 1.0f * stripIndex / (float) (NUM_OF_STRIPS / 2), 1.0f,    // bottom right
-            -1.0f, -1.0f + (stripIndex + 1.0f) / (float) (NUM_OF_STRIPS / 2), 1.0f,  // top left
-             1.0f, -1.0f + (stripIndex + 1.0f) / (float) (NUM_OF_STRIPS / 2), 1.0f   // top right
+            -1.0f, -1.0f + 2.0f * stripIndex / NUM_OF_STRIPS, 1.0f,           // bottom left
+             1.0f, -1.0f + 2.0f * stripIndex / NUM_OF_STRIPS, 1.0f,           // bottom right
+            -1.0f, -1.0f + 2.0f * (stripIndex + 1.0f) / NUM_OF_STRIPS, 1.0f,  // top left
+             1.0f, -1.0f + 2.0f * (stripIndex + 1.0f) / NUM_OF_STRIPS, 1.0f   // top right
         };
         triangleVertices = ByteBuffer
                 .allocateDirect(triangleVerticesData.length * FLOAT_SIZE_BYTES)
@@ -340,7 +371,7 @@ class TextureRender {
     /**
      * Render the current frame.
      */
-    public void drawFrame(List<HomographyMatrix> homographyList, long renderTimestampNs) {
+    public void drawFrame(List<HomographyMatrix> homographyList) {
         Log.d(TAG, "Drawing frame");
         glClear(/* mask = */ GL_COLOR_BUFFER_BIT);
         for (int i = 0; i < NUM_OF_STRIPS; i++) {

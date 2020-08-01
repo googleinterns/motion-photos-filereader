@@ -5,6 +5,7 @@ import android.opengl.EGL14;
 import android.opengl.EGLConfig;
 import android.opengl.EGLContext;
 import android.opengl.EGLDisplay;
+import android.opengl.EGLExt;
 import android.opengl.EGLSurface;
 import android.os.Build;
 import android.os.Handler;
@@ -30,7 +31,6 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private static final String TAG = "OutputSurface";
 
     private final Object frameSyncObject = new Object();
-    private final Object surfaceSyncObject = new Object();
 
     private EGLDisplay eglDisplay;
     private EGLContext eglContext;
@@ -272,10 +272,11 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     /**
      * Draw the image to the final display Surface.
      */
-    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
+    @RequiresApi(api = 18)
     public void drawImage(List<HomographyMatrix> homographyList, long renderTimestampNs) {
         renderHandler.post(() -> {
-            textureRender.drawFrame(homographyList, renderTimestampNs);
+            EGLExt.eglPresentationTimeANDROID(eglDisplay, eglSurface, renderTimestampNs);
+            textureRender.drawFrame(homographyList);
             EGL14.eglSwapBuffers(eglDisplay, eglSurface);
         });
     }
