@@ -151,12 +151,9 @@ class BufferProcessor {
      * timeout.
      */
     public int getAvailableInputBufferIndex() {
-        int bufferIndex = -1;
+        Integer bufferIndex = -1;
         try {
-            Object obj = availableInputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
-            if (obj != null) {
-                bufferIndex = (Integer) obj;
-            }
+            bufferIndex = availableInputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Log.e(TAG, "No input buffer available", e);
         }
@@ -198,10 +195,7 @@ class BufferProcessor {
     private Bundle getAvailableOutputBufferData() {
         Bundle bufferData = null;
         try {
-            Object obj = availableOutputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
-            if (obj != null) {
-                bufferData = (Bundle) obj;
-            }
+            bufferData = availableOutputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Log.e(TAG, "No output buffer available", e);
         }
@@ -220,18 +214,26 @@ class BufferProcessor {
             Stabilization.Data stabilizationData = null;
             try {
                 stabilizationData = Stabilization.Data.parseFrom(inputBuffer);
+                if (stabilizationData == null) {
+                    throw new RuntimeException("Protocol buffer is null");
+                }
             } catch (InvalidProtocolBufferException e) {
                 Log.e(TAG, "Could not parse from protocol buffer");
             }
 
-            // Add homography for each strip to the homography list
+            // Add homography for each strip to the homography list, only if the motion data type
+            // for this frame is not MOTION_TYPE_STABILIZATION (this flag indicates the frame has
+            // already been stabilized)
             List<Float> homographyDataList = stabilizationData.getMotionHomographyDataList();
-            for (int i = 0; i < NUM_OF_STRIPS; i++) {
-                homographyList.add(
-                        new HomographyMatrix(
-                                homographyDataList.subList(9 * i, 9 * (i + 1))
-                        )
-                );
+            if (stabilizationData.getMotionDataType() !=
+                    Stabilization.Data.MotionDataType.MOTION_TYPE_STABILIZATION) {
+                for (int i = 0; i < NUM_OF_STRIPS; i++) {
+                    homographyList.add(
+                            new HomographyMatrix(
+                                    homographyDataList.subList(9 * i, 9 * (i + 1))
+                            )
+                    );
+                }
             }
         }
         return homographyList;
@@ -293,7 +295,7 @@ class BufferProcessor {
                             // Multiply previous stabilization matrices by new stabilization matrices
                             // (Assume MOTION_TYPE_INTERFRAME for now)
                             List<HomographyMatrix> tempHomographyList = new ArrayList<>();
-                            for (int i = 0; i < NUM_OF_STRIPS; i++) {
+                            for (int i = 0; i < newHomographyList.size(); i++) {
                                 if (stabilizationOn) {
                                     HomographyMatrix newStripMatrix = homographyList
                                             .get(i)
@@ -352,7 +354,6 @@ class BufferProcessor {
             case MotionPhotoReader.MSG_SEEK_TO_FRAME:
                 // Seek extractor to correct location
                 extractor.seekTo(messageData.getLong("TIME_US"), messageData.getInt("MODE"));
-                homographyList = new ArrayList<>();
                 videoTrackVisited = false;
                 motionTrackVisited = !stabilizationOn;
                 while (!(videoTrackVisited && motionTrackVisited)) {

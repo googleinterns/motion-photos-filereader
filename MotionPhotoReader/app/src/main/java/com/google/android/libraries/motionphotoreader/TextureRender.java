@@ -373,6 +373,7 @@ class TextureRender {
      */
     public void drawFrame(List<HomographyMatrix> homographyList) {
         Log.d(TAG, "Drawing frame");
+        Log.d(TAG, "Homography list size: " + homographyList.size());
         glClear(/* mask = */ GL_COLOR_BUFFER_BIT);
         for (int i = 0; i < NUM_OF_STRIPS; i++) {
             drawStrip(/* stripIndex = */ i, homographyList.get(i).convertFromImageToGL(videoWidth, videoHeight));
