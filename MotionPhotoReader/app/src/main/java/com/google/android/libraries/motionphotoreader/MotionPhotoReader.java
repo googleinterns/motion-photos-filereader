@@ -43,7 +43,6 @@ public class MotionPhotoReader {
     private MediaExtractor lowResExtractor;
     private MediaCodec lowResDecoder;
     private MediaExtractor highResExtractor;
-    private MediaCodec highResDecoder;
     private MediaFormat videoFormat;
     private FileInputStream fileInputStream;
 
