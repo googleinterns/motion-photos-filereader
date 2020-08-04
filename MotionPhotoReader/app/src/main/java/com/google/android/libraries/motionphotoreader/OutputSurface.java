@@ -38,13 +38,14 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private EGLSurface eglSurface;
     private EGLConfig eglConfig;
 
+    private final Handler renderHandler;
+    private final MotionPhotoInfo motionPhotoInfo;
+
     private int surfaceTextureHandle;
     private SurfaceTexture surfaceTexture;
     private SettableFuture<Surface> decodeSurfaceFuture = SettableFuture.create();
     private TextureRender textureRender;
-    private Handler renderHandler;
     private boolean frameAvailable;
-    private MotionPhotoInfo motionPhotoInfo;
 
     /**
      * Creates a new output surface.
