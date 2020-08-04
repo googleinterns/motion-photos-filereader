@@ -23,6 +23,7 @@ import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -30,6 +31,7 @@ import static android.os.Build.VERSION_CODES.M;
 import static com.google.android.libraries.motionphotoreader.Constants.MICROVIDEO_META_MIMETYPE;
 import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_IMAGE_META_MIMETYPE;
 import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V1;
+import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V2;
 import static com.google.android.libraries.motionphotoreader.Constants.VIDEO_MIME_PREFIX;
 
 /**
@@ -203,12 +205,12 @@ public class MotionPhotoReader {
         extractor.setDataSource(fd, file.length() - videoOffset, videoOffset);
 
         // Find the do_not_stabilize bit in the image metadata track and set stabilizationOn
-        // 1. Check if the bit exists
-        //   a. If the bit exists, set stabilizationOn to true if it was originally true
-        //   b. If the bit does not exist, override stabilizationOn and set it to false
-        // 2. If the bit does not exist, then override stabilizationOn and set it to false
         int version = motionPhotoInfo.getVersion();
         if (version == MOTION_PHOTO_V1) {
+            // 1. Check if the bit exists
+            //   a. If the bit exists, set stabilizationOn to true if it was originally true
+            //   b. If the bit does not exist, override stabilizationOn and set it to false
+            // 2. If the bit does not exist, then override stabilizationOn and set it to false
             for (int i = 0; i < extractor.getTrackCount(); i++) {
                 MediaFormat format = extractor.getTrackFormat(i);
                 String mime = format.getString(MediaFormat.KEY_MIME);
@@ -234,6 +236,67 @@ public class MotionPhotoReader {
                     break;
                 }
             }
+        } else if (version == MOTION_PHOTO_V2) {
+            for (int i = 0; i < extractor.getTrackCount(); i++) {
+                MediaFormat format = extractor.getTrackFormat(i);
+                String mime = format.getString(MediaFormat.KEY_MIME);
+                assert mime != null;
+                if (mime.startsWith(MOTION_PHOTO_IMAGE_META_MIMETYPE)) {
+                    Log.d(TAG, "selected image meta track: " + i);
+                    extractor.selectTrack(i);
+                    ByteBuffer inputBuffer = ByteBuffer.allocateDirect((int) extractor.getSampleSize());
+                    int sampleSize = extractor.readSampleData(inputBuffer, 0);
+                    if (sampleSize >= 0) {
+                        byte[] bytes = inputBuffer.array();
+
+                        // Ignore padding at the beginning
+                        int index = 0;
+                        while ((bytes[index] & 0xFF) == 0x00) {
+                            index++;
+                        }
+
+                        // Get the isStabilized bit
+                        while (index < bytes.length) {
+                            byte descriptorTag = bytes[index++];
+                            // The isStabilized bit lies inside the 0xC4 descriptor
+                            if ((descriptorTag & 0xFF) == 0xC4) {
+                                int variableLength = Byte.toUnsignedInt(bytes[index++]);
+
+                                // The low res 0xC5 descriptor contains the isStabilized bit we want
+                                descriptorTag = bytes[index++];
+                                assert (descriptorTag & 0xFF) == 0xC5;
+                                stabilizationOn = stabilizationOn &&
+                                        ((bytes[index++] ^ 1) != 0);
+                                break;
+                            } else if ((descriptorTag & 0xFF) == 0xC0) {
+                                // We want to ignore the variable length information in the 0xC0
+                                // descriptor, since this descriptor contains all the other
+                                // descriptors in which we are interested
+                                while ((bytes[index] & 0xFF) == 0x80) {
+                                    index++;
+                                }
+                                int variableLength = Byte.toUnsignedInt(bytes[index++]);
+                            } else {
+                                // Not the descriptor we want, so look for the variable length and
+                                // skip that many bytes
+                                while ((bytes[index] & 0xFF) == 0x80) {
+                                    index++;
+                                }
+                                int variableLength = Byte.toUnsignedInt(bytes[index++]);
+                                index += variableLength;
+                            }
+                        }
+
+                    } else {
+                        // The do_not_stabilize bit is unavailable
+                        stabilizationOn = false;
+                    }
+                    extractor.unselectTrack(i);
+                    break;
+                }
+            }
+        } else {
+            throw new RuntimeException("Invalid motion photo version");
         }
 
         // Find the appropriate tracks (motion and video) and configure them

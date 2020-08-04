@@ -22,7 +22,7 @@ public class WidgetTestActivity extends Activity {
     private static final String TAG = "MainActivity";
 
     private String[] testMotionPhotosList;
-    private int currPhotoIndex = 0;
+    private int currPhotoIndex = 6;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
