@@ -111,7 +111,11 @@ public class MotionPhotoWidget extends SurfaceView {
                     reader.close();
                 }
                 try {
-                    reader = MotionPhotoReader.open(file, holder.getSurface(), surfaceWidth, surfaceHeight, stabilizationOn);
+                    reader = MotionPhotoReader.open(
+                            file,
+                            holder.getSurface(), surfaceWidth, surfaceHeight,
+                            stabilizationOn
+                    );
                     Log.d(TAG, "New motion photo reader created");
                 } catch (IOException | XMPException e) {
                     Log.e(TAG, "Exception occurred while opening file", e);

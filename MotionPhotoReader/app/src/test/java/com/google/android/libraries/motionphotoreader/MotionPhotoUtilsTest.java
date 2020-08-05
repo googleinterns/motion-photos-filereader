@@ -84,28 +84,28 @@ public class MotionPhotoUtilsTest {
         // Test polling queue as elements are added
         for (int i = 0; i < OUTPUT_BUFFER_QUEUE_SIZE; i++) {
             Bundle bufferData = mock(Bundle.class);
-            when(bufferData.getInt(eq("BUFFER_INDEX"), eq(i))).thenReturn(i);
-            when(bufferData.getLong(eq("TIMESTAMP_US"), eq(i))).thenReturn(1000L * i);
+            when(bufferData.getInt(eq("BUFFER_INDEX"))).thenReturn(i);
+            when(bufferData.getLong(eq("TIMESTAMP_US"))).thenReturn(1000L * i);
             boolean result = outputBufferQueue.offer(bufferData);
             assertTrue(result);
 
             Bundle receivedBufferData = MotionPhotoReaderUtils.getOutputBuffer(outputBufferQueue);
             assertEquals(i, receivedBufferData.getInt("BUFFER_INDEX"));
-            assertEquals(1000 * i, receivedBufferData.getInt("TIMESTAMP_US"));
+            assertEquals(1000 * i, receivedBufferData.getLong("TIMESTAMP_US"));
         }
 
         // Test polling queue after all elements are added
         for (int i = 0; i < OUTPUT_BUFFER_QUEUE_SIZE; i++) {
-            Bundle bufferData = new Bundle();
-            when(bufferData.getInt(eq("BUFFER_INDEX"), eq(i))).thenReturn(i);
-            when(bufferData.getLong(eq("TIMESTAMP_US"), eq(i))).thenReturn(1000L * i);
+            Bundle bufferData = mock(Bundle.class);
+            when(bufferData.getInt(eq("BUFFER_INDEX"))).thenReturn(i);
+            when(bufferData.getLong(eq("TIMESTAMP_US"))).thenReturn(1000L * i);
             boolean result = outputBufferQueue.offer(bufferData);
             assertTrue(result);
         }
         for (int i = 0; i < OUTPUT_BUFFER_QUEUE_SIZE; i++) {
             Bundle receivedBufferData = MotionPhotoReaderUtils.getOutputBuffer(outputBufferQueue);
             assertEquals(i, receivedBufferData.getInt("BUFFER_INDEX"));
-            assertEquals(1000 * i, receivedBufferData.getInt("TIMESTAMP_US"));
+            assertEquals(1000 * i, receivedBufferData.getLong("TIMESTAMP_US"));
         }
     }
 

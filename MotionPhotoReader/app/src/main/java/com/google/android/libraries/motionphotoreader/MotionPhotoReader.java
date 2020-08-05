@@ -40,31 +40,35 @@ import static com.google.android.libraries.motionphotoreader.Constants.VIDEO_MIM
 /**
  * The MotionPhotoReader API allows developers to read through the video portion of Motion Photos in
  * a frame-by-frame manner.
+ *
+ * Each motion photo reader is meant to decode a single motion photo file. A reader must be closed
+ * when it is no longer in use to prevent leaking resources. If a Surface is passed to the reader
+ * to display the video to, then the reader renders the video via a separate OpenGL pipeline. This
+ * pipeline is comprised of the OutputSurface.java and TextureRender.java classes.
  */
 
 @RequiresApi(api = 28)
 public class MotionPhotoReader {
 
-    private static final String TAG = "MotionPhotoReader";
+    private static final String TAG = "MotionPhotoReaderClass";
 
     private final File file;
     private final Surface surface;
     private final boolean stabilizationOn;
-
-    private int videoTrackIndex;
-    private int motionTrackIndex;
-    private List<HomographyMatrix> homographyList;
-    private long prevRenderTimestampNs;
-    private long prevTimestampUs;
 
     private MediaExtractor extractor;
     private MediaCodec decoder;
     private MediaFormat videoFormat;
     private FileInputStream fileInputStream;
 
-    // message keys
-    static final int MSG_NEXT_FRAME = 0x0001;
-    static final int MSG_SEEK_TO_FRAME = 0x0010;
+    /**
+     * Fields which are used to play the next frame or seek to a frame.
+     */
+    private int videoTrackIndex;
+    private int motionTrackIndex;
+    private List<HomographyMatrix> homographyList;
+    private long prevRenderTimestampNs;
+    private long prevTimestampUs;
 
     /**
      * The renderWorker and renderHandler are in charge of executing all calls relevant to rendering
@@ -87,6 +91,17 @@ public class MotionPhotoReader {
 
     /**
      * Standard MotionPhotoReader constructor.
+     * @param file A motion photo file to open.
+     * @param extractor A MediaExtractor for reading frame data and stabilization data (if needed).
+     * @param surface The surface on which the final video should be displayed.
+     * @param surfaceWidth The width of the surface to display.
+     * @param surfaceHeight The height of the surface to display.
+     * @param stabilizationOn If true, then the video should be stabilized (if possible). Otherwise,
+     * we should not stabilize the video.
+     * @param testMode If true, then we use mock video frame and stabilization data. This should
+     * only be set to true if the reader is being used in a testing environment.
+     * @param inputBufferQueue A blocking queue to hold available input buffer information.
+     * @param outputBufferQueue A blocking queue to hold available output buffer information.
      */
     private MotionPhotoReader(File file,
                               MediaExtractor extractor,
@@ -164,8 +179,10 @@ public class MotionPhotoReader {
      * An extractor is set up for both the video and motion track (if applicable). The extractor
      * reads samples for both tracks and passes the information to a buffer processor. A decoder is
      * set up for the video track to read frame data.
+     * @throws IOException if the extractor cannot read the motion photo file.
      */
-    private void startRenderThread(MotionPhotoInfo motionPhotoInfo, boolean stabilizationOn) throws IOException {
+    private void startRenderThread(MotionPhotoInfo motionPhotoInfo,
+                                   boolean stabilizationOn) throws IOException {
         // Set up the render handler and thread
         renderWorker = new HandlerThread("renderHandler");
         renderWorker.start();
@@ -212,7 +229,9 @@ public class MotionPhotoReader {
         }
 
         // Find the appropriate tracks (motion and video) and configure them
+        Log.d(TAG, "Stabilization on: " + stabilizationOn);
         boolean videoTrackSelected = false;
+        boolean motionTrackSelected = false;
         for (int i = 0; i < extractor.getTrackCount(); i++) {
             MediaFormat format = extractor.getTrackFormat(i);
             String mime = format.getString(MediaFormat.KEY_MIME);
@@ -220,20 +239,20 @@ public class MotionPhotoReader {
             // Set the video track (which should be the first video track) and create an
             // appropriate media decoder
             if (mime.startsWith(VIDEO_MIME_PREFIX) && !videoTrackSelected) {
-                Log.d(TAG, "selected video track: " + i);
                 extractor.selectTrack(i);
+                Log.d(TAG, "Selected video track: " + i);
                 videoTrackIndex = i;
                 videoFormat = format;
                 decoder = MediaCodec.createDecoderByType(mime);
                 videoTrackSelected = true;
             }
             // Set the motion track (if appropriate)
-            if (mime.startsWith(MICROVIDEO_META_MIMETYPE)) {
-                Log.d(TAG, "stabilizationOn: " + stabilizationOn);
+            if (mime.startsWith(MICROVIDEO_META_MIMETYPE) && !motionTrackSelected) {
                 if (stabilizationOn) {
-                    Log.d(TAG, "selected motion track: " + i);
                     extractor.selectTrack(i);
+                    Log.d(TAG, "Selected motion track: " + i);
                     motionTrackIndex = i;
+                    motionTrackSelected = true;
                 }
             }
         }
@@ -273,7 +292,8 @@ public class MotionPhotoReader {
             }
         }, renderHandler);
 
-        // Set up OpenGL pipeline if the surface is not null
+        // Set up OpenGL pipeline if the surface is not null, otherwise we skip the OpenGL rendering
+        // steps altogether
         if (surface != null) {
             outputSurface = new OutputSurface(renderHandler, motionPhotoInfo);
             outputSurface.setSurface(surface, surfaceWidth, surfaceHeight);
@@ -324,21 +344,31 @@ public class MotionPhotoReader {
         Bundle bufferData;
         Integer bufferIndex = -1;
         long timestampUs = -1;
+
+        // We only want to render the final frame if all steps are successful, so this field will
+        // be set to false in the event that any step fails
         boolean doRender = true;
+
+        // Loop through the tracks on the media extractor (note that we only visit the motion track
+        // if we wish to stabilize the video)
         boolean videoTrackVisited = false;
         boolean motionTrackVisited = !stabilizationOn;
         while (!(videoTrackVisited && motionTrackVisited)) {
             int trackIndex = extractor.getSampleTrackIndex();
             ByteBuffer inputBuffer;
-            if (trackIndex == videoTrackIndex) {
+            if (trackIndex == videoTrackIndex && !videoTrackVisited) {
                 // Get the next available input buffer and read frame data
                 bufferIndex = MotionPhotoReaderUtils.getInputBuffer(inputBufferQueue);
                 if (bufferIndex == null) {
                     doRender = false;
                     break;
                 }
-                // TODO: Consider the case when this call returns null
+
                 inputBuffer = decoder.getInputBuffer(bufferIndex);
+                if (inputBuffer == null) {
+                    doRender = false;
+                    break;
+                }
                 MotionPhotoReaderUtils.readFromVideoTrack(
                         extractor,
                         decoder,
@@ -347,7 +377,6 @@ public class MotionPhotoReader {
                 );
 
                 // Get the next available output buffer and release frame data
-                // TODO: Consider the case when this call times out and returns null
                 bufferData = MotionPhotoReaderUtils.getOutputBuffer(outputBufferQueue);
                 if (bufferData == null) {
                     doRender = false;
@@ -356,25 +385,21 @@ public class MotionPhotoReader {
                 timestampUs = bufferData.getLong("TIMESTAMP_US");
                 bufferIndex = bufferData.getInt("BUFFER_INDEX");
                 videoTrackVisited = true;
-            } else if (trackIndex == motionTrackIndex) {
+            } else if (trackIndex == motionTrackIndex && !motionTrackVisited) {
                 if (!testMode) {
-                    // Get stabilization data from the high resolution extractor
+                    // Get stabilization data from the high resolution extractor (the list of
+                    // homographies will be empty if the frame has already been stabilized)
                     inputBuffer = ByteBuffer.allocateDirect((int) extractor.getSampleSize());
                     List<HomographyMatrix> newHomographyList =
                             MotionPhotoReaderUtils.getHomographies(extractor, inputBuffer);
 
                     // Multiply previous stabilization matrices by new stabilization matrices
-                    // (Assume MOTION_TYPE_INTERFRAME for now)
                     List<HomographyMatrix> tempHomographyList = new ArrayList<>();
                     for (int i = 0; i < newHomographyList.size(); i++) {
-                        if (stabilizationOn) {
-                            HomographyMatrix newStripMatrix = homographyList
-                                    .get(i)
-                                    .leftMultiplyBy(newHomographyList.get(i));
-                            tempHomographyList.add(newStripMatrix);
-                        } else {
-                            tempHomographyList.add(new HomographyMatrix());
-                        }
+                        HomographyMatrix newStripMatrix = homographyList
+                                .get(i)
+                                .leftMultiplyBy(newHomographyList.get(i));
+                        tempHomographyList.add(newStripMatrix);
                     }
                     homographyList = tempHomographyList;
                 }
@@ -434,21 +459,31 @@ public class MotionPhotoReader {
         Bundle bufferData;
         Integer bufferIndex = -1;
         long timestampUs = -1;
+
+        // We only want to render the final frame if all steps are successful, so this field will
+        // be set to false in the event that any step fails
         boolean doRender = true;
+
+        // Loop through the tracks on the media extractor (note that we only visit the motion track
+        // if we wish to stabilize the video)
         boolean videoTrackVisited = false;
         boolean motionTrackVisited = !stabilizationOn;
         while (!(videoTrackVisited && motionTrackVisited)) {
             int trackIndex = extractor.getSampleTrackIndex();
             ByteBuffer inputBuffer;
-            if (trackIndex == videoTrackIndex) {
+            if (trackIndex == videoTrackIndex && !videoTrackVisited) {
                 // Get the next available input buffer and read frame data
                 bufferIndex = MotionPhotoReaderUtils.getInputBuffer(inputBufferQueue);
                 if (bufferIndex == null) {
                     doRender = false;
                     break;
                 }
-                // TODO: Consider the case when this call returns null
+
                 inputBuffer = decoder.getInputBuffer(bufferIndex);
+                if (inputBuffer == null) {
+                    doRender = false;
+                    break;
+                }
                 MotionPhotoReaderUtils.readFromVideoTrack(
                         extractor,
                         decoder,
@@ -457,7 +492,6 @@ public class MotionPhotoReader {
                 );
 
                 // Get the next available output buffer and release frame data
-                // TODO: Consider the case when this call times out and returns null
                 bufferData = MotionPhotoReaderUtils.getOutputBuffer(outputBufferQueue);
                 if (bufferData == null) {
                     doRender = false;
@@ -466,7 +500,7 @@ public class MotionPhotoReader {
                 timestampUs = bufferData.getLong("TIMESTAMP_US");
                 bufferIndex = bufferData.getInt("BUFFER_INDEX");
                 videoTrackVisited = true;
-            } else if (trackIndex == motionTrackIndex) {
+            } else if (trackIndex == motionTrackIndex && !motionTrackVisited) {
                 // Set the stabilization matrices to the identity for each strip
                 homographyList = new ArrayList<>();
                 for (int i = 0; i < NUM_OF_STRIPS; i++) {
@@ -507,6 +541,8 @@ public class MotionPhotoReader {
 
     /**
      * @return a MotionPhotoInfo object containing motion photo metadata.
+     * @throws IOException if the given file cannot be found.
+     * @throws XMPException if attempting to parse invalid XMP data.
      */
     public MotionPhotoInfo getMotionPhotoInfo() throws IOException, XMPException {
         return MotionPhotoInfo.newInstance(file);
@@ -514,6 +550,7 @@ public class MotionPhotoReader {
 
     /**
      * @return a bitmap of the JPEG stored by the motion photo.
+     * @throws IOException if the BitmapFactory cannot decode the given file.
      */
     public Bitmap getMotionPhotoImageBitmap() throws IOException {
         try (FileInputStream input = new FileInputStream(file)) {
