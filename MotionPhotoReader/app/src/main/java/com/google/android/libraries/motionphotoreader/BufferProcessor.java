@@ -14,10 +14,11 @@ import java.util.concurrent.TimeUnit;
 import static android.os.Build.VERSION_CODES.LOLLIPOP;
 
 /**
- * A handler meant specifically for handling messages received from a motion photo reader.
+ * A processor specifically used to handle nextFrame() and seekTo() calls from MotionPhotoReader.
  */
 class BufferProcessor {
     private static final String TAG = "BufferProcessor";
+
     private static final long TIMEOUT_US = 1000L;
     private static final long US_TO_NS = 1000L;
     private static final long FALLBACK_FRAME_DELTA_NS = 1_000_000_000L / 30;
@@ -28,6 +29,7 @@ class BufferProcessor {
     /**
      * Fields shared with motion photo reader.
      */
+    private final OutputSurface outputSurface;
     private final MediaExtractor lowResExtractor;
     private final MediaCodec lowResDecoder;
     private final BlockingQueue<Integer> availableInputBuffers;
@@ -40,10 +42,12 @@ class BufferProcessor {
      * @param availableInputBuffers The queue of available input buffers.
      * @param availableOutputBuffers The queue of available output buffers.
      */
-    public BufferProcessor(MediaExtractor lowResExtractor,
+    public BufferProcessor(OutputSurface outputSurface,
+                           MediaExtractor lowResExtractor,
                            MediaCodec lowResDecoder,
                            BlockingQueue<Integer> availableInputBuffers,
                            BlockingQueue<Bundle> availableOutputBuffers) {
+        this.outputSurface = outputSurface;
         this.lowResExtractor = lowResExtractor;
         this.lowResDecoder = lowResDecoder;
         this.availableInputBuffers = availableInputBuffers;
@@ -145,7 +149,6 @@ class BufferProcessor {
                 timestampUs = bufferData.getLong("TIMESTAMP_US");
                 bufferIndex = bufferData.getInt("BUFFER_INDEX");
 
-                // TODO: Fix playback speed issues
                 // Compute the delay in render timestamp between the current frame and the previous
                 // frame.
                 long frameDeltaNs = (timestampUs - prevTimestampUs) * US_TO_NS;
@@ -168,6 +171,12 @@ class BufferProcessor {
                 lowResDecoder.releaseOutputBuffer(bufferIndex, renderTimestampNs);
                 prevTimestampUs = timestampUs;
                 prevRenderTimestampNs = renderTimestampNs;
+
+                // Wait for the image and render it after it arrives
+                if (outputSurface != null) {
+                    outputSurface.awaitNewImage();
+                    outputSurface.drawImage();
+                }
                 break;
 
             case MotionPhotoReader.MSG_SEEK_TO_FRAME:
@@ -189,6 +198,12 @@ class BufferProcessor {
 
                 // Reset the previous timestamp and previous render timestamp
                 prevTimestampUs = timestampUs;
+
+                // Wait for the image and render it after it arrives
+                if (outputSurface != null) {
+                    outputSurface.awaitNewImage();
+                    outputSurface.drawImage();
+                }
                 break;
 
             default:

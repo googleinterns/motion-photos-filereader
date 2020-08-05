@@ -3,10 +3,7 @@ package com.google.android.libraries.motionphotoreader;
 import android.content.pm.ActivityInfo;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.rule.ActivityTestRule;
-
-import com.google.common.io.ByteStreams;
 
 import org.junit.After;
 import org.junit.Rule;
@@ -14,10 +11,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -56,25 +49,6 @@ public class MotionPhotoWidgetTest {
             r.run();
         }
         cleanup.clear();
-    }
-
-    private File fetchAssetFile(String filename) throws IOException {
-        InputStream input = InstrumentationRegistry.getInstrumentation()
-                .getContext()
-                .getResources()
-                .getAssets()
-                .open(filename);
-
-        // Write file to temporary folder for instrumentation test access
-        File f = temporaryFolder.newFile(filename);
-        writeBytesToFile(input, f);
-        return f;
-    }
-
-    private static void writeBytesToFile(InputStream input, File file) throws IOException {
-        try (FileOutputStream fos = new FileOutputStream(file)) {
-            ByteStreams.copy(input, fos);
-        }
     }
 
     @Test

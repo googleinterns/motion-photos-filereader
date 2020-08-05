@@ -42,6 +42,7 @@ public class MotionPhotoReader {
 
     private MediaExtractor lowResExtractor;
     private MediaCodec lowResDecoder;
+    private MediaExtractor highResExtractor;
     private MediaFormat videoFormat;
     private FileInputStream fileInputStream;
 
@@ -62,22 +63,59 @@ public class MotionPhotoReader {
     private final BlockingQueue<Integer> availableInputBuffers;
     private final BlockingQueue<Bundle> availableOutputBuffers;
 
+    /** Fields passed onto OpenGL pipeline. */
+    private OutputSurface outputSurface;
+    private int surfaceWidth;
+    private int surfaceHeight;
+
     /**
      * Standard MotionPhotoReader constructor.
      */
-    private MotionPhotoReader(File file, Surface surface,
+    private MotionPhotoReader(File file,
+                              Surface surface,
+                              int surfaceWidth,
+                              int surfaceHeight,
                               BlockingQueue<Integer> availableInputBuffers,
                               BlockingQueue<Bundle> availableOutputBuffers,
                               MotionPhotoInfo motionPhotoInfo) {
         this.file = file;
         this.surface = surface;
+        this.surfaceWidth = surfaceWidth;
+        this.surfaceHeight = surfaceHeight;
         this.lowResExtractor = new MediaExtractor();
+        this.highResExtractor = new MediaExtractor();
         this.availableInputBuffers = availableInputBuffers;
         this.availableOutputBuffers = availableOutputBuffers;
         this.motionPhotoInfo = motionPhotoInfo;
     }
 
     /**
+     * Opens and prepares a new MotionPhotoReader for a particular file.
+     * @param file The motion photo file to open.
+     * @param surface The surface for the motion photo reader to decode.
+     * @param surfaceWidth The width of the surface, in pixels.
+     * @param surfaceHeight The height of the surface, in pixels.
+     * @return a MotionPhotoReader object for the specified file.
+     * @throws IOException when the file cannot be found.
+     * @throws XMPException when parsing invalid XML syntax.
+     */
+    @RequiresApi(api = M)
+    public static MotionPhotoReader open(File file,
+                                         Surface surface,
+                                         int surfaceWidth,
+                                         int surfaceHeight) throws IOException, XMPException {
+        return open(
+                file,
+                surface,
+                surfaceWidth,
+                surfaceHeight,
+                /* availableInputBuffers = */ new LinkedBlockingQueue<>(),
+                /* availableOutputBuffers = */ new LinkedBlockingQueue<>()
+        );
+    }
+
+    /**
+     * TODO: Discuss phasing out of methods with no dimension arguments.
      * Opens and prepares a new MotionPhotoReader for a particular file.
      * @param file The motion photo file to open.
      * @param surface The surface for the motion photo reader to decode.
@@ -91,11 +129,14 @@ public class MotionPhotoReader {
         return open(
                 file,
                 surface,
+                /* surfaceWidth = */ 0,
+                /* surfaceHeight = */ 0,
                 /* availableInputBuffers = */ new LinkedBlockingQueue<>(),
                 /* availableOutputBuffers = */ new LinkedBlockingQueue<>()
         );
     }
 
+    // TODO: Discuss phasing out of methods with no dimension arguments.
     @RequiresApi(api = M)
     public static MotionPhotoReader open(String filename, Surface surface)
             throws IOException, XMPException {
@@ -109,6 +150,8 @@ public class MotionPhotoReader {
     @VisibleForTesting
     static MotionPhotoReader open(File file,
                                   Surface surface,
+                                  int surfaceWidth,
+                                  int surfaceHeight,
                                   BlockingQueue<Integer> availableInputBuffers,
                                   BlockingQueue<Bundle> availableOutputBuffers)
             throws IOException, XMPException {
@@ -116,12 +159,43 @@ public class MotionPhotoReader {
         MotionPhotoReader reader = new MotionPhotoReader(
                 file,
                 surface,
+                surfaceWidth,
+                surfaceHeight,
                 availableInputBuffers,
                 availableOutputBuffers,
                 motionPhotoInfo
         );
         reader.startRenderThread(motionPhotoInfo);
         reader.bufferProcessor = new BufferProcessor(
+                reader.outputSurface,
+                reader.lowResExtractor,
+                reader.lowResDecoder,
+                availableInputBuffers,
+                availableOutputBuffers
+        );
+        return reader;
+    }
+
+    @RequiresApi(api = M)
+    @VisibleForTesting
+    static MotionPhotoReader open(File file,
+                                  Surface surface,
+                                  BlockingQueue<Integer> availableInputBuffers,
+                                  BlockingQueue<Bundle> availableOutputBuffers)
+            throws IOException, XMPException {
+        MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(file);
+        MotionPhotoReader reader = new MotionPhotoReader(
+                file,
+                surface,
+                /* surfaceWidth = */ 0,
+                /* surfaceHeight = */ 0,
+                availableInputBuffers,
+                availableOutputBuffers,
+                motionPhotoInfo
+        );
+        reader.startRenderThread(motionPhotoInfo);
+        reader.bufferProcessor = new BufferProcessor(
+                reader.outputSurface,
                 reader.lowResExtractor,
                 reader.lowResDecoder,
                 availableInputBuffers,
@@ -131,7 +205,12 @@ public class MotionPhotoReader {
     }
 
     /**
-     * Sets up and starts a new handler thread for MediaCodec objects (decoder and extractor).
+     * Sets up and starts a new handler thread for the rendering pipeline and media decoders and
+     * extractors.
+     *
+     * An extractor is set up for both the video and motion track (if applicable). The extractor
+     * reads samples for both tracks and passes the information to a buffer processor. A decoder is
+     * set up for the video track to read frame data.
      */
     @RequiresApi(api = 23)
     private void startRenderThread(MotionPhotoInfo motionPhotoInfo) throws IOException {
@@ -164,7 +243,6 @@ public class MotionPhotoReader {
             Log.e("MotionPhotoReader", "Insufficient Android build version");
             return;
         }
-
         lowResDecoder.setCallback(new MediaCodec.Callback() {
 
             @Override
@@ -196,7 +274,14 @@ public class MotionPhotoReader {
             }
         }, renderHandler);
 
-        lowResDecoder.configure(videoFormat, surface, null, 0);
+        // Set up OpenGL pipeline if the surface is not null
+        if (surface != null) {
+            outputSurface = new OutputSurface(renderHandler, motionPhotoInfo);
+            outputSurface.setSurface(surface, surfaceWidth, surfaceHeight);
+            lowResDecoder.configure(videoFormat, outputSurface.getDecodeSurface(), null, 0);
+        } else {
+            lowResDecoder.configure(videoFormat, null, null, 0);
+        }
         lowResDecoder.start();
     }
 
@@ -205,20 +290,20 @@ public class MotionPhotoReader {
      */
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     public void close() {
-        Log.d("ReaderActivity", "Closed decoder and extractor");
+        Log.d(TAG, "Closing motion photo reader");
+        if (outputSurface != null) {
+            outputSurface.release();
+        }
         try {
             fileInputStream.close();
-            Log.d("ReaderActivity", "Close file input stream");
 
         } catch (IOException e) {
             e.printStackTrace();
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
             renderHandler.getLooper().quitSafely();
-            Log.d("ReaderActivity", "Safely quit looper");
         } else {
             renderHandler.getLooper().quit();
-            Log.d("ReaderActivity", "Quit looper");
         }
         lowResDecoder.release();
         lowResExtractor.release();
@@ -226,8 +311,7 @@ public class MotionPhotoReader {
 
     /**
      * Checks whether the Motion Photo video has a succeeding frame.
-     * @return 1 if there is no frame, 0 if the next frame exists, and -1 if no buffers are
-     * available.
+     * @return true if there is a frame, otherwise return false.
      */
     @RequiresApi(api = Build.VERSION_CODES.P)
     public boolean hasNextFrame() {

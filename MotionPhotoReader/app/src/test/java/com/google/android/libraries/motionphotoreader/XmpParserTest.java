@@ -10,7 +10,8 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 public class XmpParserTest {
     private static final byte[] OPEN_ARR = "<x:xmpmeta".getBytes(); /* Start of XMP metadata tag */
