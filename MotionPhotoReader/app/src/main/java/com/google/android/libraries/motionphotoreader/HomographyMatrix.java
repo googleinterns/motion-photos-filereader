@@ -100,6 +100,13 @@ class HomographyMatrix {
         return rotationMatrix;
     }
 
+    public static HomographyMatrix createScaleMatrix(float xScale, float yScale) {
+        HomographyMatrix scaleMatrix = new HomographyMatrix();
+        scaleMatrix.set(0,  0, xScale);
+        scaleMatrix.set(1,  1, yScale);
+        return scaleMatrix;
+    }
+
     public HomographyMatrix convertFromImageToGL(int imageWidth, int imageHeight) {
         float halfW = imageWidth * 1.0f / 2.0f;
         float halfH = imageHeight * 1.0f / 2.0f;
