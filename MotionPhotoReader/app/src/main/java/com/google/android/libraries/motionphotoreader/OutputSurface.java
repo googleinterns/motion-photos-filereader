@@ -40,10 +40,10 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
 
     private final Handler renderHandler;
     private final MotionPhotoInfo motionPhotoInfo;
+    private final SettableFuture<Surface> decodeSurfaceFuture = SettableFuture.create();
 
     private int surfaceTextureHandle;
     private SurfaceTexture surfaceTexture;
-    private SettableFuture<Surface> decodeSurfaceFuture = SettableFuture.create();
     private TextureRender textureRender;
     private boolean frameAvailable;
 
