@@ -9,8 +9,6 @@ import static com.google.android.libraries.motionphotoreader.Constants.IDENTITY;
 
 /**
  * Represents a 3x3 homography transformation in row-major matrix form.
- *
- * TODO: write unit test
  */
 class HomographyMatrix {
 
@@ -27,16 +25,6 @@ class HomographyMatrix {
             throw new RuntimeException("List has incorrect number of elements: " + matrix.size());
         } else {
             this.matrix = matrix;
-        }
-    }
-
-    public HomographyMatrix(float[] matrix) {
-        if (matrix.length != 9) {
-            throw new RuntimeException("List has incorrect number of elements: " + matrix.length);
-        } else {
-            for (float f : matrix) {
-                this.matrix.add(f);
-            }
         }
     }
 
