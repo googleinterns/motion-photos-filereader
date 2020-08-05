@@ -471,7 +471,7 @@ public class MotionPhotoReader {
         while (!(videoTrackVisited && motionTrackVisited)) {
             int trackIndex = extractor.getSampleTrackIndex();
             ByteBuffer inputBuffer;
-            if (trackIndex == videoTrackIndex && !videoTrackVisited) {
+            if (trackIndex == videoTrackIndex) {
                 // Get the next available input buffer and read frame data
                 bufferIndex = MotionPhotoReaderUtils.getInputBuffer(inputBufferQueue);
                 if (bufferIndex == null) {
@@ -500,7 +500,7 @@ public class MotionPhotoReader {
                 timestampUs = bufferData.getLong("TIMESTAMP_US");
                 bufferIndex = bufferData.getInt("BUFFER_INDEX");
                 videoTrackVisited = true;
-            } else if (trackIndex == motionTrackIndex && !motionTrackVisited) {
+            } else if (trackIndex == motionTrackIndex) {
                 // Set the stabilization matrices to the identity for each strip
                 homographyList = new ArrayList<>();
                 for (int i = 0; i < NUM_OF_STRIPS; i++) {
