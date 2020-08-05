@@ -23,13 +23,18 @@ import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static android.os.Build.VERSION_CODES.M;
+import static com.google.android.libraries.motionphotoreader.Constants.FALLBACK_FRAME_DELTA_NS;
 import static com.google.android.libraries.motionphotoreader.Constants.MICROVIDEO_META_MIMETYPE;
 import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_IMAGE_META_MIMETYPE;
 import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V1;
+import static com.google.android.libraries.motionphotoreader.Constants.NUM_OF_STRIPS;
+import static com.google.android.libraries.motionphotoreader.Constants.US_TO_NS;
 import static com.google.android.libraries.motionphotoreader.Constants.VIDEO_MIME_PREFIX;
 
 /**
@@ -46,11 +51,17 @@ public class MotionPhotoReader {
     private final Surface surface;
     private final MotionPhotoInfo motionPhotoInfo;
 
+    private int videoTrackIndex;
+    private int motionTrackIndex;
+    private List<HomographyMatrix> homographyList;
+    private boolean stabilizationOn;
+    private long prevRenderTimestampNs;
+    private long prevTimestampUs;
+
     private MediaExtractor extractor;
     private MediaCodec decoder;
     private MediaFormat videoFormat;
     private FileInputStream fileInputStream;
-    private BufferProcessor bufferProcessor;
 
     // message keys
     static final int MSG_NEXT_FRAME = 0x0001;
@@ -72,6 +83,9 @@ public class MotionPhotoReader {
     private int surfaceWidth;
     private int surfaceHeight;
 
+    /** Flag used for debugging. */
+    private boolean testMode;
+
     /**
      * Standard MotionPhotoReader constructor.
      */
@@ -79,6 +93,7 @@ public class MotionPhotoReader {
                               Surface surface,
                               int surfaceWidth,
                               int surfaceHeight,
+                              boolean testMode,
                               BlockingQueue<Integer> availableInputBuffers,
                               BlockingQueue<Bundle> availableOutputBuffers,
                               MotionPhotoInfo motionPhotoInfo) {
@@ -86,10 +101,17 @@ public class MotionPhotoReader {
         this.surface = surface;
         this.surfaceWidth = surfaceWidth;
         this.surfaceHeight = surfaceHeight;
+        this.testMode = testMode;
         this.extractor = new MediaExtractor();
         this.availableInputBuffers = availableInputBuffers;
         this.availableOutputBuffers = availableOutputBuffers;
         this.motionPhotoInfo = motionPhotoInfo;
+
+        // Set the stabilization matrices to the identity for each strip
+        homographyList = new ArrayList<>();
+        for (int i = 0; i < NUM_OF_STRIPS; i++) {
+            homographyList.add(new HomographyMatrix());
+        }
     }
 
     /**
@@ -113,25 +135,10 @@ public class MotionPhotoReader {
                 file,
                 surface, surfaceWidth, surfaceHeight,
                 /* stabilizationOn = */ stabilizationOn,
+                /* testMode = */ false,
                 /* availableInputBuffers = */ new LinkedBlockingQueue<>(),
                 /* availableOutputBuffers = */ new LinkedBlockingQueue<>()
         );
-    }
-
-    public static MotionPhotoReader open(File file, Surface surface)
-            throws IOException, XMPException {
-        return open(
-                file,
-                surface, /* surfaceWidth = */ 0, /* surfaceHeight = */ 0,
-                /* stabilizationOn = */ true,
-                /* availableInputBuffers = */ new LinkedBlockingQueue<>(),
-                /* availableOutputBuffers = */ new LinkedBlockingQueue<>()
-        );
-    }
-
-    public static MotionPhotoReader open(String filename, Surface surface)
-            throws IOException, XMPException {
-        return open(new File(filename), surface);
     }
 
     /**
@@ -143,6 +150,7 @@ public class MotionPhotoReader {
                                   int surfaceWidth,
                                   int surfaceHeight,
                                   boolean stabilizationOn,
+                                  boolean testMode,
                                   BlockingQueue<Integer> availableInputBuffers,
                                   BlockingQueue<Bundle> availableOutputBuffers)
             throws IOException, XMPException {
@@ -152,27 +160,7 @@ public class MotionPhotoReader {
                 surface,
                 surfaceWidth,
                 surfaceHeight,
-                availableInputBuffers,
-                availableOutputBuffers,
-                motionPhotoInfo
-        );
-        reader.startRenderThread(motionPhotoInfo, stabilizationOn);
-        return reader;
-    }
-
-    @VisibleForTesting
-    static MotionPhotoReader open(File file,
-                                  Surface surface,
-                                  boolean stabilizationOn,
-                                  BlockingQueue<Integer> availableInputBuffers,
-                                  BlockingQueue<Bundle> availableOutputBuffers)
-            throws IOException, XMPException {
-        MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(file);
-        MotionPhotoReader reader = new MotionPhotoReader(
-                file,
-                surface,
-                /* surfaceWidth = */ 0,
-                /* surfaceHeight = */ 0,
+                testMode,
                 availableInputBuffers,
                 availableOutputBuffers,
                 motionPhotoInfo
@@ -194,7 +182,6 @@ public class MotionPhotoReader {
         renderWorker = new HandlerThread("renderHandler");
         renderWorker.start();
         renderHandler = new Handler(renderWorker.getLooper());
-        bufferProcessor = new BufferProcessor(availableInputBuffers, availableOutputBuffers);
 
         // Set up input stream from Motion Photo file for media extractor
         fileInputStream = new FileInputStream(file);
@@ -247,7 +234,7 @@ public class MotionPhotoReader {
             if (mime.startsWith(VIDEO_MIME_PREFIX) && !videoTrackSelected) {
                 Log.d(TAG, "selected video track: " + i);
                 extractor.selectTrack(i);
-                bufferProcessor.setVideoTrackIndex(i);
+                videoTrackIndex = i;
                 videoFormat = format;
                 decoder = MediaCodec.createDecoderByType(mime);
                 videoTrackSelected = true;
@@ -258,7 +245,7 @@ public class MotionPhotoReader {
                 if (stabilizationOn) {
                     Log.d(TAG, "selected motion track: " + i);
                     extractor.selectTrack(i);
-                    bufferProcessor.setMotionTrackIndex(i);
+                    motionTrackIndex = i;
                 }
             }
         }
@@ -309,7 +296,7 @@ public class MotionPhotoReader {
         decoder.start();
 
         // Configure the buffer processor
-        bufferProcessor.configure(outputSurface, extractor, decoder, stabilizationOn);
+//        motionPhotoReaderUtils.configure(outputSurface, extractor, decoder, stabilizationOn);
     }
 
     /**
@@ -349,22 +336,180 @@ public class MotionPhotoReader {
      * Advances the decoder and extractor by one frame.
      */
     public void nextFrame() {
-        Bundle messageData = new Bundle();
-        messageData.putInt("MESSAGE_KEY", MSG_NEXT_FRAME);
-        bufferProcessor.process(messageData);
+        Bundle bufferData;
+        int bufferIndex = -1;
+        long timestampUs = -1;
+        boolean doRender = true;
+        boolean videoTrackVisited = false;
+        boolean motionTrackVisited = !stabilizationOn;
+        while (!(videoTrackVisited && motionTrackVisited)) {
+            int trackIndex = extractor.getSampleTrackIndex();
+            ByteBuffer inputBuffer;
+            if (trackIndex == videoTrackIndex) {
+                // Get the next available input buffer and read frame data
+                bufferIndex = MotionPhotoReaderUtils.getInputBuffer(availableInputBuffers);
+                if (bufferIndex == -1) {
+                    doRender = false;
+                    break;
+                }
+                // TODO: Consider the case when this call returns null
+                inputBuffer = decoder.getInputBuffer(bufferIndex);
+                MotionPhotoReaderUtils.readFromVideoTrack(
+                        extractor,
+                        decoder,
+                        inputBuffer,
+                        bufferIndex
+                );
+
+                // Get the next available output buffer and release frame data
+                // TODO: Consider the case when this call times out and returns null
+                bufferData = MotionPhotoReaderUtils.getOutputBuffer(availableOutputBuffers);
+                if (bufferData == null) {
+                    doRender = false;
+                    break;
+                }
+                timestampUs = bufferData.getLong("TIMESTAMP_US");
+                bufferIndex = bufferData.getInt("BUFFER_INDEX");
+                videoTrackVisited = true;
+            } else if (trackIndex == motionTrackIndex) {
+                if (!testMode) {
+                    // Get stabilization data from the high resolution extractor
+                    inputBuffer = ByteBuffer.allocateDirect((int) extractor.getSampleSize());
+                    List<HomographyMatrix> newHomographyList =
+                            MotionPhotoReaderUtils.getHomographies(extractor, inputBuffer);
+
+                    // Multiply previous stabilization matrices by new stabilization matrices
+                    // (Assume MOTION_TYPE_INTERFRAME for now)
+                    List<HomographyMatrix> tempHomographyList = new ArrayList<>();
+                    for (int i = 0; i < newHomographyList.size(); i++) {
+                        if (stabilizationOn) {
+                            HomographyMatrix newStripMatrix = homographyList
+                                    .get(i)
+                                    .leftMultiplyBy(newHomographyList.get(i));
+                            tempHomographyList.add(newStripMatrix);
+                        } else {
+                            tempHomographyList.add(new HomographyMatrix());
+                        }
+                    }
+                    homographyList = tempHomographyList;
+                }
+                motionTrackVisited = true;
+            } else if (trackIndex == -1) {
+                // If the track index is -1, then the extractor has no frame data to read,
+                // so we don't want to render anything
+                doRender = false;
+                break;
+            } else {
+                throw new RuntimeException("Unexpected track index: " + trackIndex);
+            }
+            extractor.advance();
+        }
+
+        if (doRender) {
+            // Compute the delay in render timestamp between the current frame and the previous
+            // frame.
+            long frameDeltaNs = (timestampUs - prevTimestampUs) * US_TO_NS;
+            if (frameDeltaNs <= 0) {
+                frameDeltaNs = FALLBACK_FRAME_DELTA_NS;
+            }
+            // Set the previous timestamp ("zero out" the timestamps) to the current system
+            // timestamp if it has not been set yet (i.e. equals zero).
+            long renderTimestampNs;
+            long currentTimestampNs = System.nanoTime();
+            if (prevRenderTimestampNs == 0) {
+                renderTimestampNs = currentTimestampNs + frameDeltaNs;
+            } else {
+                renderTimestampNs = prevRenderTimestampNs + frameDeltaNs;
+            }
+            // Rebase the render timestamp if it has drifted too far behind
+            if (renderTimestampNs < currentTimestampNs) {
+                renderTimestampNs = currentTimestampNs + frameDeltaNs;
+            }
+            decoder.releaseOutputBuffer(bufferIndex, /* render = */ true);
+            prevTimestampUs = timestampUs;
+            prevRenderTimestampNs = renderTimestampNs;
+
+            // Wait for the image and render it after it arrives
+            if (outputSurface != null) {
+                outputSurface.awaitNewImage();
+                outputSurface.drawImage(homographyList, renderTimestampNs);
+            }
+        }
     }
 
     /**
      * Sets the decoder and extractor to the frame specified by the given timestamp.
-     * @param timeUs The desired timestamp of the video.
+     * @param seekTimestampUs The desired timestamp of the video.
      * @param mode The sync mode of the extractor.
      */
-    public void seekTo(long timeUs, int mode) {
-        Bundle messageData = new Bundle();
-        messageData.putInt("MESSAGE_KEY", MSG_SEEK_TO_FRAME);
-        messageData.putLong("TIME_US", timeUs);
-        messageData.putInt("MODE", mode);
-        bufferProcessor.process(messageData);
+    public void seekTo(long seekTimestampUs, int mode) {
+        // Seek extractor to correct location
+        extractor.seekTo(seekTimestampUs, mode);
+
+        Bundle bufferData;
+        int bufferIndex = -1;
+        long timestampUs = -1;
+        boolean doRender = true;
+        boolean videoTrackVisited = false;
+        boolean motionTrackVisited = !stabilizationOn;
+        while (!(videoTrackVisited && motionTrackVisited)) {
+            int trackIndex = extractor.getSampleTrackIndex();
+            ByteBuffer inputBuffer;
+            if (trackIndex == videoTrackIndex) {
+                // Get the next available input buffer and read frame data
+                bufferIndex = MotionPhotoReaderUtils.getInputBuffer(availableInputBuffers);
+                if (bufferIndex == -1) {
+                    doRender = false;
+                    break;
+                }
+                // TODO: Consider the case when this call returns null
+                inputBuffer = decoder.getInputBuffer(bufferIndex);
+                MotionPhotoReaderUtils.readFromVideoTrack(
+                        extractor,
+                        decoder,
+                        inputBuffer,
+                        bufferIndex
+                );
+
+                // Get the next available output buffer and release frame data
+                // TODO: Consider the case when this call times out and returns null
+                bufferData = MotionPhotoReaderUtils.getOutputBuffer(availableOutputBuffers);
+                if (bufferData == null) {
+                    doRender = false;
+                    break;
+                }
+                timestampUs = bufferData.getLong("TIMESTAMP_US");
+                bufferIndex = bufferData.getInt("BUFFER_INDEX");
+                videoTrackVisited = true;
+            } else if (trackIndex == motionTrackIndex) {
+                // Set the stabilization matrices to the identity for each strip
+                homographyList = new ArrayList<>();
+                for (int i = 0; i < NUM_OF_STRIPS; i++) {
+                    homographyList.add(new HomographyMatrix());
+                }
+                motionTrackVisited = true;
+            } else if (trackIndex == -1) {
+                doRender = false;
+                break;
+            } else {
+                throw new RuntimeException("Unexpected track index: " + trackIndex);
+            }
+            extractor.advance();
+        }
+
+        if (doRender) {
+            long renderTimestampNs = prevRenderTimestampNs;
+            decoder.releaseOutputBuffer(bufferIndex, /* render = */ true);
+
+            // Reset the previous timestamp and previous render timestamp
+            prevTimestampUs = timestampUs;
+
+            // Wait for the image and render it after it arrives
+            if (outputSurface != null) {
+                outputSurface.awaitNewImage();
+                outputSurface.drawImage(homographyList, renderTimestampNs);
+            }
+        }
     }
 
     /**

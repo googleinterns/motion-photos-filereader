@@ -32,7 +32,7 @@ import static org.mockito.Mockito.when;
 /**
  * Local unit test for the BufferHandler class.
  */
-public class BufferProcessorTest {
+public class MotionPhotoUtilsTest {
 
     // define a mock media format for motion photo v1 format
     private final static int V1 = 1;
@@ -137,7 +137,7 @@ public class BufferProcessorTest {
 
     @Test
     public void handleNextFrameMsg_hasNextFrameTrue_stabilizationOff_isCorrect() {
-        BufferProcessor bufferProcessor = spy(new BufferProcessor(
+        MotionPhotoReaderUtils bufferProcessor = spy(new MotionPhotoReaderUtils(
                 outputSurface,
                 extractor,
                 decoder,
@@ -166,7 +166,7 @@ public class BufferProcessorTest {
 
     @Test
     public void handleNextFrameMsg_hasNextFrameTrue_stabilizationOn_isCorrect() {
-        BufferProcessor bufferProcessor = spy(new BufferProcessor(
+        MotionPhotoReaderUtils bufferProcessor = spy(new MotionPhotoReaderUtils(
                 outputSurface,
                 extractor,
                 decoder,
@@ -195,7 +195,7 @@ public class BufferProcessorTest {
 
     @Test
     public void handleNextFrameMsg_hasNextFrameFalse_stabilizationOff_isCorrect() {
-        BufferProcessor bufferProcessor = spy(new BufferProcessor(
+        MotionPhotoReaderUtils bufferProcessor = spy(new MotionPhotoReaderUtils(
                 outputSurface,
                 extractor,
                 decoder,
@@ -228,7 +228,7 @@ public class BufferProcessorTest {
 
     @Test
     public void handleNextFrameMsg_hasNextFrameFalse_stabilizationOn_isCorrect() {
-        BufferProcessor bufferProcessor = spy(new BufferProcessor(
+        MotionPhotoReaderUtils bufferProcessor = spy(new MotionPhotoReaderUtils(
                 outputSurface,
                 extractor,
                 decoder,
@@ -261,7 +261,7 @@ public class BufferProcessorTest {
 
     @Test
     public void handleSeekToFrameMsg_stabilizationOff_isCorrect() {
-        BufferProcessor bufferProcessor = spy(new BufferProcessor(
+        MotionPhotoReaderUtils bufferProcessor = spy(new MotionPhotoReaderUtils(
                 outputSurface,
                 extractor,
                 decoder,
@@ -283,7 +283,7 @@ public class BufferProcessorTest {
 
     @Test
     public void handleSeekToFrameMsg_stabilizationOn_isCorrect() {
-        BufferProcessor bufferProcessor = spy(new BufferProcessor(
+        MotionPhotoReaderUtils bufferProcessor = spy(new MotionPhotoReaderUtils(
                 outputSurface,
                 extractor,
                 decoder,
@@ -305,7 +305,7 @@ public class BufferProcessorTest {
 
     @Test(expected = IllegalStateException.class)
     public void handleIncorrectMsg_stabilizationOff_isCorrect() {
-        BufferProcessor bufferProcessor = spy(new BufferProcessor(
+        MotionPhotoReaderUtils bufferProcessor = spy(new MotionPhotoReaderUtils(
                 outputSurface,
                 extractor,
                 decoder,
@@ -327,7 +327,7 @@ public class BufferProcessorTest {
 
     @Test(expected = IllegalStateException.class)
     public void handleIncorrectMsg_stabilizationOn_isCorrect() {
-        BufferProcessor bufferProcessor = spy(new BufferProcessor(
+        MotionPhotoReaderUtils bufferProcessor = spy(new MotionPhotoReaderUtils(
                 outputSurface,
                 extractor,
                 decoder,
