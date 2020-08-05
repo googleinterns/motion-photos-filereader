@@ -100,6 +100,17 @@ class Constants {
     static final int VIDEO_OFFSET_V2 = 1317283;
 
     /**
+     * MotionPhotoUtilsTest.java
+     */
+    static final int INPUT_BUFFER_QUEUE_SIZE = 3;
+    static final int OUTPUT_BUFFER_QUEUE_SIZE = 3;
+    static final int SAMPLE_BUFFER_INDEX = 2;
+    static final int EMPTY_SAMPLE_SIZE = -1;
+    static final int SAMPLE_SIZE = 12;
+    static final long SAMPLE_PRESENTATION_TIME_US = 1000L;
+
+
+    /**
      * HomographyMatrix.java
      */
     static final double THETA_DEGREES_A = 45.0;

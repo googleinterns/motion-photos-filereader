@@ -49,12 +49,11 @@ public class MotionPhotoReader {
 
     private final File file;
     private final Surface surface;
-    private final MotionPhotoInfo motionPhotoInfo;
+    private final boolean stabilizationOn;
 
     private int videoTrackIndex;
     private int motionTrackIndex;
     private List<HomographyMatrix> homographyList;
-    private boolean stabilizationOn;
     private long prevRenderTimestampNs;
     private long prevTimestampUs;
 
@@ -75,43 +74,59 @@ public class MotionPhotoReader {
     private Handler renderHandler;
 
     /** Available buffer queues **/
-    private final BlockingQueue<Integer> availableInputBuffers;
-    private final BlockingQueue<Bundle> availableOutputBuffers;
+    private final BlockingQueue<Integer> inputBufferQueue;
+    private final BlockingQueue<Bundle> outputBufferQueue;
 
     /** Fields passed onto OpenGL pipeline. */
     private OutputSurface outputSurface;
-    private int surfaceWidth;
-    private int surfaceHeight;
+    private final int surfaceWidth;
+    private final int surfaceHeight;
 
     /** Flag used for debugging. */
-    private boolean testMode;
+    private final boolean testMode;
 
     /**
      * Standard MotionPhotoReader constructor.
      */
     private MotionPhotoReader(File file,
-                              Surface surface,
-                              int surfaceWidth,
-                              int surfaceHeight,
-                              boolean testMode,
-                              BlockingQueue<Integer> availableInputBuffers,
-                              BlockingQueue<Bundle> availableOutputBuffers,
-                              MotionPhotoInfo motionPhotoInfo) {
+                              MediaExtractor extractor,
+                              Surface surface, int surfaceWidth, int surfaceHeight,
+                              boolean stabilizationOn, boolean testMode,
+                              BlockingQueue<Integer> inputBufferQueue,
+                              BlockingQueue<Bundle> outputBufferQueue) {
         this.file = file;
         this.surface = surface;
         this.surfaceWidth = surfaceWidth;
         this.surfaceHeight = surfaceHeight;
+        this.stabilizationOn = stabilizationOn;
         this.testMode = testMode;
-        this.extractor = new MediaExtractor();
-        this.availableInputBuffers = availableInputBuffers;
-        this.availableOutputBuffers = availableOutputBuffers;
-        this.motionPhotoInfo = motionPhotoInfo;
+        this.extractor = extractor;
+        this.inputBufferQueue = inputBufferQueue;
+        this.outputBufferQueue = outputBufferQueue;
 
         // Set the stabilization matrices to the identity for each strip
         homographyList = new ArrayList<>();
         for (int i = 0; i < NUM_OF_STRIPS; i++) {
             homographyList.add(new HomographyMatrix());
         }
+    }
+
+    @VisibleForTesting
+    static MotionPhotoReader open(File file, MediaExtractor extractor,
+                                  Surface surface, int surfaceWidth, int surfaceHeight,
+                                  boolean stabilizationOn,
+                                  BlockingQueue<Integer> inputBufferQueue,
+                                  BlockingQueue<Bundle> outputBufferQueue)
+            throws IOException, XMPException {
+        MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(file);
+        MotionPhotoReader reader = new MotionPhotoReader(
+                file, extractor,
+                surface, surfaceWidth, surfaceHeight,
+                stabilizationOn, /* testMode = */ true,
+                inputBufferQueue, outputBufferQueue
+        );
+        reader.startRenderThread(motionPhotoInfo, stabilizationOn);
+        return reader;
     }
 
     /**
@@ -126,44 +141,17 @@ public class MotionPhotoReader {
      * @throws XMPException when parsing invalid XML syntax.
      */
     public static MotionPhotoReader open(File file,
-                                         Surface surface,
-                                         int surfaceWidth,
-                                         int surfaceHeight,
+                                         Surface surface, int surfaceWidth, int surfaceHeight,
                                          boolean stabilizationOn
     ) throws IOException, XMPException {
-        return open(
-                file,
-                surface, surfaceWidth, surfaceHeight,
-                /* stabilizationOn = */ stabilizationOn,
-                /* testMode = */ false,
-                /* availableInputBuffers = */ new LinkedBlockingQueue<>(),
-                /* availableOutputBuffers = */ new LinkedBlockingQueue<>()
-        );
-    }
-
-    /**
-     * Opens and prepares a new MotionPhotoReader for testing.
-     */
-    @VisibleForTesting
-    static MotionPhotoReader open(File file,
-                                  Surface surface,
-                                  int surfaceWidth,
-                                  int surfaceHeight,
-                                  boolean stabilizationOn,
-                                  boolean testMode,
-                                  BlockingQueue<Integer> availableInputBuffers,
-                                  BlockingQueue<Bundle> availableOutputBuffers)
-            throws IOException, XMPException {
         MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(file);
         MotionPhotoReader reader = new MotionPhotoReader(
                 file,
-                surface,
-                surfaceWidth,
-                surfaceHeight,
-                testMode,
-                availableInputBuffers,
-                availableOutputBuffers,
-                motionPhotoInfo
+                new MediaExtractor(),
+                surface, surfaceWidth, surfaceHeight,
+                stabilizationOn, /* testMode = */ false,
+                /* inputBufferQueue = */ new LinkedBlockingQueue<>(),
+                /* outputBufferQueue = */ new LinkedBlockingQueue<>()
         );
         reader.startRenderThread(motionPhotoInfo, stabilizationOn);
         return reader;
@@ -260,7 +248,7 @@ public class MotionPhotoReader {
 
             @Override
             public void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
-                boolean result = availableInputBuffers.offer(index);
+                boolean result = inputBufferQueue.offer(index);
             }
 
             @Override
@@ -270,7 +258,7 @@ public class MotionPhotoReader {
                 Bundle bufferData = new Bundle();
                 bufferData.putInt("BUFFER_INDEX", index);
                 bufferData.putLong("TIMESTAMP_US", info.presentationTimeUs);
-                boolean result = availableOutputBuffers.offer(bufferData);
+                boolean result = outputBufferQueue.offer(bufferData);
             }
 
             @Override
@@ -294,9 +282,6 @@ public class MotionPhotoReader {
             decoder.configure(videoFormat, null, null, 0);
         }
         decoder.start();
-
-        // Configure the buffer processor
-//        motionPhotoReaderUtils.configure(outputSurface, extractor, decoder, stabilizationOn);
     }
 
     /**
@@ -337,7 +322,7 @@ public class MotionPhotoReader {
      */
     public void nextFrame() {
         Bundle bufferData;
-        int bufferIndex = -1;
+        Integer bufferIndex = -1;
         long timestampUs = -1;
         boolean doRender = true;
         boolean videoTrackVisited = false;
@@ -347,8 +332,8 @@ public class MotionPhotoReader {
             ByteBuffer inputBuffer;
             if (trackIndex == videoTrackIndex) {
                 // Get the next available input buffer and read frame data
-                bufferIndex = MotionPhotoReaderUtils.getInputBuffer(availableInputBuffers);
-                if (bufferIndex == -1) {
+                bufferIndex = MotionPhotoReaderUtils.getInputBuffer(inputBufferQueue);
+                if (bufferIndex == null) {
                     doRender = false;
                     break;
                 }
@@ -363,7 +348,7 @@ public class MotionPhotoReader {
 
                 // Get the next available output buffer and release frame data
                 // TODO: Consider the case when this call times out and returns null
-                bufferData = MotionPhotoReaderUtils.getOutputBuffer(availableOutputBuffers);
+                bufferData = MotionPhotoReaderUtils.getOutputBuffer(outputBufferQueue);
                 if (bufferData == null) {
                     doRender = false;
                     break;
@@ -447,7 +432,7 @@ public class MotionPhotoReader {
         extractor.seekTo(seekTimestampUs, mode);
 
         Bundle bufferData;
-        int bufferIndex = -1;
+        Integer bufferIndex = -1;
         long timestampUs = -1;
         boolean doRender = true;
         boolean videoTrackVisited = false;
@@ -457,8 +442,8 @@ public class MotionPhotoReader {
             ByteBuffer inputBuffer;
             if (trackIndex == videoTrackIndex) {
                 // Get the next available input buffer and read frame data
-                bufferIndex = MotionPhotoReaderUtils.getInputBuffer(availableInputBuffers);
-                if (bufferIndex == -1) {
+                bufferIndex = MotionPhotoReaderUtils.getInputBuffer(inputBufferQueue);
+                if (bufferIndex == null) {
                     doRender = false;
                     break;
                 }
@@ -473,7 +458,7 @@ public class MotionPhotoReader {
 
                 // Get the next available output buffer and release frame data
                 // TODO: Consider the case when this call times out and returns null
-                bufferData = MotionPhotoReaderUtils.getOutputBuffer(availableOutputBuffers);
+                bufferData = MotionPhotoReaderUtils.getOutputBuffer(outputBufferQueue);
                 if (bufferData == null) {
                     doRender = false;
                     break;

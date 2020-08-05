@@ -5,6 +5,7 @@ import android.media.MediaExtractor;
 import android.os.Bundle;
 import android.util.Log;
 
+import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.VisibleForTesting;
 
@@ -36,102 +37,43 @@ import static com.google.android.libraries.motionphotoreader.Constants.US_TO_NS;
  */
 @RequiresApi(api = 28)
 class MotionPhotoReaderUtils {
-    private static final String TAG = "BufferProcessor";
+    private static final String TAG = "MotionPhotoReaderUtils";
 
-    private long prevRenderTimestampNs;
-    private long prevTimestampUs;
-
-    /**
-     * Fields used for extracting stabilization data.
-     */
-    private int videoTrackIndex;
-    private int motionTrackIndex;
-    private List<HomographyMatrix> homographyList;
-    private boolean stabilizationOn;
-
-    /**
-     * Fields shared with motion photo reader.
-     */
-    private OutputSurface outputSurface;
-    private MediaExtractor extractor;
-    private MediaCodec decoder;
-    private final BlockingQueue<Integer> availableInputBuffers;
-    private final BlockingQueue<Bundle> availableOutputBuffers;
-
-    private boolean testMode;
-
-    /**
-     * Constructor for setting up a buffer processor from a motion photo reader.
-     * @param availableInputBuffers The queue of available input buffers.
-     * @param availableOutputBuffers The queue of available output buffers.
-     */
-    public MotionPhotoReaderUtils(BlockingQueue<Integer> availableInputBuffers,
-                                  BlockingQueue<Bundle> availableOutputBuffers) {
-        this.availableInputBuffers = availableInputBuffers;
-        this.availableOutputBuffers = availableOutputBuffers;
-        prevRenderTimestampNs = 0;
-        prevTimestampUs = 0;
-
-        // Set the stabilization matrices to the identity for each strip
-        homographyList = new ArrayList<>();
-        for (int i = 0; i < NUM_OF_STRIPS; i++) {
-            homographyList.add(new HomographyMatrix());
-        }
-    }
-
-    @VisibleForTesting
-    MotionPhotoReaderUtils(OutputSurface outputSurface,
-                           MediaExtractor extractor,
-                           MediaCodec decoder,
-                           boolean stabilizationOn,
-                           int videoTrackIndex,
-                           int motionTrackIndex,
-                           boolean testMode,
-                           BlockingQueue<Integer> availableInputBuffers,
-                           BlockingQueue<Bundle> availableOutputBuffers) {
-        this.outputSurface = outputSurface;
-        this.extractor = extractor;
-        this.decoder = decoder;
-        this.videoTrackIndex = videoTrackIndex;
-        this.motionTrackIndex = motionTrackIndex;
-        this.testMode = testMode;
-        this.availableInputBuffers = availableInputBuffers;
-        this.availableOutputBuffers = availableOutputBuffers;
-        prevRenderTimestampNs = 0;
-        prevTimestampUs = 0;
-        this.stabilizationOn = stabilizationOn;
-
-        // Set the stabilization matrices to the identity for each strip
-        homographyList = new ArrayList<>();
-        for (int i = 0; i < NUM_OF_STRIPS; i++) {
-            homographyList.add(new HomographyMatrix());
-        }
-    }
-
-    /**
-     * Configure the buffer processor to access the fields of a certain motion photo reader.
-     * @param outputSurface The output surface which connects the buffer processor and the motion
-     * photo reader to the OpenGL pipeline.
-     * @param extractor The MediaExtractor from the motion photo reader that reads the video track.
-     * @param decoder The low resolution MediaCodec from the motion photo reader.
-     * @param stabilizationOn If true, the buffer processor will also extract stabilization data.
-     */
-    public void configure(OutputSurface outputSurface,
-                           MediaExtractor extractor,
-                           MediaCodec decoder,
-                           boolean stabilizationOn) {
-        this.outputSurface = outputSurface;
-        this.extractor = extractor;
-        this.decoder = decoder;
-        this.stabilizationOn = stabilizationOn;
-    }
+//    @VisibleForTesting
+//    MotionPhotoReaderUtils(OutputSurface outputSurface,
+//                           MediaExtractor extractor,
+//                           MediaCodec decoder,
+//                           boolean stabilizationOn,
+//                           int videoTrackIndex,
+//                           int motionTrackIndex,
+//                           boolean testMode,
+//                           BlockingQueue<Integer> availableInputBuffers,
+//                           BlockingQueue<Bundle> availableOutputBuffers) {
+//        this.outputSurface = outputSurface;
+//        this.extractor = extractor;
+//        this.decoder = decoder;
+//        this.videoTrackIndex = videoTrackIndex;
+//        this.motionTrackIndex = motionTrackIndex;
+//        this.testMode = testMode;
+//        this.availableInputBuffers = availableInputBuffers;
+//        this.availableOutputBuffers = availableOutputBuffers;
+//        prevRenderTimestampNs = 0;
+//        prevTimestampUs = 0;
+//        this.stabilizationOn = stabilizationOn;
+//
+//        // Set the stabilization matrices to the identity for each strip
+//        homographyList = new ArrayList<>();
+//        for (int i = 0; i < NUM_OF_STRIPS; i++) {
+//            homographyList.add(new HomographyMatrix());
+//        }
+//    }
 
     /**
      * Retrieve the index of the next available input buffer.
-     * @return the index of the next available input buffer, or -1 if the poll call results in a
+     * @return the index of the next available input buffer, or null if the poll call results in a
      * timeout.
      */
-    public static int getInputBuffer(BlockingQueue<Integer> availableInputBuffers) {
+    public static Integer getInputBuffer(BlockingQueue<Integer> availableInputBuffers) {
         Integer bufferIndex = -1;
         try {
             bufferIndex = availableInputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
