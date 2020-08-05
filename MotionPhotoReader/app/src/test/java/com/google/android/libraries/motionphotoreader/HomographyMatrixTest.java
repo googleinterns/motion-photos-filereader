@@ -27,18 +27,10 @@ public class HomographyMatrixTest {
         float sinThetaB = (float) Math.sin(Math.toRadians(THETA_DEGREES_B));
 
         // Rotation around z-axis by 45 degrees
-        A = new HomographyMatrix();
-        A.set(0, 0, cosThetaA);
-        A.set(0, 1, -sinThetaA);
-        A.set(1, 0, sinThetaA);
-        A.set(1, 1, cosThetaA);
+        A = HomographyMatrix.createRotationMatrix(THETA_DEGREES_A);
 
         // Rotation around x-axis by 60 degrees
-        B = new HomographyMatrix();
-        B.set(1, 1, cosThetaB);
-        B.set(1, 2, -sinThetaB);
-        B.set(2, 1, sinThetaB);
-        B.set(2, 2, cosThetaB);
+        B = HomographyMatrix.createRotationMatrix(THETA_DEGREES_B);
 
         // Rotation around z-axis by 45 degrees followed by rotation around x-axis by 60 degrees
         BA = new HomographyMatrix();

@@ -85,6 +85,21 @@ class HomographyMatrix {
 
     }
 
+    public static HomographyMatrix createRotationMatrix(float degrees) {
+        float cosThetaA = (float) Math.cos(Math.toRadians(degrees));
+        float sinThetaA = (float) Math.sin(Math.toRadians(degrees));
+        float cosThetaB = (float) Math.cos(Math.toRadians(degrees));
+        float sinThetaB = (float) Math.sin(Math.toRadians(degrees));
+
+        HomographyMatrix rotationMatrix = new HomographyMatrix();
+        rotationMatrix.set(0, 0, cosThetaA);
+        rotationMatrix.set(0, 1, -sinThetaA);
+        rotationMatrix.set(1, 0, sinThetaA);
+        rotationMatrix.set(1, 1, cosThetaA);
+
+        return rotationMatrix;
+    }
+
     public HomographyMatrix convertFromImageToGL(int imageWidth, int imageHeight) {
         float halfW = imageWidth * 1.0f / 2.0f;
         float halfH = imageHeight * 1.0f / 2.0f;

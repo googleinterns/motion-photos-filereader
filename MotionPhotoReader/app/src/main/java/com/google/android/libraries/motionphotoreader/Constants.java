@@ -113,8 +113,8 @@ class Constants {
     /**
      * HomographyMatrix.java
      */
-    static final double THETA_DEGREES_A = 45.0;
-    static final double THETA_DEGREES_B = 60.0;
+    static final float THETA_DEGREES_A = 45.0f;
+    static final float THETA_DEGREES_B = 60.0f;
     static final int VIDEO_WIDTH_PIXELS = 4032;
     static final int VIDEO_HEIGHT_PIXELS = 3024;
 
