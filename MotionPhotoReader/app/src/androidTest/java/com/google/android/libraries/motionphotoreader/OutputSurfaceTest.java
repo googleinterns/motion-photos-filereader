@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTOS_DIR;
 import static org.junit.Assert.assertNotNull;
 
 /**
@@ -63,11 +64,11 @@ public class OutputSurfaceTest {
         Context context = activityRule.getActivity().getApplicationContext();
         AssetManager assetManager = context.getAssets();
         try {
-            testMotionPhotosList = assetManager.list("motionphotos");
+            testMotionPhotosList = assetManager.list(MOTION_PHOTOS_DIR);
         } catch (IOException e) {
             e.printStackTrace();
         }
-        filename = Constants.MOTION_PHOTOS_DIR + testMotionPhotosList[0];
+        filename = MOTION_PHOTOS_DIR + testMotionPhotosList[0];
 
         // Get motion photo info
         motionPhotoInfo = MotionPhotoInfo.newInstance(
