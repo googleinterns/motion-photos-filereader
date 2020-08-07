@@ -1,5 +1,7 @@
 package com.google.android.libraries.motionphotoreader;
 
+import com.google.common.base.Preconditions;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -9,37 +11,50 @@ import static com.google.android.libraries.motionphotoreader.Constants.IDENTITY;
 
 /**
  * Represents a 3x3 homography transformation in row-major matrix form.
- *
- * TODO: write unit test
  */
 class HomographyMatrix {
 
-    private List<Float> matrix = new ArrayList<>();
+    // A list representation of the matrix, stored in row-major order.
+    private final List<Float> matrix;
 
+    /**
+     * The default constructor sets the matrix to an identity matrix.
+     */
     public HomographyMatrix() {
+        this.matrix = new ArrayList<>();
         for (float f : IDENTITY) {
             matrix.add(f);
         }
     }
 
+    /**
+     * Creates a matrix out of a list of floats, stored in row-major order. The list must contain
+     * exactly nine elements.
+     */
     public HomographyMatrix(List<Float> matrix) {
-        if (matrix.size() != 9) {
-            throw new RuntimeException("List has incorrect number of elements: " + matrix.size());
-        } else {
-            this.matrix = matrix;
-        }
+        Preconditions.checkArgument(matrix.size() == 9,
+                "Provided matrix must have exactly 9 elements");
+        this.matrix = matrix;
     }
 
+    /**
+     * Creates a matrix out of an array of floats, stored in row-major order. The array must contain
+     * exactly nine elements.
+     */
     public HomographyMatrix(float[] matrix) {
-        if (matrix.length != 9) {
-            throw new RuntimeException("List has incorrect number of elements: " + matrix.length);
-        } else {
-            for (float f : matrix) {
-                this.matrix.add(f);
-            }
+        Preconditions.checkArgument(matrix.length == 9,
+                "Provided matrix must have exactly 9 elements");
+        this.matrix = new ArrayList<>();
+        for (float f : matrix) {
+            this.matrix.add(f);
         }
     }
 
+    /**
+     * Multiply this matrix on the left by another homography matrix.
+     * @param otherMatrix The homography matrix on the left of the product.
+     * @return a HomographyMatrix containing the product of the two matrices.
+     */
     public HomographyMatrix leftMultiplyBy(HomographyMatrix otherMatrix) {
         List<Float> product = new ArrayList<>();
         for (int r = 0; r < 3; r++) {
@@ -53,6 +68,11 @@ class HomographyMatrix {
         return new HomographyMatrix(product);
     }
 
+    /**
+     * Multiply this matrix on the right by another homography matrix.
+     * @param otherMatrix The homography matrix on the right of the product.
+     * @return a HomographyMatrix containing the product of the two matrices.
+     */
     public HomographyMatrix rightMultiplyBy(HomographyMatrix otherMatrix) {
         List<Float> product = new ArrayList<>();
         for (int r = 0; r < 3; r++) {
@@ -66,14 +86,25 @@ class HomographyMatrix {
         return new HomographyMatrix(product);
     }
 
+    /**
+     * Get the entry of this matrix at row r, column c (both zero-indexed).
+     */
     public float get(int r, int c) {
         return matrix.get(3 * r + c);
     }
 
+    /**
+     * Set the entry of this matrix at row r, column c (both zero-indexed) to the value val.
+     */
     public void set(int r, int c, float val) {
         matrix.set(3 * r + c, val);
     }
 
+    /**
+     * Add two matrices together.
+     * @param otherMatrix The matrix to add to this instance.
+     * @return a HomographyMatrix containing the sum of this matrix and the other matrix.
+     */
     public HomographyMatrix add(HomographyMatrix otherMatrix) {
         List<Float> sum = new ArrayList<>();
         for (int r = 0; r < 3; r++) {
@@ -85,6 +116,10 @@ class HomographyMatrix {
         return new HomographyMatrix(sum);
     }
 
+    /**
+     * Multiply this matrix by a scalar s.
+     * @return a HomographyMatrix object containing the scaled matrix.
+     */
     public HomographyMatrix multiplyScalar(float s) {
         List<Float> scaled = new ArrayList<>();
         for (int r = 0; r < 3; r++) {
@@ -94,13 +129,21 @@ class HomographyMatrix {
             }
         }
         return new HomographyMatrix(scaled);
-
     }
 
+    /**
+     * Convert this homography transform from the pixel coordinate system basis to the OpenGL
+     * frame coordinate system basis ([-1, 1] x [-1, 1]).
+     * @param imageWidth The width of the pixel coordinate system (i.e. width of the image).
+     * @param imageHeight The height of the pixel coordinate system (i.e. height of the image).
+     * @return a HommographyMatrix representing the homoggraphy transform in the OpenGL frame
+     * coordinate system.
+     */
     public HomographyMatrix convertFromImageToGL(int imageWidth, int imageHeight) {
         float halfW = imageWidth * 1.0f / 2.0f;
         float halfH = imageHeight * 1.0f / 2.0f;
 
+        // Change of basis matrices
         float[] t1 = {
                 halfW,  0.0f, halfW,
                 0.0f, -halfH, halfH,
@@ -122,9 +165,14 @@ class HomographyMatrix {
         HomographyMatrix h1 = new HomographyMatrix(l1);
         HomographyMatrix h2 = new HomographyMatrix(l2);
 
+        // P^-1 * M * P
         return this.rightMultiplyBy(h1).leftMultiplyBy(h2);
     }
 
+    /**
+     * Check if this matrix equals another matrix, element-wise.
+     * @return true if the two matrices are equal (up to a small error), otherwise return false.
+     */
     public boolean equals(HomographyMatrix otherMatrix) {
         for (int r = 0; r < 3; r++) {
             for (int c = 0; c < 3; c++) {
@@ -136,6 +184,9 @@ class HomographyMatrix {
         return true;
     }
 
+    /**
+     * Returns a string containing the elements in this homography listed in row-major order.
+     */
     public String toString() {
         return Arrays.toString(matrix.toArray());
     }
