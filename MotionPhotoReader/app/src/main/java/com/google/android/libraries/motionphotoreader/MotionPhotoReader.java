@@ -24,16 +24,21 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static android.os.Build.VERSION_CODES.M;
+import static com.google.android.libraries.motionphotoreader.Constants.BOTTOM_LEFT;
+import static com.google.android.libraries.motionphotoreader.Constants.BOTTOM_RIGHT;
 import static com.google.android.libraries.motionphotoreader.Constants.FALLBACK_FRAME_DELTA_NS;
 import static com.google.android.libraries.motionphotoreader.Constants.MICROVIDEO_META_MIMETYPE;
 import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_IMAGE_META_MIMETYPE;
 import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V1;
 import static com.google.android.libraries.motionphotoreader.Constants.NUM_OF_STRIPS;
+import static com.google.android.libraries.motionphotoreader.Constants.TOP_LEFT;
+import static com.google.android.libraries.motionphotoreader.Constants.TOP_RIGHT;
 import static com.google.android.libraries.motionphotoreader.Constants.US_TO_NS;
 import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V2;
 import static com.google.android.libraries.motionphotoreader.Constants.VIDEO_MIME_PREFIX;
@@ -86,6 +91,7 @@ public class MotionPhotoReader {
     private OutputSurface outputSurface;
     private final int surfaceWidth;
     private final int surfaceHeight;
+    private float scaleFactor = 1.0f;
 
     /** Flag used for debugging. */
     private final boolean testMode;
@@ -281,7 +287,6 @@ public class MotionPhotoReader {
                                 index += variableLength;
                             }
                         }
-
                     } else {
                         // The do_not_stabilize bit is unavailable
                         stabilizationOn = false;
@@ -294,32 +299,82 @@ public class MotionPhotoReader {
             }
         }
 
-        // Find the appropriate tracks (motion and video) and configure them
-        Log.d(TAG, "Stabilization on: " + stabilizationOn);
-        boolean videoTrackSelected = false;
-        boolean motionTrackSelected = false;
+        // Set the motion track, and find an auto-crop if stabilization is on
         for (int i = 0; i < extractor.getTrackCount(); i++) {
             MediaFormat format = extractor.getTrackFormat(i);
             String mime = format.getString(MediaFormat.KEY_MIME);
-            assert mime != null;
+            if (mime.startsWith(MICROVIDEO_META_MIMETYPE)) {
+                if (stabilizationOn) {
+                    extractor.selectTrack(i);
+                    motionTrackIndex = i;
+
+                    // Find an auto-crop scale
+                    float[] bottomLeft = Arrays.copyOf(BOTTOM_LEFT, BOTTOM_LEFT.length);
+                    float[] bottomRight = Arrays.copyOf(BOTTOM_RIGHT, BOTTOM_RIGHT.length);
+                    float[] topRight = Arrays.copyOf(TOP_RIGHT, TOP_RIGHT.length);
+                    float[] topLeft = Arrays.copyOf(TOP_LEFT, TOP_LEFT.length);
+
+                    int videoWidth = motionPhotoInfo.getWidth();
+                    int videoHeight = motionPhotoInfo.getHeight();
+                    while (extractor.getSampleSize() >= 0) {
+                        ByteBuffer inputBuffer = ByteBuffer.allocateDirect((int) extractor.getSampleSize());
+                        List<HomographyMatrix> newHomographyList =
+                                MotionPhotoReaderUtils.getHomographies(extractor, inputBuffer);
+
+                        // Update corner positions
+                        bottomLeft = newHomographyList
+                                .get(NUM_OF_STRIPS - 1)
+                                .convertFromImageToGL(videoWidth, videoHeight)
+                                .rightMultiplyBy(bottomLeft);
+                        bottomRight = newHomographyList
+                                .get(NUM_OF_STRIPS - 1)
+                                .convertFromImageToGL(videoWidth, videoHeight)
+                                .rightMultiplyBy(bottomRight);
+                        topRight = newHomographyList
+                                .get(0)
+                                .convertFromImageToGL(videoWidth, videoHeight)
+                                .rightMultiplyBy(topRight);
+                        topLeft = newHomographyList
+                                .get(0)
+                                .convertFromImageToGL(videoWidth, videoHeight)
+                                .rightMultiplyBy(topLeft);
+
+                        extractor.advance();
+                    }
+                    Log.d(TAG, "\nBottom left : " + Arrays.toString(bottomLeft)
+                            + "\nBottom right: " + Arrays.toString(bottomRight)
+                            + "\nTop right   : " + Arrays.toString(topRight)
+                            + "\nTop left    : " + Arrays.toString(topLeft));
+
+                    // Calculate furthest distance that a corner moves
+                    float bottomLeftDist = HomographyMatrix.distanceBetween(bottomLeft, BOTTOM_LEFT);
+                    float bottomRightDist = HomographyMatrix.distanceBetween(bottomRight, BOTTOM_RIGHT);
+                    float topRightDist = HomographyMatrix.distanceBetween(topRight, TOP_RIGHT);
+                    float topLeftDist = HomographyMatrix.distanceBetween(topLeft, TOP_LEFT);
+                    float maxDist = Math.max(Math.max(bottomLeftDist, bottomRightDist), Math.max(topRightDist, topLeftDist));
+                    scaleFactor = 1.0f + 1.5f * maxDist;
+                }
+
+                // Reset the extractor to the beginning
+                extractor.seekTo(0L, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+                break;
+            }
+        }
+
+        // Find the appropriate tracks (motion and video) and configure them
+        Log.d(TAG, "Stabilization on: " + stabilizationOn);
+        for (int i = 0; i < extractor.getTrackCount(); i++) {
+            MediaFormat format = extractor.getTrackFormat(i);
+            String mime = format.getString(MediaFormat.KEY_MIME);
             // Set the video track (which should be the first video track) and create an
             // appropriate media decoder
-            if (mime.startsWith(VIDEO_MIME_PREFIX) && !videoTrackSelected) {
+            if (mime.startsWith(VIDEO_MIME_PREFIX)) {
                 extractor.selectTrack(i);
                 Log.d(TAG, "Selected video track: " + i);
                 videoTrackIndex = i;
                 videoFormat = format;
                 decoder = MediaCodec.createDecoderByType(mime);
-                videoTrackSelected = true;
-            }
-            // Set the motion track (if appropriate)
-            if (mime.startsWith(MICROVIDEO_META_MIMETYPE) && !motionTrackSelected) {
-                if (stabilizationOn) {
-                    extractor.selectTrack(i);
-                    Log.d(TAG, "Selected motion track: " + i);
-                    motionTrackIndex = i;
-                    motionTrackSelected = true;
-                }
+                break;
             }
         }
 
@@ -362,7 +417,7 @@ public class MotionPhotoReader {
         // steps altogether
         if (surface != null) {
             outputSurface = new OutputSurface(renderHandler, motionPhotoInfo);
-            outputSurface.setSurface(surface, surfaceWidth, surfaceHeight);
+            outputSurface.setSurface(surface, surfaceWidth, surfaceHeight, scaleFactor);
             decoder.configure(videoFormat, outputSurface.getDecodeSurface(), null, 0);
         } else {
             decoder.configure(videoFormat, null, null, 0);
@@ -422,7 +477,7 @@ public class MotionPhotoReader {
         while (!(videoTrackVisited && motionTrackVisited)) {
             int trackIndex = extractor.getSampleTrackIndex();
             ByteBuffer inputBuffer;
-            if (trackIndex == videoTrackIndex && !videoTrackVisited) {
+            if (trackIndex == videoTrackIndex) {
                 // Get the next available input buffer and read frame data
                 bufferIndex = MotionPhotoReaderUtils.getInputBuffer(inputBufferQueue);
                 if (bufferIndex == null) {
@@ -451,7 +506,7 @@ public class MotionPhotoReader {
                 timestampUs = bufferData.getLong("TIMESTAMP_US");
                 bufferIndex = bufferData.getInt("BUFFER_INDEX");
                 videoTrackVisited = true;
-            } else if (trackIndex == motionTrackIndex && !motionTrackVisited) {
+            } else if (trackIndex == motionTrackIndex) {
                 if (!testMode) {
                     // Get stabilization data from the high resolution extractor (the list of
                     // homographies will be empty if the frame has already been stabilized)
@@ -567,7 +622,7 @@ public class MotionPhotoReader {
                 bufferIndex = bufferData.getInt("BUFFER_INDEX");
                 videoTrackVisited = true;
             } else if (trackIndex == motionTrackIndex) {
-                // Set the stabilization matrices to the identity for each strip
+                // Set the stabilization matrices to the appropriate scaling matrix for each strip
                 homographyList = new ArrayList<>();
                 for (int i = 0; i < NUM_OF_STRIPS; i++) {
                     homographyList.add(new HomographyMatrix());

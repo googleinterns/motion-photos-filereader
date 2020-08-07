@@ -54,6 +54,34 @@ class HomographyMatrix {
         return new HomographyMatrix(product);
     }
 
+    public float[] leftMultiplyBy(float[] vector) {
+        float[] product = new float[3];
+        for (int i = 0; i < 3; i++) {
+            float vectorElement = vector[0] * this.get(0, i) +
+                    vector[1] * this.get(1, i) +
+                    vector[2] * this.get(2, i);
+            product[i] = vectorElement;
+        }
+        return product;
+    }
+
+    public float[] rightMultiplyBy(float[] vector) {
+        float[] product = new float[3];
+        for (int i = 0; i < 3; i++) {
+            float vectorElement = this.get(i, 0) * vector[0] +
+                    this.get(i, 1) * vector[1] +
+                    this.get(i, 2) * vector[2];
+            product[i] = vectorElement;
+        }
+        return product;
+    }
+
+    public static float distanceBetween(float[] a, float[] b) {
+        return (float) Math.sqrt(Math.pow(a[0] - b[0], 2) +
+                Math.pow(a[1] - b[1], 2) +
+                Math.pow(a[2] - b[2], 2));
+    }
+
     public float get(int r, int c) {
         return matrix.get(3 * r + c);
     }

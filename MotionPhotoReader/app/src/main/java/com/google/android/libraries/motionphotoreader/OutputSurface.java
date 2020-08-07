@@ -68,13 +68,14 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
      * @param surfaceWidth The width of the surface on which the video is displayed, in pixels.
      * @param surfaceHeight The height of the surface on which the video is displayed, in pixels.
      */
-    private void setupTextureRender(int surfaceWidth, int surfaceHeight) {
+    private void setupTextureRender(int surfaceWidth, int surfaceHeight, float scaleFactor) {
         Log.d(TAG, "Setup output surface");
         renderHandler.post(() -> {
             textureRender = new TextureRender();
             textureRender.setVideoWidth(motionPhotoInfo.getWidth());
             textureRender.setVideoHeight(motionPhotoInfo.getHeight());
             textureRender.setVideoRotation(motionPhotoInfo.getRotation());
+            textureRender.setScaleFactor(scaleFactor);
             textureRender.onSurfaceCreated(surfaceWidth, surfaceHeight);
 
             // Get the texture for motion photo outputs
@@ -158,9 +159,9 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
      * @param surfaceWidth The width of the Surface object, in pixels.
      * @param surfaceHeight The height of the Surface object, in pixels.
      */
-    public void setSurface(Surface surface, int surfaceWidth, int surfaceHeight) {
+    public void setSurface(Surface surface, int surfaceWidth, int surfaceHeight, float scaleFactor) {
         // Set up the texture render
-        setupTextureRender(surfaceWidth, surfaceHeight);
+        setupTextureRender(surfaceWidth, surfaceHeight, scaleFactor);
 
         renderHandler.post(() -> {
             // Abort if context is null

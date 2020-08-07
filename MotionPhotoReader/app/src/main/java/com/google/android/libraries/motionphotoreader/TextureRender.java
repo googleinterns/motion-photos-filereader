@@ -102,6 +102,7 @@ class TextureRender {
     private int videoRotation = 0;
     int surfaceWidth = 0;
     int surfaceHeight = 0;
+    float scaleFactor;
 
     private FloatBuffer triangleVertices;
 
@@ -134,6 +135,10 @@ class TextureRender {
      */
     public void setVideoRotation(int videoRotation) {
         this.videoRotation = videoRotation;
+    }
+
+    public void setScaleFactor(float scaleFactor) {
+        this.scaleFactor = scaleFactor;
     }
 
     /**
@@ -225,6 +230,8 @@ class TextureRender {
         if (glGetError() != 0) {
             throw new RuntimeException("Failed to set up viewport");
         }
+
+        Matrix.scaleM(uMatrix, 0, scaleFactor, scaleFactor, 1.0f);
 
         // Set up rotation matrix if the camera orientation is greater than 0 degrees
         if (videoRotation > 0) {

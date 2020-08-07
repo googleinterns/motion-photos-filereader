@@ -1,5 +1,8 @@
 package com.google.android.libraries.motionphotoreader;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * All internal constant values used within the MotionPhotoReader API.
  */
@@ -12,7 +15,7 @@ class Constants {
     static final long TIMEOUT_US = 1000L;
     static final long US_TO_NS = 1000L;
     static final long FALLBACK_FRAME_DELTA_NS = 1_000_000_000L / 30;
-    static final int NUM_OF_STRIPS = 12;
+    static final int NUM_OF_STRIPS = 2;
 
     /* *********************************************************************************************
      * HomographyMatrix.java
@@ -54,6 +57,14 @@ class Constants {
      * Prefix for MIME type that represents video.
      */
     static final String VIDEO_MIME_PREFIX = "video/";
+
+    /**
+     * Coordinates for corners of frame in OpenGL position coordinate system.
+     */
+    static final float[] BOTTOM_LEFT  = {-1.0f, -1.0f, 1.0f};
+    static final float[] BOTTOM_RIGHT = { 1.0f, -1.0f, 1.0f};
+    static final float[] TOP_RIGHT    = { 1.0f,  1.0f, 1.0f};
+    static final float[] TOP_LEFT     = {-1.0f,  1.0f, 1.0f};
 
     /* *********************************************************************************************
      * TextureRender.java
