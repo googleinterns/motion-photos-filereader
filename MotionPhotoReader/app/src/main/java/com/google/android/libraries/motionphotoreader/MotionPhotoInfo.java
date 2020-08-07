@@ -21,9 +21,6 @@ import java.io.IOException;
 import static com.google.android.libraries.motionphotoreader.Constants.CAMERA_XMP_NAMESPACE;
 import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V1;
 import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V2;
-import static com.google.android.libraries.motionphotoreader.Constants.V2_XMP_PROP_LENGTH_SUFFIX;
-import static com.google.android.libraries.motionphotoreader.Constants.V2_XMP_PROP_PADDING_SUFFIX;
-import static com.google.android.libraries.motionphotoreader.Constants.V2_XMP_PROP_PREFIX;
 
 /**
  * Contains information relevant to extracting frames in a Motion Photo file.
@@ -39,6 +36,11 @@ import static com.google.android.libraries.motionphotoreader.Constants.V2_XMP_PR
 public class MotionPhotoInfo {
 
     private final static String TAG = "MotionPhotoInfo";
+
+    private static final String V2_XMP_PROP_PREFIX = "Container:Directory[";
+    private static final String V2_XMP_PROP_LENGTH_SUFFIX = "]/Container:Item/Item:Length";
+    private static final String V2_XMP_PROP_PADDING_SUFFIX = "]/Container:Item/Item:Length";
+
 
     private final int width;
     private final int height;
@@ -207,6 +209,5 @@ public class MotionPhotoInfo {
         return rotation;
     }
 
-    // TODO: Add unit test
     public int getVersion() { return version; }
 }

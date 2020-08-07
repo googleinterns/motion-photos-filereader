@@ -25,8 +25,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTOS_DIR;
-import static com.google.android.libraries.motionphotoreader.Constants.NUM_FRAMES;
-import static com.google.android.libraries.motionphotoreader.Constants.SEEK_AMOUNT_US;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -37,6 +35,9 @@ import static org.junit.Assert.assertTrue;
  */
 @RunWith(AndroidJUnit4.class)
 public class MotionPhotoReaderTest {
+
+    private static final int NUM_FRAMES = 43;
+    private static final long SEEK_AMOUNT_US = 10_000L;
 
     private Context context;
     private String[] testMotionPhotosList;

@@ -3,10 +3,10 @@ package com.google.android.libraries.motionphotoreader;
 import org.junit.Before;
 import org.junit.Test;
 
-import static com.google.android.libraries.motionphotoreader.Constants.THETA_DEGREES_A;
-import static com.google.android.libraries.motionphotoreader.Constants.THETA_DEGREES_B;
-import static com.google.android.libraries.motionphotoreader.Constants.VIDEO_HEIGHT_PIXELS;
-import static com.google.android.libraries.motionphotoreader.Constants.VIDEO_WIDTH_PIXELS;
+import static com.google.android.libraries.motionphotoreader.TestConstants.THETA_DEGREES_A;
+import static com.google.android.libraries.motionphotoreader.TestConstants.THETA_DEGREES_B;
+import static com.google.android.libraries.motionphotoreader.TestConstants.VIDEO_HEIGHT_PIXELS;
+import static com.google.android.libraries.motionphotoreader.TestConstants.VIDEO_WIDTH_PIXELS;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 

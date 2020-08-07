@@ -15,6 +15,14 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V1;
+import static com.google.android.libraries.motionphotoreader.TestConstants.KEY_HEIGHT;
+import static com.google.android.libraries.motionphotoreader.TestConstants.KEY_MIME;
+import static com.google.android.libraries.motionphotoreader.TestConstants.KEY_ROTATION;
+import static com.google.android.libraries.motionphotoreader.TestConstants.KEY_WIDTH;
+import static com.google.android.libraries.motionphotoreader.TestConstants.MOTION_TRACK_INDEX;
+import static com.google.android.libraries.motionphotoreader.TestConstants.VIDEO_OFFSET;
+import static com.google.android.libraries.motionphotoreader.TestConstants.VIDEO_TRACK_INDEX;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -33,17 +41,6 @@ import static org.mockito.Mockito.when;
  * Local unit test for the BufferHandler class.
  */
 public class BufferProcessorTest {
-
-    // define a mock media format for motion photo v1 format
-    private final static int V1 = 1;
-    private final static int KEY_WIDTH = 4032;
-    private final static int KEY_HEIGHT = 3024;
-    private final static long KEY_DURATION = 1499400;
-    private final static int KEY_ROTATION = 90;
-    private final static String KEY_MIME = "video/avc";
-    private final static int VIDEO_OFFSET = 2592317;
-    private final static int VIDEO_TRACK_INDEX = 0;
-    private final static int MOTION_TRACK_INDEX = 2;
 
     private OutputSurface outputSurface;
     private MediaExtractor extractor;
@@ -87,7 +84,7 @@ public class BufferProcessorTest {
         availableInputBuffers = new LinkedBlockingQueue<>();
         availableOutputBuffers = new LinkedBlockingQueue<>();
 
-        motionPhotoInfo = new MotionPhotoInfo(videoFormat, VIDEO_OFFSET, V1);
+        motionPhotoInfo = new MotionPhotoInfo(videoFormat, VIDEO_OFFSET, MOTION_PHOTO_V1);
         outputSurface = new OutputSurface(mock(Handler.class), motionPhotoInfo);
 
         availableInputBuffers.offer(1);
