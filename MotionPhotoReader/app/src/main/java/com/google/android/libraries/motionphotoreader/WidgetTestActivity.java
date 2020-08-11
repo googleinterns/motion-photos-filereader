@@ -14,12 +14,15 @@ import com.adobe.internal.xmp.XMPException;
 import java.io.IOException;
 import java.util.Arrays;
 
-import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTOS_DIR;
-
 @RequiresApi(api = 29)
 public class WidgetTestActivity extends Activity {
 
     private static final String TAG = "MainActivity";
+
+    /**
+     * Asset directory containing all motion photo files.
+     */
+    static final String MOTION_PHOTOS_DIR = "motionphotos/";
 
     private String[] testMotionPhotosList;
     private int currPhotoIndex = 0;

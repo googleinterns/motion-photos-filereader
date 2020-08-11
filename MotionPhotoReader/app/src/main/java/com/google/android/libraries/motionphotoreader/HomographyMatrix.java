@@ -21,10 +21,7 @@ class HomographyMatrix {
      * The default constructor sets the matrix to an identity matrix.
      */
     public HomographyMatrix() {
-        this.matrix = new ArrayList<>();
-        for (float f : IDENTITY) {
-            matrix.add(f);
-        }
+        this.matrix = Arrays.asList(IDENTITY);
     }
 
     /**

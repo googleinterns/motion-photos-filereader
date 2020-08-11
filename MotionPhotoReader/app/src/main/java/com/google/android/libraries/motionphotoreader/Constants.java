@@ -31,7 +31,7 @@ class Constants {
     /**
      * Float array for the identity matrix.
      */
-    static final float[] IDENTITY = {
+    static final Float[] IDENTITY = {
             1.0f, 0.0f, 0.0f,
             0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 1.0f
@@ -72,9 +72,4 @@ class Constants {
      */
     static final byte[] OPEN_ARR = "<x:xmpmeta".getBytes();
     static final byte[] CLOSE_ARR = "</x:xmpmeta>".getBytes();
-
-    /**
-     * Asset directory containing all motion photo files.
-     */
-    static final String MOTION_PHOTOS_DIR = "motionphotos/";
 }
