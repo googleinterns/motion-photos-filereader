@@ -36,7 +36,7 @@ public class WidgetTestActivity extends Activity {
         try {
             testMotionPhotosList = assetManager.list("motionphotos");
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.e(TAG, "Error occurred while trying to fetch assets", e);
         }
         Log.d(TAG, "test image array: " + Arrays.toString(testMotionPhotosList));
 

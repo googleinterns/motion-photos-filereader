@@ -87,8 +87,8 @@ class TextureRender {
             "  FragColor = texture(uTexUnit, TexCoord);\n" +
             "}";
 
-    private float[] uMatrix = new float[16];
-    private float[] uStabMatrix = new float[16];
+    private final float[] uMatrix = new float[16];
+    private final float[] uStabMatrix = new float[16];
 
     private int textureID;
     private int program;
@@ -331,7 +331,17 @@ class TextureRender {
             throw new RuntimeException("Failed to get vertex position");
         }
 
-        // Create the homography matrix for this strip
+        // Set the homography matrix for this strip
+        storeAsGLMatrix(homography);
+
+        // Draw the strip
+        glDrawArrays(GL_TRIANGLE_STRIP, /* first = */ 0, /* count = */ 4);
+        if (glGetError() != 0) {
+            throw new RuntimeException("Failed to draw to strip" + stripIndex);
+        }
+    }
+
+    private void storeAsGLMatrix(HomographyMatrix homography) {
         // 1. Store the matrix in row-major order
         // 2. Invert the matrix
         // 3. Store a pointer to the matrix (mark the matrix as transposed, since GL stores matrices
@@ -360,12 +370,6 @@ class TextureRender {
         if (glGetError() != 0) {
             throw new RuntimeException("Failed to get matrix");
         }
-
-        // Draw the strip
-        glDrawArrays(GL_TRIANGLE_STRIP, /* first = */ 0, /* count = */ 4);
-        if (glGetError() != 0) {
-            throw new RuntimeException("Failed to draw to strip" + stripIndex);
-        }
     }
 
     /**
@@ -376,7 +380,10 @@ class TextureRender {
         Log.d(TAG, "Homography list size: " + homographyList.size());
         glClear(/* mask = */ GL_COLOR_BUFFER_BIT);
         for (int i = 0; i < NUM_OF_STRIPS; i++) {
-            drawStrip(/* stripIndex = */ i, homographyList.get(i).convertFromImageToGL(videoWidth, videoHeight));
+            drawStrip(
+                    /* stripIndex = */ i,
+                    homographyList.get(i).convertFromImageToGL(videoWidth, videoHeight)
+            );
         }
     }
 

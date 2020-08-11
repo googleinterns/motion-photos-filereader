@@ -203,38 +203,7 @@ public class MotionPhotoReader {
         extractor.setDataSource(fd, file.length() - videoOffset, videoOffset);
 
         // Find the do_not_stabilize bit in the image metadata track and set stabilizationOn
-        // 1. Check if the bit exists
-        //   a. If the bit exists, set stabilizationOn to true if it was originally true
-        //   b. If the bit does not exist, override stabilizationOn and set it to false
-        // 2. If the bit does not exist, then override stabilizationOn and set it to false
-        int version = motionPhotoInfo.getVersion();
-        if (version == MOTION_PHOTO_V1) {
-            for (int i = 0; i < extractor.getTrackCount(); i++) {
-                MediaFormat format = extractor.getTrackFormat(i);
-                String mime = format.getString(MediaFormat.KEY_MIME);
-                assert mime != null;
-                if (mime.startsWith(MOTION_PHOTO_IMAGE_META_MIMETYPE)) {
-                    Log.d(TAG, "selected image meta track: " + i);
-                    extractor.selectTrack(i);
-                    ByteBuffer inputBuffer = ByteBuffer.allocateDirect((int) extractor.getSampleSize());
-                    int sampleSize = extractor.readSampleData(inputBuffer, 0);
-                    if (sampleSize >= 0) {
-                        // The do_not_stabilize bit is available
-                        ImageMeta.ImageData imageData = ImageMeta.ImageData.parseFrom(inputBuffer);
-                        if (imageData.hasDoNotStabilize()) {
-                            stabilizationOn = stabilizationOn && !imageData.getDoNotStabilize();
-                        } else {
-                            stabilizationOn = false;
-                        }
-                    } else {
-                        // The do_not_stabilize bit is unavailable
-                        stabilizationOn = false;
-                    }
-                    extractor.unselectTrack(i);
-                    break;
-                }
-            }
-        }
+        stabilizationOn = isStabilizationOn(motionPhotoInfo, stabilizationOn);
 
         // Find the appropriate tracks (motion and video) and configure them
         boolean videoTrackSelected = false;
@@ -310,6 +279,48 @@ public class MotionPhotoReader {
 
         // Configure the buffer processor
         bufferProcessor.configure(outputSurface, extractor, decoder, stabilizationOn);
+    }
+
+    /**
+     * Determines whether the motion photo is pre-stabilized, in which case we should not stabilize
+     * the video.
+     * @throws com.google.protobuf.InvalidProtocolBufferException if parsing an invalid proto object
+     */
+    private boolean isStabilizationOn(MotionPhotoInfo motionPhotoInfo, boolean stabilizationOn)
+            throws com.google.protobuf.InvalidProtocolBufferException {
+        // 1. Check if the bit exists
+        //   a. If the bit exists, set stabilizationOn to true if it was originally true
+        //   b. If the bit does not exist, override stabilizationOn and set it to false
+        // 2. If the bit does not exist, then override stabilizationOn and set it to false
+        int version = motionPhotoInfo.getVersion();
+        if (version == MOTION_PHOTO_V1) {
+            for (int i = 0; i < extractor.getTrackCount(); i++) {
+                MediaFormat format = extractor.getTrackFormat(i);
+                String mime = format.getString(MediaFormat.KEY_MIME);
+                assert mime != null;
+                if (mime.startsWith(MOTION_PHOTO_IMAGE_META_MIMETYPE)) {
+                    Log.d(TAG, "selected image meta track: " + i);
+                    extractor.selectTrack(i);
+                    ByteBuffer inputBuffer = ByteBuffer.allocateDirect((int) extractor.getSampleSize());
+                    int sampleSize = extractor.readSampleData(inputBuffer, 0);
+                    if (sampleSize >= 0) {
+                        // The do_not_stabilize bit is available
+                        ImageMeta.ImageData imageData = ImageMeta.ImageData.parseFrom(inputBuffer);
+                        if (imageData.hasDoNotStabilize()) {
+                            stabilizationOn = stabilizationOn && !imageData.getDoNotStabilize();
+                        } else {
+                            stabilizationOn = false;
+                        }
+                    } else {
+                        // The do_not_stabilize bit is unavailable
+                        stabilizationOn = false;
+                    }
+                    extractor.unselectTrack(i);
+                    break;
+                }
+            }
+        }
+        return stabilizationOn;
     }
 
     /**
