@@ -312,6 +312,8 @@ public class MotionPhotoReader {
 
                     // Find the bounding box intersection of all frames
                     BoundingBox boundingBox = new BoundingBox();
+                    float error = 0.0f;
+
                     float[] bottomLeft = Arrays.copyOf(BOTTOM_LEFT, BOTTOM_LEFT.length);
                     float[] bottomRight = Arrays.copyOf(BOTTOM_RIGHT, BOTTOM_RIGHT.length);
                     float[] topRight = Arrays.copyOf(TOP_RIGHT, TOP_RIGHT.length);
@@ -349,15 +351,17 @@ public class MotionPhotoReader {
                                 topLeft
                         );
                         boundingBox = boundingBox.intersect(newBoundingBox);
+                        error = Math.max(error, newBoundingBox.error());
                         extractor.advance();
                     }
-                    Log.d(TAG, "Bounding box dimensions: " + boundingBox.width() + " x " + boundingBox.height());
+                    Log.d(TAG, "Bounding box dimensions: " + boundingBox.width() + " x " + boundingBox.height() + " with error " + error);
                     Log.d(TAG, "Bounding box coordinates: " + boundingBox.toString());
 
                     // Compute the scale factor: if the box is wider than it is tall, then we want
                     // to scale the box according to the height; otherwise, we want to scale the
                     // box according to its width
                     scaleFactor = Math.max(2.0f / boundingBox.width(), 2.0f / boundingBox.height());
+                    scaleFactor += error;
                     xTranslate = (boundingBox.xMin + boundingBox.xMax) / 2.0f;
                     yTranslate = (boundingBox.yMin + boundingBox.yMax) / 2.0f;
                 }
