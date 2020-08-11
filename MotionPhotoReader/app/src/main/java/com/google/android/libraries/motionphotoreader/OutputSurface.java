@@ -68,14 +68,13 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
      * @param surfaceWidth The width of the surface on which the video is displayed, in pixels.
      * @param surfaceHeight The height of the surface on which the video is displayed, in pixels.
      */
-    private void setupTextureRender(int surfaceWidth, int surfaceHeight, float scaleFactor) {
+    private void setupTextureRender(int surfaceWidth, int surfaceHeight) {
         Log.d(TAG, "Setup output surface");
         renderHandler.post(() -> {
             textureRender = new TextureRender();
             textureRender.setVideoWidth(motionPhotoInfo.getWidth());
             textureRender.setVideoHeight(motionPhotoInfo.getHeight());
             textureRender.setVideoRotation(motionPhotoInfo.getRotation());
-            textureRender.setScaleFactor(scaleFactor);
             textureRender.onSurfaceCreated(surfaceWidth, surfaceHeight);
 
             // Get the texture for motion photo outputs
@@ -159,9 +158,9 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
      * @param surfaceWidth The width of the Surface object, in pixels.
      * @param surfaceHeight The height of the Surface object, in pixels.
      */
-    public void setSurface(Surface surface, int surfaceWidth, int surfaceHeight, float scaleFactor) {
+    public void setSurface(Surface surface, int surfaceWidth, int surfaceHeight) {
         // Set up the texture render
-        setupTextureRender(surfaceWidth, surfaceHeight, scaleFactor);
+        setupTextureRender(surfaceWidth, surfaceHeight);
 
         renderHandler.post(() -> {
             // Abort if context is null
@@ -264,6 +263,12 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
                 frameAvailable = false;
             }
             surfaceTexture.updateTexImage();
+        });
+    }
+
+    public void setCropTransform(float scaleFactor, float xTranslate, float yTranslate) {
+        renderHandler.post(() -> {
+            textureRender.setUMatrix(scaleFactor, xTranslate, yTranslate);
         });
     }
 

@@ -102,7 +102,6 @@ class TextureRender {
     private int videoRotation = 0;
     int surfaceWidth = 0;
     int surfaceHeight = 0;
-    float scaleFactor;
 
     private FloatBuffer triangleVertices;
 
@@ -135,10 +134,6 @@ class TextureRender {
      */
     public void setVideoRotation(int videoRotation) {
         this.videoRotation = videoRotation;
-    }
-
-    public void setScaleFactor(float scaleFactor) {
-        this.scaleFactor = scaleFactor;
     }
 
     /**
@@ -179,19 +174,6 @@ class TextureRender {
             throw new RuntimeException("Failed to set up textures");
         }
 
-        // TODO: Switch to VBOs and VAOs
-        uMatrixHandle = glGetUniformLocation(program, "uMatrix");
-        glUniformMatrix4fv(
-                uMatrixHandle,
-                /* count = */ 1,
-                /* transpose = */ false,
-                uMatrix,
-                /* offset = */ 0
-        );
-        if (glGetError() != 0) {
-            throw new RuntimeException("Failed to get matrix");
-        }
-
         uTextureUnitHandle = glGetUniformLocation(program, "uTexUnit");
         glUniform1i(uTextureUnitHandle, /* x = */0);
 
@@ -229,21 +211,6 @@ class TextureRender {
         glViewport(translateOffsetX, translateOffsetY, viewportWidth, viewportHeight);
         if (glGetError() != 0) {
             throw new RuntimeException("Failed to set up viewport");
-        }
-
-        Matrix.scaleM(uMatrix, 0, scaleFactor, scaleFactor, 1.0f);
-
-        // Set up rotation matrix if the camera orientation is greater than 0 degrees
-        if (videoRotation > 0) {
-            Log.d(TAG, "rotation: " + videoRotation);
-            Matrix.rotateM(
-                    uMatrix,
-                    /* rmOffset = */ 0,
-                    /* a = */ -videoRotation,  // Original video rotation is stored clockwise
-                    /* x = */ 0,
-                    /* y = */ 0,
-                    /* z = */ 1
-            );
         }
     }
 
@@ -301,6 +268,38 @@ class TextureRender {
         }
 
         return shader;
+    }
+
+    public void setUMatrix(float scaleFactor, float xTranslate, float yTranslate) {
+        // Scale and translate matrix for auto-crop
+        Matrix.translateM(uMatrix, 0, xTranslate, yTranslate, 0.0f);
+        Matrix.scaleM(uMatrix, 0, scaleFactor, scaleFactor, 1.0f);
+
+        // Set up rotation matrix if the camera orientation is greater than 0 degrees
+        if (videoRotation > 0) {
+            Log.d(TAG, "rotation: " + videoRotation);
+            Matrix.rotateM(
+                    uMatrix,
+                    /* rmOffset = */ 0,
+                    /* a = */ -videoRotation,  // Original video rotation is stored clockwise
+                    /* x = */ 0,
+                    /* y = */ 0,
+                    /* z = */ 1
+            );
+        }
+
+        // TODO: Switch to VBOs and VAOs
+        uMatrixHandle = glGetUniformLocation(program, "uMatrix");
+        glUniformMatrix4fv(
+                uMatrixHandle,
+                /* count = */ 1,
+                /* transpose = */ false,
+                uMatrix,
+                /* offset = */ 0
+        );
+        if (glGetError() != 0) {
+            throw new RuntimeException("Failed to get matrix");
+        }
     }
 
     /**
@@ -380,7 +379,7 @@ class TextureRender {
      */
     public void drawFrame(List<HomographyMatrix> homographyList) {
         Log.d(TAG, "Drawing frame");
-        Log.d(TAG, "Homography list size: " + homographyList.size());
+
         glClear(/* mask = */ GL_COLOR_BUFFER_BIT);
         for (int i = 0; i < NUM_OF_STRIPS; i++) {
             drawStrip(/* stripIndex = */ i, homographyList.get(i).convertFromImageToGL(videoWidth, videoHeight));

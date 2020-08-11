@@ -92,6 +92,8 @@ public class MotionPhotoReader {
     private final int surfaceWidth;
     private final int surfaceHeight;
     private float scaleFactor = 1.0f;
+    private float xTranslate = 0.0f;
+    private float yTranslate = 0.0f;
 
     /** Flag used for debugging. */
     private final boolean testMode;
@@ -308,7 +310,8 @@ public class MotionPhotoReader {
                     extractor.selectTrack(i);
                     motionTrackIndex = i;
 
-                    // Find an auto-crop scale
+                    // Find the bounding box intersection of all frames
+                    BoundingBox boundingBox = new BoundingBox();
                     float[] bottomLeft = Arrays.copyOf(BOTTOM_LEFT, BOTTOM_LEFT.length);
                     float[] bottomRight = Arrays.copyOf(BOTTOM_RIGHT, BOTTOM_RIGHT.length);
                     float[] topRight = Arrays.copyOf(TOP_RIGHT, TOP_RIGHT.length);
@@ -339,20 +342,24 @@ public class MotionPhotoReader {
                                 .convertFromImageToGL(videoWidth, videoHeight)
                                 .rightMultiplyBy(topLeft);
 
+                        BoundingBox newBoundingBox = new BoundingBox(
+                                bottomLeft,
+                                bottomRight,
+                                topRight,
+                                topLeft
+                        );
+                        boundingBox = boundingBox.intersect(newBoundingBox);
                         extractor.advance();
                     }
-                    Log.d(TAG, "\nBottom left : " + Arrays.toString(bottomLeft)
-                            + "\nBottom right: " + Arrays.toString(bottomRight)
-                            + "\nTop right   : " + Arrays.toString(topRight)
-                            + "\nTop left    : " + Arrays.toString(topLeft));
+                    Log.d(TAG, "Bounding box dimensions: " + boundingBox.width() + " x " + boundingBox.height());
+                    Log.d(TAG, "Bounding box coordinates: " + boundingBox.toString());
 
-                    // Calculate furthest distance that a corner moves
-                    float bottomLeftDist = HomographyMatrix.distanceBetween(bottomLeft, BOTTOM_LEFT);
-                    float bottomRightDist = HomographyMatrix.distanceBetween(bottomRight, BOTTOM_RIGHT);
-                    float topRightDist = HomographyMatrix.distanceBetween(topRight, TOP_RIGHT);
-                    float topLeftDist = HomographyMatrix.distanceBetween(topLeft, TOP_LEFT);
-                    float maxDist = Math.max(Math.max(bottomLeftDist, bottomRightDist), Math.max(topRightDist, topLeftDist));
-                    scaleFactor = 1.0f + 1.5f * maxDist;
+                    // Compute the scale factor: if the box is wider than it is tall, then we want
+                    // to scale the box according to the height; otherwise, we want to scale the
+                    // box according to its width
+                    scaleFactor = Math.max(2.0f / boundingBox.width(), 2.0f / boundingBox.height());
+                    xTranslate = (boundingBox.xMin + boundingBox.xMax) / 2.0f;
+                    yTranslate = (boundingBox.yMin + boundingBox.yMax) / 2.0f;
                 }
 
                 // Reset the extractor to the beginning
@@ -417,7 +424,8 @@ public class MotionPhotoReader {
         // steps altogether
         if (surface != null) {
             outputSurface = new OutputSurface(renderHandler, motionPhotoInfo);
-            outputSurface.setSurface(surface, surfaceWidth, surfaceHeight, scaleFactor);
+            outputSurface.setSurface(surface, surfaceWidth, surfaceHeight);
+            outputSurface.setCropTransform(scaleFactor, xTranslate, yTranslate);
             decoder.configure(videoFormat, outputSurface.getDecodeSurface(), null, 0);
         } else {
             decoder.configure(videoFormat, null, null, 0);
