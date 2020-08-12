@@ -98,7 +98,7 @@ public class MotionPhotoReader {
      * @param surface The surface for the motion photo reader to decode.
      * @param surfaceWidth The width of the surface, in pixels.
      * @param surfaceHeight The height of the surface, in pixels.
-     * @param stabilizationOn If true, the video will be stabilized
+     * @param enableStabilization If true, the video will be stabilized
      * @return a MotionPhotoReader object for the specified file.
      * @throws IOException when the file cannot be found.
      * @throws XMPException when parsing invalid XML syntax.
@@ -107,12 +107,14 @@ public class MotionPhotoReader {
                                          Surface surface,
                                          int surfaceWidth,
                                          int surfaceHeight,
-                                         boolean stabilizationOn
+                                         boolean enableStabilization
     ) throws IOException, XMPException {
         return open(
                 file,
-                surface, surfaceWidth, surfaceHeight,
-                /* stabilizationOn = */ stabilizationOn,
+                surface,
+                surfaceWidth,
+                surfaceHeight,
+                /* enableStabilization = */ enableStabilization,
                 /* availableInputBuffers = */ new LinkedBlockingQueue<>(),
                 /* availableOutputBuffers = */ new LinkedBlockingQueue<>()
         );
@@ -122,8 +124,10 @@ public class MotionPhotoReader {
             throws IOException, XMPException {
         return open(
                 file,
-                surface, /* surfaceWidth = */ 0, /* surfaceHeight = */ 0,
-                /* stabilizationOn = */ true,
+                surface,
+                /* surfaceWidth = */ 0,
+                /* surfaceHeight = */ 0,
+                /* enableStabilization = */ true,
                 /* availableInputBuffers = */ new LinkedBlockingQueue<>(),
                 /* availableOutputBuffers = */ new LinkedBlockingQueue<>()
         );
@@ -142,7 +146,7 @@ public class MotionPhotoReader {
                                   Surface surface,
                                   int surfaceWidth,
                                   int surfaceHeight,
-                                  boolean stabilizationOn,
+                                  boolean enableStabilization,
                                   BlockingQueue<Integer> availableInputBuffers,
                                   BlockingQueue<Bundle> availableOutputBuffers)
             throws IOException, XMPException {
@@ -156,14 +160,14 @@ public class MotionPhotoReader {
                 availableOutputBuffers,
                 motionPhotoInfo
         );
-        reader.startRenderThread(motionPhotoInfo, stabilizationOn);
+        reader.startRenderThread(motionPhotoInfo, enableStabilization);
         return reader;
     }
 
     @VisibleForTesting
     static MotionPhotoReader open(File file,
                                   Surface surface,
-                                  boolean stabilizationOn,
+                                  boolean enableStabilization,
                                   BlockingQueue<Integer> availableInputBuffers,
                                   BlockingQueue<Bundle> availableOutputBuffers)
             throws IOException, XMPException {
@@ -177,7 +181,7 @@ public class MotionPhotoReader {
                 availableOutputBuffers,
                 motionPhotoInfo
         );
-        reader.startRenderThread(motionPhotoInfo, stabilizationOn);
+        reader.startRenderThread(motionPhotoInfo, enableStabilization);
         return reader;
     }
 
@@ -187,9 +191,11 @@ public class MotionPhotoReader {
      *
      * An extractor is set up for both the video and motion track (if applicable). The extractor
      * reads samples for both tracks and passes the information to a buffer processor. A decoder is
-     * set up for the video track to read frame data.
+     * set up for the video track to read frame data. If enableStabilization is set to true by the
+     * client, then we assume that we want to stabilize the video (if possible).
      */
-    private void startRenderThread(MotionPhotoInfo motionPhotoInfo, boolean stabilizationOn) throws IOException {
+    private void startRenderThread(MotionPhotoInfo motionPhotoInfo, boolean enableStabilization)
+            throws IOException {
         // Set up the render handler and thread
         renderWorker = new HandlerThread("renderHandler");
         renderWorker.start();
@@ -202,8 +208,10 @@ public class MotionPhotoReader {
         int videoOffset = motionPhotoInfo.getVideoOffset();
         extractor.setDataSource(fd, file.length() - videoOffset, videoOffset);
 
-        // Find the do_not_stabilize bit in the image metadata track and set stabilizationOn
-        stabilizationOn = isStabilizationOn(motionPhotoInfo, stabilizationOn);
+        // Find the do_not_stabilize bit in the image metadata track and override 
+        // enableStabilization, if needed
+        boolean isStabilized = isAlreadyStabilized(motionPhotoInfo);
+        enableStabilization = enableStabilization && !isStabilized;
 
         // Find the appropriate tracks (motion and video) and configure them
         boolean videoTrackSelected = false;
@@ -223,8 +231,8 @@ public class MotionPhotoReader {
             }
             // Set the motion track (if appropriate)
             if (mime.startsWith(MICROVIDEO_META_MIMETYPE)) {
-                Log.d(TAG, "stabilizationOn: " + stabilizationOn);
-                if (stabilizationOn) {
+                Log.d(TAG, "enableStabilization: " + enableStabilization);
+                if (enableStabilization) {
                     Log.d(TAG, "selected motion track: " + i);
                     extractor.selectTrack(i);
                     bufferProcessor.setMotionTrackIndex(i);
@@ -278,7 +286,7 @@ public class MotionPhotoReader {
         decoder.start();
 
         // Configure the buffer processor
-        bufferProcessor.configure(outputSurface, extractor, decoder, stabilizationOn);
+        bufferProcessor.configure(outputSurface, extractor, decoder, enableStabilization);
     }
 
     /**
@@ -286,13 +294,13 @@ public class MotionPhotoReader {
      * the video.
      * @throws com.google.protobuf.InvalidProtocolBufferException if parsing an invalid proto object
      */
-    private boolean isStabilizationOn(MotionPhotoInfo motionPhotoInfo, boolean stabilizationOn)
+    private boolean isAlreadyStabilized(MotionPhotoInfo motionPhotoInfo)
             throws com.google.protobuf.InvalidProtocolBufferException {
-        // 1. Check if the bit exists
-        //   a. If the bit exists, set stabilizationOn to true if it was originally true
-        //   b. If the bit does not exist, override stabilizationOn and set it to false
-        // 2. If the bit does not exist, then override stabilizationOn and set it to false
+        // Check if the bit exists
+        //   a. If the bit exists, set isStabilized to the value of the bit
+        //   b. If the bit does not exist, set isStabilized to true
         int version = motionPhotoInfo.getVersion();
+        boolean isStabilized = false;
         if (version == MOTION_PHOTO_V1) {
             for (int i = 0; i < extractor.getTrackCount(); i++) {
                 MediaFormat format = extractor.getTrackFormat(i);
@@ -301,26 +309,28 @@ public class MotionPhotoReader {
                 if (mime.startsWith(MOTION_PHOTO_IMAGE_META_MIMETYPE)) {
                     Log.d(TAG, "selected image meta track: " + i);
                     extractor.selectTrack(i);
-                    ByteBuffer inputBuffer = ByteBuffer.allocateDirect((int) extractor.getSampleSize());
+                    ByteBuffer inputBuffer = ByteBuffer.allocateDirect(
+                            (int) extractor.getSampleSize()
+                    );
                     int sampleSize = extractor.readSampleData(inputBuffer, 0);
                     if (sampleSize >= 0) {
                         // The do_not_stabilize bit is available
                         ImageMeta.ImageData imageData = ImageMeta.ImageData.parseFrom(inputBuffer);
                         if (imageData.hasDoNotStabilize()) {
-                            stabilizationOn = stabilizationOn && !imageData.getDoNotStabilize();
+                            isStabilized = imageData.getDoNotStabilize();
                         } else {
-                            stabilizationOn = false;
+                            isStabilized = true;
                         }
                     } else {
                         // The do_not_stabilize bit is unavailable
-                        stabilizationOn = false;
+                        isStabilized = true;
                     }
                     extractor.unselectTrack(i);
                     break;
                 }
             }
         }
-        return stabilizationOn;
+        return isStabilized;
     }
 
     /**
