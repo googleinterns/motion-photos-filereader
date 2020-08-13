@@ -15,6 +15,7 @@ import android.view.Surface;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.VisibleForTesting;
+import androidx.core.util.Preconditions;
 
 import com.adobe.internal.xmp.XMPException;
 
@@ -45,8 +46,8 @@ public class MotionPhotoReader {
     private final File file;
     private final Surface surface;
     private final MotionPhotoInfo motionPhotoInfo;
+    private final MediaExtractor extractor;
 
-    private MediaExtractor extractor;
     private MediaCodec decoder;
     private MediaFormat videoFormat;
     private FileInputStream fileInputStream;
@@ -218,7 +219,7 @@ public class MotionPhotoReader {
         for (int i = 0; i < extractor.getTrackCount(); i++) {
             MediaFormat format = extractor.getTrackFormat(i);
             String mime = format.getString(MediaFormat.KEY_MIME);
-            assert mime != null;
+            Preconditions.checkNotNull(mime);
             // Set the video track (which should be the first video track) and create an
             // appropriate media decoder
             if (mime.startsWith(VIDEO_MIME_PREFIX) && !videoTrackSelected) {

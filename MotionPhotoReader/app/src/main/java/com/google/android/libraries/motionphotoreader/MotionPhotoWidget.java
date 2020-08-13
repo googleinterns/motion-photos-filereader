@@ -77,7 +77,7 @@ public class MotionPhotoWidget extends SurfaceView {
         autoloop = ta.getBoolean(R.styleable.MotionPhotoWidget_autoloop, true);
 
         // Fetch value of “custom:stabilizationOn”
-        stabilizationOn = ta.getBoolean(R.styleable.MotionPhotoWidget_stabilizationOn, true);
+        stabilizationOn = ta.getBoolean(R.styleable.MotionPhotoWidget_enableStabilization, true);
 
         ta.recycle();
         initialize();
