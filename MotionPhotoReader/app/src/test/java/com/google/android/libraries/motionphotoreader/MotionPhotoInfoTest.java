@@ -13,19 +13,19 @@ import org.mockito.stubbing.Answer;
 import java.io.File;
 import java.io.IOException;
 
-import static com.google.android.libraries.motionphotoreader.Constants.FILENAME_V1;
-import static com.google.android.libraries.motionphotoreader.Constants.FILENAME_V2;
-import static com.google.android.libraries.motionphotoreader.Constants.KEY_DURATION_V1;
-import static com.google.android.libraries.motionphotoreader.Constants.KEY_DURATION_V2;
-import static com.google.android.libraries.motionphotoreader.Constants.KEY_HEIGHT;
-import static com.google.android.libraries.motionphotoreader.Constants.KEY_MIME;
-import static com.google.android.libraries.motionphotoreader.Constants.KEY_ROTATION_V1;
-import static com.google.android.libraries.motionphotoreader.Constants.KEY_ROTATION_V2;
-import static com.google.android.libraries.motionphotoreader.Constants.KEY_WIDTH;
 import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V1;
 import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V2;
-import static com.google.android.libraries.motionphotoreader.Constants.VIDEO_OFFSET_V1;
-import static com.google.android.libraries.motionphotoreader.Constants.VIDEO_OFFSET_V2;
+import static com.google.android.libraries.motionphotoreader.TestConstants.FILENAME_V1;
+import static com.google.android.libraries.motionphotoreader.TestConstants.FILENAME_V2;
+import static com.google.android.libraries.motionphotoreader.TestConstants.KEY_DURATION_V1;
+import static com.google.android.libraries.motionphotoreader.TestConstants.KEY_DURATION_V2;
+import static com.google.android.libraries.motionphotoreader.TestConstants.KEY_HEIGHT;
+import static com.google.android.libraries.motionphotoreader.TestConstants.KEY_MIME;
+import static com.google.android.libraries.motionphotoreader.TestConstants.KEY_ROTATION_V1;
+import static com.google.android.libraries.motionphotoreader.TestConstants.KEY_ROTATION_V2;
+import static com.google.android.libraries.motionphotoreader.TestConstants.KEY_WIDTH;
+import static com.google.android.libraries.motionphotoreader.TestConstants.VIDEO_OFFSET_V1;
+import static com.google.android.libraries.motionphotoreader.TestConstants.VIDEO_OFFSET_V2;
 import static junit.framework.TestCase.assertNotNull;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -213,5 +213,15 @@ public class MotionPhotoInfoTest {
     @Test
     public void getRotation_whenKeyDoesNotExist_v2_isCorrect() {
         assertEquals(0, motionPhotoInfoV2.getRotation());
+    }
+
+    @Test
+    public void getVersion_v1_isCorrect() {
+        assertEquals(MOTION_PHOTO_V1, motionPhotoInfoV1.getVersion());
+    }
+
+    @Test
+    public void getVersion_v2_isCorrect() {
+        assertEquals(MOTION_PHOTO_V2, motionPhotoInfoV2.getVersion());
     }
 }

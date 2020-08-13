@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTOS_DIR;
 import static org.junit.Assert.assertNotNull;
 
 /**
@@ -30,6 +29,11 @@ import static org.junit.Assert.assertNotNull;
  */
 @RunWith(AndroidJUnit4.class)
 public class OutputSurfaceTest {
+
+    /**
+     * Asset directory containing all motion photo files.
+     */
+    static final String MOTION_PHOTOS_DIR = "motionphotos/";
 
     private HandlerThread renderThread;
     private Handler renderHandler;
