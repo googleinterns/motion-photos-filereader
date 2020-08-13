@@ -1,7 +1,6 @@
 package com.google.android.libraries.motionphotoreader;
 
 import android.content.Context;
-import android.util.Log;
 
 import com.google.common.io.ByteStreams;
 
@@ -16,30 +15,6 @@ import java.net.URL;
  */
 class ResourceFetcher {
     private static final String TAG = "ResourceFetcher";
-
-    /**
-     * Gets a resource from the res/raw folder and creates a temporary file holding the resource.
-     * Used to fetch motion photo files.
-     * @param context The context containing the raw resource.
-     * @param id The id of the file.
-     * @param prefix The name of the temporary file to create from the raw resource.
-     * @param suffix The extension of the temporary file to create from the raw resource.
-     * @return a File object containing the raw resource file.
-     */
-    public static File fetchRawFile(Context context,
-                                    int id, String prefix,
-                                    String suffix) throws IOException {
-        try (InputStream input = context.getResources().openRawResource(id)) {
-            File file = null;
-            try {
-                file = File.createTempFile(prefix, suffix);
-            } catch (IOException e) {
-                Log.e(TAG, "Error fetching raw file", e);
-            }
-            writeBytesToFile(input, file);
-            return file;
-        }
-    }
 
     /**
      * Gets a resource from the res/raw folder and creates a temporary file holding the resource.

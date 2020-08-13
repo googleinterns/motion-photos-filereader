@@ -1,17 +1,19 @@
 package com.google.android.libraries.motionphotoreader;
 
 import android.content.Context;
+import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.media.MediaExtractor;
 import android.os.Bundle;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.rule.ActivityTestRule;
 
 import com.adobe.internal.xmp.XMPException;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -32,18 +34,36 @@ import static org.junit.Assert.assertTrue;
  */
 @RunWith(AndroidJUnit4.class)
 public class MotionPhotoReaderTest {
-    private static final String filename = "MVIMG_20200621_200240.jpg";
-    private static final int NUM_FRAMES = 44;
+
+    /**
+     * Asset directory containing all motion photo files.
+     */
+    static final String MOTION_PHOTOS_DIR = "motionphotos/";
+
+    private static final int NUM_FRAMES = 43;
     private static final long SEEK_AMOUNT_US = 10_000L;
-    
+
     private Context context;
+    private String[] testMotionPhotosList;
+    private String filename;
 
     /** A list of opened motion photo readers to close afterwards. */
     private final List<Runnable> cleanup = new ArrayList<>();
 
+    @Rule
+    public ActivityTestRule<MainActivity> activityRule =
+            new ActivityTestRule<>(
+                    MainActivity.class,
+                    /* initialTouchMode = */ true,
+                    /* launchActivity= */ true
+            );
+
     @Before 
-    public void setUp() {
-        context = InstrumentationRegistry.getInstrumentation().getContext();
+    public void setUp() throws IOException {
+        context = activityRule.getActivity().getApplicationContext();
+        AssetManager assetManager = context.getAssets();
+        testMotionPhotosList = assetManager.list("motionphotos");
+        filename = MOTION_PHOTOS_DIR + testMotionPhotosList[0];
     }
 
     @After
@@ -163,11 +183,12 @@ public class MotionPhotoReaderTest {
         MotionPhotoReader reader = MotionPhotoReader.open(
                 ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
                 null,
+                true,
                 fakeAvailableInputBuffers,
                 fakeAvailableOutputBuffers
         );
-        assertFalse("Available input buffer queue is empty",
-                fakeAvailableInputBuffers.isEmpty());
+        assertGreaterOrEqual(NUM_FRAMES, fakeAvailableInputBuffers.getOfferCount());
+        assertGreaterOrEqual(NUM_FRAMES, fakeAvailableInputBuffers.getPollCount());
         cleanup.add(reader::close);
     }
 
@@ -181,6 +202,7 @@ public class MotionPhotoReaderTest {
         MotionPhotoReader reader = MotionPhotoReader.open(
                 ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
                 null,
+                true,
                 fakeAvailableInputBuffers,
                 fakeAvailableOutputBuffers
         );
@@ -203,6 +225,10 @@ public class MotionPhotoReaderTest {
         Bitmap bmp = reader.getMotionPhotoImageBitmap();
         assertNotNull(bmp);
         cleanup.add(reader::close);
+    }
+
+    private static boolean assertGreaterOrEqual(int expected, int actual) {
+        return actual >= expected;
     }
 
     /** Mock LinkedBlockingQueue class to simulate and test input/output buffer queue behaviors. */
@@ -239,6 +265,10 @@ public class MotionPhotoReaderTest {
 
         public int getPollCount() {
             return pollCount.get();
+        }
+
+        public int size() {
+            return size.get();
         }
 
         public boolean isEmpty() {

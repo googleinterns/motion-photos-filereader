@@ -13,6 +13,19 @@ import org.mockito.stubbing.Answer;
 import java.io.File;
 import java.io.IOException;
 
+import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V1;
+import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V2;
+import static com.google.android.libraries.motionphotoreader.TestConstants.FILENAME_V1;
+import static com.google.android.libraries.motionphotoreader.TestConstants.FILENAME_V2;
+import static com.google.android.libraries.motionphotoreader.TestConstants.KEY_DURATION_V1;
+import static com.google.android.libraries.motionphotoreader.TestConstants.KEY_DURATION_V2;
+import static com.google.android.libraries.motionphotoreader.TestConstants.KEY_HEIGHT;
+import static com.google.android.libraries.motionphotoreader.TestConstants.KEY_MIME;
+import static com.google.android.libraries.motionphotoreader.TestConstants.KEY_ROTATION_V1;
+import static com.google.android.libraries.motionphotoreader.TestConstants.KEY_ROTATION_V2;
+import static com.google.android.libraries.motionphotoreader.TestConstants.KEY_WIDTH;
+import static com.google.android.libraries.motionphotoreader.TestConstants.VIDEO_OFFSET_V1;
+import static com.google.android.libraries.motionphotoreader.TestConstants.VIDEO_OFFSET_V2;
 import static junit.framework.TestCase.assertNotNull;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -28,23 +41,6 @@ import static org.mockito.Mockito.when;
  * Local unit test for MotionPhotoInfo class.
  */
 public class MotionPhotoInfoTest {
-    // define a mock media format for motion photo v1 format
-    private final static String FILENAME_V1 = "MVIMG_20200621_200240.jpg";
-    private final static int KEY_WIDTH_V1 = 4032;
-    private final static int KEY_HEIGHT_V1 = 3024;
-    private final static long KEY_DURATION_V1 = 1499400;
-    private final static int KEY_ROTATION_V1 = 90;
-    private final static String KEY_MIME_V1 = "video/avc";
-    private final static int VIDEO_OFFSET_V1 = 2592317;
-
-    // define a mock media format for motion photo v2 format
-    private final static String FILENAME_V2 = "PXL_20200710_061629144.MP.jpg";
-    private final static int KEY_WIDTH_V2 = 4032;
-    private final static int KEY_HEIGHT_V2 = 3024;
-    private final static long KEY_DURATION_V2 = 763422;
-    private final static int KEY_ROTATION_V2 = 0;
-    private final static String KEY_MIME_V2 = "video/avc";
-    private final static int VIDEO_OFFSET_V2 = 1317283;
 
     private XMPMeta metaV1;
     private XMPMeta metaV2;
@@ -53,28 +49,25 @@ public class MotionPhotoInfoTest {
     private MotionPhotoInfo motionPhotoInfoV1;
     private MotionPhotoInfo motionPhotoInfoV2;
 
-
-    private String fileResourceNameV1;
-
     @Before
     public void setUp() throws IOException, XMPException {
         // set up v1 motion photo metadata
-        File fileV1 = ResourceFetcher.fetchResourceFile(getClass().getClassLoader(), FILENAME_V2);
+        File fileV1 = ResourceFetcher.fetchResourceFile(getClass().getClassLoader(), FILENAME_V1);
         metaV1 = XmpParser.getXmpMetadata(fileV1);
         assertNotNull(metaV1);
 
         // set up a media format to mimic a v1 motion photo format, and create a corresponding
         // media extractor
         videoFormatV1 = createFakeVideoFormat(
-                KEY_WIDTH_V1,
-                KEY_HEIGHT_V1,
+                KEY_WIDTH,
+                KEY_HEIGHT,
                 KEY_DURATION_V1,
                 KEY_ROTATION_V1,
-                KEY_MIME_V1
+                KEY_MIME
         );
 
         // create motion photo info objects from a string filename and a file object
-        motionPhotoInfoV1 = new MotionPhotoInfo(videoFormatV1, VIDEO_OFFSET_V1);
+        motionPhotoInfoV1 = new MotionPhotoInfo(videoFormatV1, VIDEO_OFFSET_V1, MOTION_PHOTO_V1);
         assertNotNull(motionPhotoInfoV1);
         verify(videoFormatV1, times(2)).getInteger(anyString());
         verify(videoFormatV1, times(1)).getLong(anyString());
@@ -88,15 +81,15 @@ public class MotionPhotoInfoTest {
         // set up a media format to mimic a v2 motion photo format, and create a corresponding
         // media extractor
         videoFormatV2 = createFakeVideoFormat(
-                KEY_WIDTH_V2,
-                KEY_HEIGHT_V2,
+                KEY_WIDTH,
+                KEY_HEIGHT,
                 KEY_DURATION_V2,
                 KEY_ROTATION_V2,
-                KEY_MIME_V2
+                KEY_MIME
         );
 
         // create motion photo info object
-        motionPhotoInfoV2 = new MotionPhotoInfo(videoFormatV2, VIDEO_OFFSET_V2);
+        motionPhotoInfoV2 = new MotionPhotoInfo(videoFormatV2, VIDEO_OFFSET_V2, MOTION_PHOTO_V2);
         assertNotNull(motionPhotoInfoV2);
         verify(videoFormatV2, times(2)).getInteger(anyString());
         verify(videoFormatV2, times(1)).getLong(anyString());
@@ -162,22 +155,22 @@ public class MotionPhotoInfoTest {
 
     @Test
     public void getWidth_v1_isCorrect() {
-        assertEquals(KEY_WIDTH_V1, motionPhotoInfoV1.getWidth());
+        assertEquals(KEY_WIDTH, motionPhotoInfoV1.getWidth());
     }
 
     @Test
     public void getWidth_v2_isCorrect() {
-        assertEquals(KEY_WIDTH_V2, motionPhotoInfoV2.getWidth());
+        assertEquals(KEY_WIDTH, motionPhotoInfoV2.getWidth());
     }
 
     @Test
     public void getHeight_v1_isCorrect() {
-        assertEquals(KEY_HEIGHT_V1, motionPhotoInfoV1.getHeight());
+        assertEquals(KEY_HEIGHT, motionPhotoInfoV1.getHeight());
     }
 
     @Test
     public void getHeight_v2_isCorrect() {
-        assertEquals(KEY_HEIGHT_V2, motionPhotoInfoV2.getHeight());
+        assertEquals(KEY_HEIGHT, motionPhotoInfoV2.getHeight());
     }
 
     @Test
@@ -194,7 +187,7 @@ public class MotionPhotoInfoTest {
     public void getRotation_whenKeyExists_v1_isCorrect() {
         // set up the media format so that it has a rotation
         doReturn(true).when(videoFormatV1).containsKey(eq(MediaFormat.KEY_ROTATION));
-        motionPhotoInfoV1 = new MotionPhotoInfo(videoFormatV1, VIDEO_OFFSET_V1);
+        motionPhotoInfoV1 = new MotionPhotoInfo(videoFormatV1, VIDEO_OFFSET_V1, MOTION_PHOTO_V1);
         // Number of invocations includes those in setUp()
         verify(videoFormatV1, times(5)).getInteger(anyString());
         verify(videoFormatV1, times(2)).getLong(anyString());
@@ -205,7 +198,7 @@ public class MotionPhotoInfoTest {
     public void getRotation_whenKeyExists_v2_isCorrect() {
         // set up the media format so that it has a rotation
         doReturn(true).when(videoFormatV2).containsKey(eq(MediaFormat.KEY_ROTATION));
-        motionPhotoInfoV2 = new MotionPhotoInfo(videoFormatV2, VIDEO_OFFSET_V2);
+        motionPhotoInfoV2 = new MotionPhotoInfo(videoFormatV2, VIDEO_OFFSET_V2, MOTION_PHOTO_V2);
         // Number of invocations includes those in setUp()
         verify(videoFormatV2, times(5)).getInteger(anyString());
         verify(videoFormatV2, times(2)).getLong(anyString());
@@ -220,5 +213,15 @@ public class MotionPhotoInfoTest {
     @Test
     public void getRotation_whenKeyDoesNotExist_v2_isCorrect() {
         assertEquals(0, motionPhotoInfoV2.getRotation());
+    }
+
+    @Test
+    public void getVersion_v1_isCorrect() {
+        assertEquals(MOTION_PHOTO_V1, motionPhotoInfoV1.getVersion());
+    }
+
+    @Test
+    public void getVersion_v2_isCorrect() {
+        assertEquals(MOTION_PHOTO_V2, motionPhotoInfoV2.getVersion());
     }
 }

@@ -1,0 +1,19 @@
+syntax = "proto2";
+
+option java_package = "com.google.android.libraries.motionphotoreader";
+option java_outer_classname = "ImageMeta";
+
+// Contains metadata payload associated with the image still of the microvideo.
+message ImageData {
+  // Device timestamp (in microseconds) of the associated image still.
+  optional int64 photo_timestamp_us = 1;
+
+  // Presentation timestamp (in microseconds) of the associated image still.
+  // Note: this value can become invalid if the associated video has been
+  // edited, trimmed, or truncated.
+  optional int64 photo_presentation_time_us = 2;
+
+  // Set to true if the associated video track should NOT be stabilized (e.g.
+  // already stabilized, or stabilization is inappropriate).
+  optional bool do_not_stabilize = 3 [default = false];
+}

@@ -18,6 +18,10 @@ import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.IOException;
 
+import static com.google.android.libraries.motionphotoreader.Constants.CAMERA_XMP_NAMESPACE;
+import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V1;
+import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V2;
+
 /**
  * Contains information relevant to extracting frames in a Motion Photo file.
  *
@@ -28,26 +32,28 @@ import java.io.IOException;
  *   - The camera orientation while the motion photo was taken, as a rotation in degrees.
  *   - The byte offset from the end of the file at which the video track begins.
  */
+@RequiresApi(api = 23)
 public class MotionPhotoInfo {
 
     private final static String TAG = "MotionPhotoInfo";
 
-    private final static int MOTION_PHOTO_VERSION_V1 = 1;
-    private final static int MOTION_PHOTO_VERSION_V2 = 2;
-    private static final String CAMERA_XMP_NAMESPACE = "http://ns.google.com/photos/1.0/camera/";
+    private static final String V2_XMP_PROP_PREFIX = "Container:Directory[";
+    private static final String V2_XMP_PROP_LENGTH_SUFFIX = "]/Container:Item/Item:Length";
+    private static final String V2_XMP_PROP_PADDING_SUFFIX = "]/Container:Item/Item:Length";
+
 
     private final int width;
     private final int height;
     private final long durationUs;
     private final int rotation;
     private final int videoOffset;
+    private final int version;
 
     /**
      * Creates a MotionPhotoInfo object associated with a given file.
      */
-    @RequiresApi(api = Build.VERSION_CODES.M)
     @VisibleForTesting
-    MotionPhotoInfo(MediaFormat mediaFormat, int videoOffset) {
+    MotionPhotoInfo(MediaFormat mediaFormat, int videoOffset, int version) {
         width = mediaFormat.getInteger(MediaFormat.KEY_WIDTH);
         height = mediaFormat.getInteger(MediaFormat.KEY_HEIGHT);
         durationUs = mediaFormat.getLong(MediaFormat.KEY_DURATION);
@@ -55,25 +61,25 @@ public class MotionPhotoInfo {
                 ? mediaFormat.getInteger(MediaFormat.KEY_ROTATION)
                 : 0;
         this.videoOffset = videoOffset;
+        this.version = version;
     }
 
     /**
      * Returns a new instance of MotionPhotoInfo for a specified file.
      */
-    @RequiresApi(api = Build.VERSION_CODES.M)
     public static MotionPhotoInfo newInstance(File file) throws IOException, XMPException {
         MediaExtractor extractor = new MediaExtractor();
         try {
             XMPMeta meta = getFileXmp(file);
-            int videoOffset = getVideoOffset(meta);
+            int version = getMotionPhotoVersion(meta);
+            int videoOffset = getVideoOffset(meta, version);
             MediaFormat mediaFormat = getFileMediaFormat(file, new MediaExtractor(), videoOffset);
-            return new MotionPhotoInfo(mediaFormat, videoOffset);
+            return new MotionPhotoInfo(mediaFormat, videoOffset, version);
         } finally {
             extractor.release();
         }
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.M)
     public static MotionPhotoInfo newInstance(String filename) throws IOException, XMPException {
         return MotionPhotoInfo.newInstance(new File(filename));
     }
@@ -85,17 +91,13 @@ public class MotionPhotoInfo {
      * video track.
      * @throws XMPException when parsing invalid XMP metadata.
      */
-    private static int getVideoOffset(XMPMeta meta) throws XMPException {
-        int version = getMotionPhotoVersion(meta);
+    private static int getVideoOffset(XMPMeta meta, int version) throws XMPException {
         int videoOffset = 0;
         switch (version) {
-            case MOTION_PHOTO_VERSION_V1:
-                videoOffset = meta.getPropertyInteger(
-                        CAMERA_XMP_NAMESPACE,
-                        "MicroVideoOffset"
-                );
+            case MOTION_PHOTO_V1:
+                videoOffset = meta.getPropertyInteger(CAMERA_XMP_NAMESPACE, "MicroVideoOffset");
                 break;
-            case MOTION_PHOTO_VERSION_V2:
+            case MOTION_PHOTO_V2:
                 // Iterate through the nodes of the XMP metadata to find the desired item length
                 // and padding properties. The items we are looking for belong in an array with name
                 // "Directory" that is indexed starting at 1. We ignore the first item in the array
@@ -106,12 +108,12 @@ public class MotionPhotoInfo {
                 while (itr.hasNext()) {
                     XMPPropertyInfo property = (XMPPropertyInfo) itr.next();
                     String propertyPath = property.getPath();
-                    String lengthProperty = "Container:Directory["
+                    String lengthProperty = V2_XMP_PROP_PREFIX
                             + arrayItemIdx
-                            + "]/Container:Item/Item:Length";
-                    String paddingProperty = "Container:Directory["
+                            + V2_XMP_PROP_LENGTH_SUFFIX;
+                    String paddingProperty = V2_XMP_PROP_PREFIX
                             + arrayItemIdx
-                            + "]/Container:Item/Item:Padding";
+                            + V2_XMP_PROP_PADDING_SUFFIX;
                     if (propertyPath != null) {
                         if (propertyPath.equalsIgnoreCase(lengthProperty)) {
                             videoOffset += Integer.parseInt(property.getValue());
@@ -206,4 +208,6 @@ public class MotionPhotoInfo {
     public int getRotation() {
         return rotation;
     }
+
+    public int getVersion() { return version; }
 }

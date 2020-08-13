@@ -1,6 +1,7 @@
 package com.google.android.libraries.motionphotoreader;
 
 import android.app.Activity;
+import android.content.res.AssetManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -11,31 +12,46 @@ import androidx.annotation.RequiresApi;
 import com.adobe.internal.xmp.XMPException;
 
 import java.io.IOException;
+import java.util.Arrays;
 
+@RequiresApi(api = 29)
 public class WidgetTestActivity extends Activity {
 
     private static final String TAG = "MainActivity";
 
-    private boolean isV1;
+    /**
+     * Asset directory containing all motion photo files.
+     */
+    static final String MOTION_PHOTOS_DIR = "motionphotos/";
 
-    @RequiresApi(api = Build.VERSION_CODES.P)
+    private String[] testMotionPhotosList;
+    private int currPhotoIndex = 0;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_widget_test);
+
+        AssetManager assetManager = getAssets();
+        try {
+            testMotionPhotosList = assetManager.list("motionphotos");
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred while trying to fetch assets", e);
+        }
+        Log.d(TAG, "test image array: " + Arrays.toString(testMotionPhotosList));
 
         // Get the widget and set the default file to v1 motion photo
         MotionPhotoWidget motionPhotoWidget = findViewById(R.id.motion_photo_widget);
         Log.d(TAG, "Motion photo widget set up");
         try {
             motionPhotoWidget.setFile(
-                    ResourceFetcher.fetchRawFile(
+                    ResourceFetcher.fetchAssetFile(
                             this.getApplicationContext(),
-                            R.raw.v1a,
-                            "motionPhotoV1", "jpg"
+                            MOTION_PHOTOS_DIR + testMotionPhotosList[currPhotoIndex],
+                            /* prefix = */ testMotionPhotosList[currPhotoIndex],
+                            /* suffix = */ "jpg"
                     )
             );
-            isV1 = true;
         } catch (IOException | XMPException e) {
             Log.e(TAG, "Unable to set widget file", e);
         }
@@ -52,37 +68,19 @@ public class WidgetTestActivity extends Activity {
         // Holding down on the widget will switch between the two motion photo files (one is v1 and
         // the other is v2)
         motionPhotoWidget.setOnLongClickListener((View v) -> {
-            if (isV1) {
-                Log.d(TAG, "Is V1");
-                try {
-                    motionPhotoWidget.setFile(
-                            ResourceFetcher.fetchRawFile(
-                                    this.getApplicationContext(),
-                                    R.raw.v2,
-                                    /* prefix = */ "motionPhotoV2",
-                                    /* suffix = */ ".jpg"
-                            )
-                    );
-                    isV1 = false;
-                    return true;
-                } catch (IOException | XMPException e) {
-                    Log.e(TAG, "Unable to set widget file", e);
-                }
-            } else {
-                try {
-                    motionPhotoWidget.setFile(
-                            ResourceFetcher.fetchRawFile(
-                                    this.getApplicationContext(),
-                                    R.raw.v1a,
-                                    /* prefix = */ "motionPhotoV1",
-                                    /* suffix = */ ".jpg"
-                            )
-                    );
-                    isV1 = true;
-                    return true;
-                } catch (IOException | XMPException e) {
-                    Log.e(TAG, "Unable to set widget file", e);
-                }
+            try {
+                currPhotoIndex = (currPhotoIndex + 1) % testMotionPhotosList.length;
+                motionPhotoWidget.setFile(
+                        ResourceFetcher.fetchAssetFile(
+                                this.getApplicationContext(),
+                                MOTION_PHOTOS_DIR + testMotionPhotosList[currPhotoIndex],
+                                /* prefix = */ testMotionPhotosList[currPhotoIndex],
+                                /* suffix = */ ".jpg"
+                        )
+                );
+                return true;
+            } catch (IOException | XMPException e) {
+                Log.e(TAG, "Unable to set widget file", e);
             }
             return false;
         });
