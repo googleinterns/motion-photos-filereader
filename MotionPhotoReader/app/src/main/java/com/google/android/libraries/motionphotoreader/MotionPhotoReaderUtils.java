@@ -5,9 +5,7 @@ import android.media.MediaExtractor;
 import android.os.Bundle;
 import android.util.Log;
 
-import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
-import androidx.annotation.VisibleForTesting;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 
@@ -17,10 +15,8 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-import static com.google.android.libraries.motionphotoreader.Constants.FALLBACK_FRAME_DELTA_NS;
 import static com.google.android.libraries.motionphotoreader.Constants.NUM_OF_STRIPS;
 import static com.google.android.libraries.motionphotoreader.Constants.TIMEOUT_US;
-import static com.google.android.libraries.motionphotoreader.Constants.US_TO_NS;
 
 /**
  * A collection of helper methods used by MotionPhotoReader to access buffers and read track data.

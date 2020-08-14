@@ -2,7 +2,6 @@ package com.google.android.libraries.motionphotoreader;
 
 import android.app.Activity;
 import android.content.res.AssetManager;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -14,12 +13,15 @@ import com.adobe.internal.xmp.XMPException;
 import java.io.IOException;
 import java.util.Arrays;
 
-import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTOS_DIR;
-
 @RequiresApi(api = 29)
 public class WidgetTestActivity extends Activity {
 
     private static final String TAG = "MainActivity";
+
+    /**
+     * Asset directory containing all motion photo files.
+     */
+    static final String MOTION_PHOTOS_DIR = "motionphotos/";
 
     private String[] testMotionPhotosList;
     private int currPhotoIndex = 6;
@@ -33,7 +35,7 @@ public class WidgetTestActivity extends Activity {
         try {
             testMotionPhotosList = assetManager.list("motionphotos");
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.e(TAG, "Error occurred while trying to fetch assets", e);
         }
         Log.d(TAG, "test image array: " + Arrays.toString(testMotionPhotosList));
 

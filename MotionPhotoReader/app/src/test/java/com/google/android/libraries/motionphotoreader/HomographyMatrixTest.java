@@ -3,10 +3,10 @@ package com.google.android.libraries.motionphotoreader;
 import org.junit.Before;
 import org.junit.Test;
 
-import static com.google.android.libraries.motionphotoreader.Constants.THETA_DEGREES_A;
-import static com.google.android.libraries.motionphotoreader.Constants.THETA_DEGREES_B;
-import static com.google.android.libraries.motionphotoreader.Constants.VIDEO_HEIGHT_PIXELS;
-import static com.google.android.libraries.motionphotoreader.Constants.VIDEO_WIDTH_PIXELS;
+import static com.google.android.libraries.motionphotoreader.TestConstants.THETA_DEGREES_A;
+import static com.google.android.libraries.motionphotoreader.TestConstants.THETA_DEGREES_B;
+import static com.google.android.libraries.motionphotoreader.TestConstants.VIDEO_HEIGHT_PIXELS;
+import static com.google.android.libraries.motionphotoreader.TestConstants.VIDEO_WIDTH_PIXELS;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -26,11 +26,13 @@ public class HomographyMatrixTest {
         float cosThetaB = (float) Math.cos(Math.toRadians(THETA_DEGREES_B));
         float sinThetaB = (float) Math.sin(Math.toRadians(THETA_DEGREES_B));
 
+
         // Rotation around z-axis by 45 degrees
-        A = HomographyMatrix.createRotationMatrix(THETA_DEGREES_A);
+        A = HomographyMatrix.createRotationMatrix(THETA_DEGREES_A, "z");
 
         // Rotation around x-axis by 60 degrees
-        B = HomographyMatrix.createRotationMatrix(THETA_DEGREES_B);
+        B = HomographyMatrix.createRotationMatrix(THETA_DEGREES_B, "x");
+        assertFalse("Matrices are equal", A.equals(B));
 
         // Rotation around z-axis by 45 degrees followed by rotation around x-axis by 60 degrees
         BA = new HomographyMatrix();
@@ -73,21 +75,37 @@ public class HomographyMatrixTest {
 
     @Test
     public void equals_isNotEqual_isCorrect() {
-        assertFalse("Matrices are equal", A.equals(B));
-        assertFalse("Matrices are equal", B.equals(BA));
-        assertFalse("Matrices are equal", BA.equals(A));
+        assertFalse("Matrices are equal: \n" + A + "\n" + B, A.equals(B));
+        assertFalse("Matrices are equal: \n" + B + "\n" + BA, B.equals(BA));
+        assertFalse("Matrices are equal: \n" + BA + "\n" + A, BA.equals(A));
     }
 
     @Test
     public void leftMultiplyBy_isCorrect() {
-        assertTrue("Matrices are not equal", BA.equals(A.leftMultiplyBy(B)));
-        assertTrue("Matrices are not equal", AB.equals(B.leftMultiplyBy(A)));
+        HomographyMatrix BtimesA = A.leftMultiplyBy(B);
+        HomographyMatrix AtimesB = B.leftMultiplyBy(B);
+        assertTrue(
+                "Expected matrix \n" + BA + "\nbut received matrix \n" + BtimesA,
+                BA.equals(A.leftMultiplyBy(B))
+        );
+        assertTrue(
+                "Expected matrix \n" + AB + "\nbut received matrix \n" + AtimesB,
+                AB.equals(B.leftMultiplyBy(A))
+        );
     }
 
     @Test
     public void rightMultiplyBy_isCorrect() {
-        assertTrue("Matrices are not equal", AB.equals(A.rightMultiplyBy(B)));
-        assertTrue("Matrices are not equal", BA.equals(B.rightMultiplyBy(A)));
+        HomographyMatrix BtimesA = B.rightMultiplyBy(A);
+        HomographyMatrix AtimesB = A.rightMultiplyBy(B);
+        assertTrue(
+                "Expected matrix \n" + BA + "\nbut received matrix \n" + BtimesA,
+                BA.equals(B.rightMultiplyBy(A))
+        );
+        assertTrue(
+                "Expected matrix \n" + AB + "\nbut received matrix \n" + AtimesB,
+                AB.equals(A.rightMultiplyBy(B))
+        );
     }
 
     @Test

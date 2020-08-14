@@ -11,12 +11,12 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import static com.google.android.libraries.motionphotoreader.Constants.EMPTY_SAMPLE_SIZE;
-import static com.google.android.libraries.motionphotoreader.Constants.INPUT_BUFFER_QUEUE_SIZE;
-import static com.google.android.libraries.motionphotoreader.Constants.OUTPUT_BUFFER_QUEUE_SIZE;
-import static com.google.android.libraries.motionphotoreader.Constants.SAMPLE_BUFFER_INDEX;
-import static com.google.android.libraries.motionphotoreader.Constants.SAMPLE_PRESENTATION_TIME_US;
-import static com.google.android.libraries.motionphotoreader.Constants.SAMPLE_SIZE;
+import static com.google.android.libraries.motionphotoreader.TestConstants.EMPTY_SAMPLE_SIZE;
+import static com.google.android.libraries.motionphotoreader.TestConstants.INPUT_BUFFER_QUEUE_SIZE;
+import static com.google.android.libraries.motionphotoreader.TestConstants.OUTPUT_BUFFER_QUEUE_SIZE;
+import static com.google.android.libraries.motionphotoreader.TestConstants.SAMPLE_BUFFER_INDEX;
+import static com.google.android.libraries.motionphotoreader.TestConstants.SAMPLE_PRESENTATION_TIME_US;
+import static com.google.android.libraries.motionphotoreader.TestConstants.SAMPLE_SIZE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;

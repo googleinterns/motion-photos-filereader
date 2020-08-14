@@ -2,6 +2,8 @@ package com.google.android.libraries.motionphotoreader;
 
 import android.util.Log;
 
+import androidx.annotation.NonNull;
+
 import static com.google.android.libraries.motionphotoreader.Constants.EPS;
 
 public class BoundingBox {
@@ -23,7 +25,7 @@ public class BoundingBox {
         error = 0.0f;
     }
 
-    public BoundingBox(float[] a, float[] b, float[] c, float[] d) {
+    public BoundingBox(Float[] a, Float[] b, Float[] c, Float[] d) {
         xMin = Math.min(Math.min(a[0], b[0]), Math.min(c[0], d[0]));
         yMin = Math.min(Math.min(a[1], b[1]), Math.min(c[1], d[1]));
         xMax = Math.max(Math.max(a[0], b[0]), Math.max(c[0], d[0]));
@@ -73,6 +75,7 @@ public class BoundingBox {
         return error;
     }
 
+    @NonNull
     public String toString() {
         return "(" + xMin + ", " + yMin + ") to " + "(" + xMax + ", " + yMax + ")";
     }

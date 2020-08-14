@@ -40,7 +40,6 @@ import static com.google.android.libraries.motionphotoreader.Constants.NUM_OF_ST
 import static com.google.android.libraries.motionphotoreader.Constants.TOP_LEFT;
 import static com.google.android.libraries.motionphotoreader.Constants.TOP_RIGHT;
 import static com.google.android.libraries.motionphotoreader.Constants.US_TO_NS;
-import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V2;
 import static com.google.android.libraries.motionphotoreader.Constants.VIDEO_MIME_PREFIX;
 
 /**
@@ -60,9 +59,9 @@ public class MotionPhotoReader {
 
     private final File file;
     private final Surface surface;
-    private final boolean stabilizationOn;
+    private final boolean enableStabilization;
+    private final MediaExtractor extractor;
 
-    private MediaExtractor extractor;
     private MediaCodec decoder;
     private MediaFormat videoFormat;
     private FileInputStream fileInputStream;
@@ -105,7 +104,7 @@ public class MotionPhotoReader {
      * @param surface The surface on which the final video should be displayed.
      * @param surfaceWidth The width of the surface to display.
      * @param surfaceHeight The height of the surface to display.
-     * @param stabilizationOn If true, then the video should be stabilized (if possible). Otherwise,
+     * @param enableStabilization If true, then the video should be stabilized (if possible). Otherwise,
      * we should not stabilize the video.
      * @param testMode If true, then we use mock video frame and stabilization data. This should
      * only be set to true if the reader is being used in a testing environment.
@@ -115,14 +114,14 @@ public class MotionPhotoReader {
     private MotionPhotoReader(File file,
                               MediaExtractor extractor,
                               Surface surface, int surfaceWidth, int surfaceHeight,
-                              boolean stabilizationOn, boolean testMode,
+                              boolean enableStabilization, boolean testMode,
                               BlockingQueue<Integer> inputBufferQueue,
                               BlockingQueue<Bundle> outputBufferQueue) {
         this.file = file;
         this.surface = surface;
         this.surfaceWidth = surfaceWidth;
         this.surfaceHeight = surfaceHeight;
-        this.stabilizationOn = stabilizationOn;
+        this.enableStabilization = enableStabilization;
         this.testMode = testMode;
         this.extractor = extractor;
         this.inputBufferQueue = inputBufferQueue;
@@ -138,7 +137,7 @@ public class MotionPhotoReader {
     @VisibleForTesting
     static MotionPhotoReader open(File file, MediaExtractor extractor,
                                   Surface surface, int surfaceWidth, int surfaceHeight,
-                                  boolean stabilizationOn,
+                                  boolean enableStabilization,
                                   BlockingQueue<Integer> inputBufferQueue,
                                   BlockingQueue<Bundle> outputBufferQueue)
             throws IOException, XMPException {
@@ -146,10 +145,10 @@ public class MotionPhotoReader {
         MotionPhotoReader reader = new MotionPhotoReader(
                 file, extractor,
                 surface, surfaceWidth, surfaceHeight,
-                stabilizationOn, /* testMode = */ true,
+                enableStabilization, /* testMode = */ true,
                 inputBufferQueue, outputBufferQueue
         );
-        reader.startRenderThread(motionPhotoInfo, stabilizationOn);
+        reader.startRenderThread(motionPhotoInfo, enableStabilization);
         return reader;
     }
 
@@ -159,39 +158,38 @@ public class MotionPhotoReader {
      * @param surface The surface for the motion photo reader to decode.
      * @param surfaceWidth The width of the surface, in pixels.
      * @param surfaceHeight The height of the surface, in pixels.
-     * @param stabilizationOn If true, the video will be stabilized
+     * @param enableStabilization If true, the video will be stabilized
      * @return a MotionPhotoReader object for the specified file.
      * @throws IOException when the file cannot be found.
      * @throws XMPException when parsing invalid XML syntax.
      */
     public static MotionPhotoReader open(File file,
                                          Surface surface, int surfaceWidth, int surfaceHeight,
-                                         boolean stabilizationOn
+                                         boolean enableStabilization
     ) throws IOException, XMPException {
         MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(file);
         MotionPhotoReader reader = new MotionPhotoReader(
                 file,
                 new MediaExtractor(),
                 surface, surfaceWidth, surfaceHeight,
-                stabilizationOn, /* testMode = */ false,
+                enableStabilization, /* testMode = */ false,
                 /* inputBufferQueue = */ new LinkedBlockingQueue<>(),
                 /* outputBufferQueue = */ new LinkedBlockingQueue<>()
         );
-        reader.startRenderThread(motionPhotoInfo, stabilizationOn);
+        reader.startRenderThread(motionPhotoInfo, enableStabilization);
         return reader;
     }
-
     /**
      * Sets up and starts a new handler thread for the rendering pipeline and media decoders and
      * extractors.
      *
      * An extractor is set up for both the video and motion track (if applicable). The extractor
      * reads samples for both tracks and passes the information to a buffer processor. A decoder is
-     * set up for the video track to read frame data.
-     * @throws IOException if the extractor cannot read the motion photo file.
+     * set up for the video track to read frame data. If enableStabilization is set to true by the
+     * client, then we assume that we want to stabilize the video (if possible).
      */
-    private void startRenderThread(MotionPhotoInfo motionPhotoInfo,
-                                   boolean stabilizationOn) throws IOException {
+    private void startRenderThread(MotionPhotoInfo motionPhotoInfo, boolean enableStabilization)
+            throws IOException {
         // Set up the render handler and thread
         renderWorker = new HandlerThread("renderHandler");
         renderWorker.start();
@@ -203,110 +201,17 @@ public class MotionPhotoReader {
         int videoOffset = motionPhotoInfo.getVideoOffset();
         extractor.setDataSource(fd, file.length() - videoOffset, videoOffset);
 
-        // Find the do_not_stabilize bit in the image metadata track and set stabilizationOn
-        int version = motionPhotoInfo.getVersion();
-        for (int i = 0; i < extractor.getTrackCount(); i++) {
-            MediaFormat format = extractor.getTrackFormat(i);
-            String mime = format.getString(MediaFormat.KEY_MIME);
-            if (mime == null) {
-                throw new RuntimeException("Null track mime: " + i);
-            }
-            if (mime.startsWith(MOTION_PHOTO_IMAGE_META_MIMETYPE)) {
-                // 1. Check if the bit exists
-                //   a. If the bit exists, set stabilizationOn to true if it was originally true
-                //   b. If the bit does not exist, override stabilizationOn and set it to false
-                // 2. If the bit does not exist, then override stabilizationOn and set it to false
-                if (version == MOTION_PHOTO_V1) {
-                    Log.d(TAG, "selected image meta track: " + i);
-                    extractor.selectTrack(i);
-                    ByteBuffer inputBuffer = ByteBuffer.allocateDirect((int) extractor.getSampleSize());
-                    int sampleSize = extractor.readSampleData(inputBuffer, 0);
-                    if (sampleSize >= 0) {
-                        // The do_not_stabilize bit is available
-                        ImageMeta.ImageData imageData = ImageMeta.ImageData.parseFrom(inputBuffer);
-                        if (imageData.hasDoNotStabilize()) {
-                            stabilizationOn = stabilizationOn && !imageData.getDoNotStabilize();
-                        } else {
-                            stabilizationOn = false;
-                        }
-                    } else {
-                        // The do_not_stabilize bit is unavailable
-                        stabilizationOn = false;
-                    }
-                    extractor.unselectTrack(i);
-                    break;
-                } else if (version == MOTION_PHOTO_V2) {
-                    Log.d(TAG, "selected image meta track: " + i);
-                    extractor.selectTrack(i);
-                    ByteBuffer inputBuffer = ByteBuffer.allocateDirect((int) extractor.getSampleSize());
-                    int sampleSize = extractor.readSampleData(inputBuffer, 0);
-                    if (sampleSize >= 0) {
-                        byte[] bytes = inputBuffer.array();
-
-                        // Ignore padding at the beginning
-                        int index = 0;
-                        while ((bytes[index] & 0xFF) == 0x00) {
-                            index++;
-                        }
-
-                        // Get the isStabilized bit
-                        while (index < bytes.length) {
-                            byte descriptorTag = bytes[index++];
-                            // The isStabilized bit lies inside the 0xC4 descriptor
-                            if ((descriptorTag & 0xFF) == 0xC4) {
-                                // Skip over the variable length block
-                                while ((bytes[index] & 0xFF) == 0x80) {
-                                    index++;
-                                }
-                                index++;
-
-                                // The low res 0xC5 descriptor contains the isStabilized bit we want
-                                descriptorTag = bytes[index++];
-                                assert (descriptorTag & 0xFF) == 0xC5;
-
-                                // The isStabilized bit appears after the variable length for the
-                                // 0xC5 block, which should always be equal to 0x01
-                                int variableLength = Byte.toUnsignedInt(bytes[index++]);
-                                assert variableLength == 1;
-                                boolean isStabilized = ((bytes[index] & 0xFF) == 0x01);
-                                stabilizationOn = stabilizationOn && !isStabilized;
-                                break;
-                            } else if ((descriptorTag & 0xFF) == 0xC0) {
-                                // We want to ignore the variable length information in the 0xC0
-                                // descriptor, since this descriptor contains all the other
-                                // descriptors in which we are interested
-                                while ((bytes[index] & 0xFF) == 0x80) {
-                                    index++;
-                                }
-                                index++;
-                            } else {
-                                // Not the descriptor we want, so look for the variable length and
-                                // skip that many bytes
-                                while ((bytes[index] & 0xFF) == 0x80) {
-                                    index++;
-                                }
-                                int variableLength = Byte.toUnsignedInt(bytes[index++]);
-                                index += variableLength;
-                            }
-                        }
-                    } else {
-                        // The do_not_stabilize bit is unavailable
-                        stabilizationOn = false;
-                    }
-                    extractor.unselectTrack(i);
-                    break;
-                } else {
-                    throw new RuntimeException("Invalid motion photo version: " + version);
-                }
-            }
-        }
+        // Find the do_not_stabilize bit in the image metadata track and override 
+        // enableStabilization, if needed
+        boolean isStabilized = isAlreadyStabilized(motionPhotoInfo);
+        enableStabilization = enableStabilization && !isStabilized;
 
         // Set the motion track, and find an auto-crop if stabilization is on
         for (int i = 0; i < extractor.getTrackCount(); i++) {
             MediaFormat format = extractor.getTrackFormat(i);
             String mime = format.getString(MediaFormat.KEY_MIME);
             if (mime.startsWith(MICROVIDEO_META_MIMETYPE)) {
-                if (stabilizationOn) {
+                if (enableStabilization) {
                     extractor.selectTrack(i);
                     motionTrackIndex = i;
 
@@ -314,10 +219,10 @@ public class MotionPhotoReader {
                     BoundingBox boundingBox = new BoundingBox();
                     float error = 0.0f;
 
-                    float[] bottomLeft = Arrays.copyOf(BOTTOM_LEFT, BOTTOM_LEFT.length);
-                    float[] bottomRight = Arrays.copyOf(BOTTOM_RIGHT, BOTTOM_RIGHT.length);
-                    float[] topRight = Arrays.copyOf(TOP_RIGHT, TOP_RIGHT.length);
-                    float[] topLeft = Arrays.copyOf(TOP_LEFT, TOP_LEFT.length);
+                    Float[] bottomLeft = Arrays.copyOf(BOTTOM_LEFT, BOTTOM_LEFT.length);
+                    Float[] bottomRight = Arrays.copyOf(BOTTOM_RIGHT, BOTTOM_RIGHT.length);
+                    Float[] topRight = Arrays.copyOf(TOP_RIGHT, TOP_RIGHT.length);
+                    Float[] topLeft = Arrays.copyOf(TOP_LEFT, TOP_LEFT.length);
 
                     int videoWidth = motionPhotoInfo.getWidth();
                     int videoHeight = motionPhotoInfo.getHeight();
@@ -373,19 +278,31 @@ public class MotionPhotoReader {
         }
 
         // Find the appropriate tracks (motion and video) and configure them
-        Log.d(TAG, "Stabilization on: " + stabilizationOn);
+        boolean videoTrackSelected = false;
+        boolean motionTrackSelected = false;
         for (int i = 0; i < extractor.getTrackCount(); i++) {
             MediaFormat format = extractor.getTrackFormat(i);
             String mime = format.getString(MediaFormat.KEY_MIME);
+
             // Set the video track (which should be the first video track) and create an
             // appropriate media decoder
-            if (mime.startsWith(VIDEO_MIME_PREFIX)) {
+            if (mime.startsWith(VIDEO_MIME_PREFIX) && !videoTrackSelected) {
                 extractor.selectTrack(i);
                 Log.d(TAG, "Selected video track: " + i);
                 videoTrackIndex = i;
                 videoFormat = format;
                 decoder = MediaCodec.createDecoderByType(mime);
-                break;
+                videoTrackSelected = true;
+            }
+            // Set the motion track (if appropriate)
+            if (mime.startsWith(MICROVIDEO_META_MIMETYPE) && !motionTrackSelected) {
+                Log.d(TAG, "enableStabilization: " + enableStabilization);
+                if (enableStabilization) {
+                    extractor.selectTrack(i);
+                    Log.d(TAG, "Selected motion track: " + i);
+                    motionTrackIndex = i;
+                    motionTrackSelected = true;
+                }
             }
         }
 
@@ -438,6 +355,50 @@ public class MotionPhotoReader {
     }
 
     /**
+     * Determines whether the motion photo is pre-stabilized, in which case we should not stabilize
+     * the video.
+     * @throws com.google.protobuf.InvalidProtocolBufferException if parsing an invalid proto object
+     */
+    private boolean isAlreadyStabilized(MotionPhotoInfo motionPhotoInfo)
+            throws com.google.protobuf.InvalidProtocolBufferException {
+        // Check if the bit exists
+        //   a. If the bit exists, set isStabilized to the value of the bit
+        //   b. If the bit does not exist, set isStabilized to true
+        int version = motionPhotoInfo.getVersion();
+        boolean isStabilized = false;
+        if (version == MOTION_PHOTO_V1) {
+            for (int i = 0; i < extractor.getTrackCount(); i++) {
+                MediaFormat format = extractor.getTrackFormat(i);
+                String mime = format.getString(MediaFormat.KEY_MIME);
+                assert mime != null;
+                if (mime.startsWith(MOTION_PHOTO_IMAGE_META_MIMETYPE)) {
+                    Log.d(TAG, "selected image meta track: " + i);
+                    extractor.selectTrack(i);
+                    ByteBuffer inputBuffer = ByteBuffer.allocateDirect(
+                            (int) extractor.getSampleSize()
+                    );
+                    int sampleSize = extractor.readSampleData(inputBuffer, 0);
+                    if (sampleSize >= 0) {
+                        // The do_not_stabilize bit is available
+                        ImageMeta.ImageData imageData = ImageMeta.ImageData.parseFrom(inputBuffer);
+                        if (imageData.hasDoNotStabilize()) {
+                            isStabilized = imageData.getDoNotStabilize();
+                        } else {
+                            isStabilized = true;
+                        }
+                    } else {
+                        // The do_not_stabilize bit is unavailable
+                        isStabilized = true;
+                    }
+                    extractor.unselectTrack(i);
+                    break;
+                }
+            }
+        }
+        return isStabilized;
+    }
+
+    /**
      * Shut down all resources allocated to the MotionPhotoReader instance.
      */
     public void close() {
@@ -485,7 +446,7 @@ public class MotionPhotoReader {
         // Loop through the tracks on the media extractor (note that we only visit the motion track
         // if we wish to stabilize the video)
         boolean videoTrackVisited = false;
-        boolean motionTrackVisited = !stabilizationOn;
+        boolean motionTrackVisited = !enableStabilization;
         while (!(videoTrackVisited && motionTrackVisited)) {
             int trackIndex = extractor.getSampleTrackIndex();
             ByteBuffer inputBuffer;
@@ -600,7 +561,7 @@ public class MotionPhotoReader {
         // Loop through the tracks on the media extractor (note that we only visit the motion track
         // if we wish to stabilize the video)
         boolean videoTrackVisited = false;
-        boolean motionTrackVisited = !stabilizationOn;
+        boolean motionTrackVisited = !enableStabilization;
         while (!(videoTrackVisited && motionTrackVisited)) {
             int trackIndex = extractor.getSampleTrackIndex();
             ByteBuffer inputBuffer;
