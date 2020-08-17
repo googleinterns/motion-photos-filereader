@@ -50,7 +50,7 @@ import static com.google.android.libraries.motionphotoreader.Constants.VIDEO_MIM
 @RequiresApi(api = 28)
 public class MotionPhotoReader {
 
-    private static final String TAG = "MotionPhotoReaderClass";
+    private static final String TAG = "MotionPhotoReader";
 
     private final File file;
     private final Surface surface;
@@ -96,8 +96,8 @@ public class MotionPhotoReader {
      * @param surface The surface on which the final video should be displayed.
      * @param surfaceWidth The width of the surface to display.
      * @param surfaceHeight The height of the surface to display.
-     * @param enableStabilization If true, then the video should be stabilized (if possible). Otherwise,
-     * we should not stabilize the video.
+     * @param enableStabilization If true, then the video should be stabilized (if possible).
+     * Otherwise, we should not stabilize the video.
      * @param testMode If true, then we use mock video frame and stabilization data. This should
      * only be set to true if the reader is being used in a testing environment.
      * @param inputBufferQueue A blocking queue to hold available input buffer information.
@@ -105,8 +105,11 @@ public class MotionPhotoReader {
      */
     private MotionPhotoReader(File file,
                               MediaExtractor extractor,
-                              Surface surface, int surfaceWidth, int surfaceHeight,
-                              boolean enableStabilization, boolean testMode,
+                              Surface surface,
+                              int surfaceWidth,
+                              int surfaceHeight,
+                              boolean enableStabilization,
+                              boolean testMode,
                               BlockingQueue<Integer> inputBufferQueue,
                               BlockingQueue<Bundle> outputBufferQueue) {
         this.file = file;
@@ -127,18 +130,26 @@ public class MotionPhotoReader {
     }
 
     @VisibleForTesting
-    static MotionPhotoReader open(File file, MediaExtractor extractor,
-                                  Surface surface, int surfaceWidth, int surfaceHeight,
+    static MotionPhotoReader open(File file,
+                                  MediaExtractor extractor,
+                                  Surface surface,
+                                  int surfaceWidth,
+                                  int surfaceHeight,
                                   boolean enableStabilization,
                                   BlockingQueue<Integer> inputBufferQueue,
                                   BlockingQueue<Bundle> outputBufferQueue)
             throws IOException, XMPException {
         MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(file);
         MotionPhotoReader reader = new MotionPhotoReader(
-                file, extractor,
-                surface, surfaceWidth, surfaceHeight,
-                enableStabilization, /* testMode = */ true,
-                inputBufferQueue, outputBufferQueue
+                file,
+                extractor,
+                surface,
+                surfaceWidth,
+                surfaceHeight,
+                enableStabilization,
+                /* testMode = */ true,
+                inputBufferQueue,
+                outputBufferQueue
         );
         reader.startRenderThread(motionPhotoInfo, enableStabilization);
         return reader;
@@ -156,15 +167,20 @@ public class MotionPhotoReader {
      * @throws XMPException when parsing invalid XML syntax.
      */
     public static MotionPhotoReader open(File file,
-                                         Surface surface, int surfaceWidth, int surfaceHeight,
+                                         Surface surface,
+                                         int surfaceWidth,
+                                         int surfaceHeight,
                                          boolean enableStabilization
     ) throws IOException, XMPException {
         MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(file);
         MotionPhotoReader reader = new MotionPhotoReader(
                 file,
                 new MediaExtractor(),
-                surface, surfaceWidth, surfaceHeight,
-                enableStabilization, /* testMode = */ false,
+                surface,
+                surfaceWidth,
+                surfaceHeight,
+                enableStabilization,
+                /* testMode = */ false,
                 /* inputBufferQueue = */ new LinkedBlockingQueue<>(),
                 /* outputBufferQueue = */ new LinkedBlockingQueue<>()
         );
