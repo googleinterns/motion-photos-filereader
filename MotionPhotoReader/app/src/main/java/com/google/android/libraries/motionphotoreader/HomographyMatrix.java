@@ -21,7 +21,7 @@ class HomographyMatrix {
      * The default constructor sets the matrix to an identity matrix.
      */
     public HomographyMatrix() {
-        this.matrix = Arrays.asList(IDENTITY);
+        this.matrix = Arrays.asList(Arrays.copyOf(IDENTITY, IDENTITY.length));
     }
 
     /**
@@ -154,7 +154,7 @@ class HomographyMatrix {
         return rotationMatrix;
     }
 
-    public static HomographyMatrix createRotationMatriZ(float degrees) {
+    public static HomographyMatrix createRotationMatrixZ(float degrees) {
         float cosTheta = (float) Math.cos(Math.toRadians(degrees));
         float sinTheta = (float) Math.sin(Math.toRadians(degrees));
 
