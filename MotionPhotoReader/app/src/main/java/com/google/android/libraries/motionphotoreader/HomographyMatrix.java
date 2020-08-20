@@ -128,36 +128,41 @@ class HomographyMatrix {
         return new HomographyMatrix(scaled);
     }
 
-    public static HomographyMatrix createRotationMatrix(float degrees, String axis) {
+    public static HomographyMatrix createRotationMatrixX(float degrees) {
         float cosTheta = (float) Math.cos(Math.toRadians(degrees));
         float sinTheta = (float) Math.sin(Math.toRadians(degrees));
 
         HomographyMatrix rotationMatrix = new HomographyMatrix();
-        switch (axis) {
-            case "x":
-            case "X":
-                rotationMatrix.set(1, 1, cosTheta);
-                rotationMatrix.set(1, 2, -sinTheta);
-                rotationMatrix.set(2, 1, sinTheta);
-                rotationMatrix.set(2, 2, cosTheta);
-                break;
-            case "y":
-            case "Y":
-                rotationMatrix.set(0, 0, cosTheta);
-                rotationMatrix.set(0, 2, sinTheta);
-                rotationMatrix.set(2, 0, -sinTheta);
-                rotationMatrix.set(2, 2, cosTheta);
-                break;
-            case "z":
-            case "Z":
-                rotationMatrix.set(0, 0, cosTheta);
-                rotationMatrix.set(0, 1, -sinTheta);
-                rotationMatrix.set(1, 0, sinTheta);
-                rotationMatrix.set(1, 1, cosTheta);
-                break;
-            default:
-                throw new RuntimeException("Invalid axis: " + axis);
-        }
+        rotationMatrix.set(1, 1, cosTheta);
+        rotationMatrix.set(1, 2, -sinTheta);
+        rotationMatrix.set(2, 1, sinTheta);
+        rotationMatrix.set(2, 2, cosTheta);
+
+        return rotationMatrix;
+    }
+
+    public static HomographyMatrix createRotationMatrixY(float degrees) {
+        float cosTheta = (float) Math.cos(Math.toRadians(degrees));
+        float sinTheta = (float) Math.sin(Math.toRadians(degrees));
+
+        HomographyMatrix rotationMatrix = new HomographyMatrix();
+        rotationMatrix.set(0, 0, cosTheta);
+        rotationMatrix.set(0, 2, sinTheta);
+        rotationMatrix.set(2, 0, -sinTheta);
+        rotationMatrix.set(2, 2, cosTheta);
+
+        return rotationMatrix;
+    }
+
+    public static HomographyMatrix createRotationMatriZ(float degrees) {
+        float cosTheta = (float) Math.cos(Math.toRadians(degrees));
+        float sinTheta = (float) Math.sin(Math.toRadians(degrees));
+
+        HomographyMatrix rotationMatrix = new HomographyMatrix();
+        rotationMatrix.set(0, 0, cosTheta);
+        rotationMatrix.set(0, 1, -sinTheta);
+        rotationMatrix.set(1, 0, sinTheta);
+        rotationMatrix.set(1, 1, cosTheta);
 
         return rotationMatrix;
     }

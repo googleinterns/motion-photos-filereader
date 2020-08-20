@@ -24,12 +24,14 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static android.os.Build.VERSION_CODES.M;
 import static com.google.android.libraries.motionphotoreader.Constants.FALLBACK_FRAME_DELTA_NS;
+import static com.google.android.libraries.motionphotoreader.Constants.IDENTITY;
 import static com.google.android.libraries.motionphotoreader.Constants.MICROVIDEO_META_MIMETYPE;
 import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_IMAGE_META_MIMETYPE;
 import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PHOTO_V1;
@@ -69,6 +71,7 @@ public class MotionPhotoReader {
     private List<HomographyMatrix> homographyList;
     private long prevRenderTimestampNs;
     private long prevTimestampUs;
+    private List<Float> prevHomographyDataList;
 
     /**
      * The renderWorker and renderHandler are in charge of executing all calls relevant to rendering
@@ -122,10 +125,13 @@ public class MotionPhotoReader {
         this.inputBufferQueue = inputBufferQueue;
         this.outputBufferQueue = outputBufferQueue;
 
-        // Set the stabilization matrices to the identity for each strip
+        // Set the stabilization matrices to the identity for each strip, and set the previous
+        // stabilization data list to the identity for each strip (flattened into list of floats)
         homographyList = new ArrayList<>();
+        prevHomographyDataList = new ArrayList<>();
         for (int i = 0; i < NUM_OF_STRIPS; i++) {
             homographyList.add(new HomographyMatrix());
+            prevHomographyDataList.addAll(Arrays.asList(IDENTITY));
         }
     }
 
@@ -421,7 +427,11 @@ public class MotionPhotoReader {
                     // homographies will be empty if the frame has already been stabilized)
                     inputBuffer = ByteBuffer.allocateDirect((int) extractor.getSampleSize());
                     List<HomographyMatrix> newHomographyList =
-                            MotionPhotoReaderUtils.getHomographies(extractor, inputBuffer);
+                            MotionPhotoReaderUtils.getHomographies(
+                                    extractor,
+                                    inputBuffer,
+                                    prevHomographyDataList
+                            );
 
                     // Multiply previous stabilization matrices by new stabilization matrices
                     List<HomographyMatrix> tempHomographyList = new ArrayList<>();

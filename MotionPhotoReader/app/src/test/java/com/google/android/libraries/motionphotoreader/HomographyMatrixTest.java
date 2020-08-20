@@ -28,10 +28,10 @@ public class HomographyMatrixTest {
 
 
         // Rotation around z-axis by 45 degrees
-        A = HomographyMatrix.createRotationMatrix(THETA_DEGREES_A, "z");
+        A = HomographyMatrix.createRotationMatrixX(THETA_DEGREES_A);
 
         // Rotation around x-axis by 60 degrees
-        B = HomographyMatrix.createRotationMatrix(THETA_DEGREES_B, "x");
+        B = HomographyMatrix.createRotationMatrixX(THETA_DEGREES_B);
         assertFalse("Matrices are equal", A.equals(B));
 
         // Rotation around z-axis by 45 degrees followed by rotation around x-axis by 60 degrees
