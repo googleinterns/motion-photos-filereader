@@ -42,6 +42,7 @@ public class MotionPhotoWidget extends SurfaceView {
     /** Customizable attribute fields. */
     private final boolean autoloop;
     private final boolean enableStabilization;
+    private final boolean enableCrop;
 
     private ExecutorService executor;
     private MotionPhotoReader reader;
@@ -59,6 +60,7 @@ public class MotionPhotoWidget extends SurfaceView {
         super(context);
         autoloop = true;
         enableStabilization = true;
+        enableCrop = true;
         initialize();
     }
 
@@ -76,9 +78,13 @@ public class MotionPhotoWidget extends SurfaceView {
         // Fetch value of “custom:autoloop”
         autoloop = ta.getBoolean(R.styleable.MotionPhotoWidget_autoloop, true);
 
-        // Fetch value of “custom:stabilizationOn”
+        // Fetch value of “custom:enableStabilization”
         enableStabilization =
                 ta.getBoolean(R.styleable.MotionPhotoWidget_enableStabilization, true);
+
+        // Fetch value of “custom:enableCrop”
+        enableCrop =
+                ta.getBoolean(R.styleable.MotionPhotoWidget_enableCrop, true);
 
         ta.recycle();
         initialize();
@@ -114,8 +120,11 @@ public class MotionPhotoWidget extends SurfaceView {
                 try {
                     reader = MotionPhotoReader.open(
                             file,
-                            holder.getSurface(), surfaceWidth, surfaceHeight,
-                            enableStabilization
+                            holder.getSurface(),
+                            surfaceWidth,
+                            surfaceHeight,
+                            enableStabilization,
+                            enableCrop
                     );
                     Log.d(TAG, "New motion photo reader created");
                 } catch (IOException | XMPException e) {
@@ -261,7 +270,8 @@ public class MotionPhotoWidget extends SurfaceView {
                     surfaceHolder.getSurface(),
                     surfaceWidth,
                     surfaceHeight,
-                    enableStabilization
+                    enableStabilization,
+                    enableCrop
             );
             // Show the first frame
             if (reader.hasNextFrame()) {

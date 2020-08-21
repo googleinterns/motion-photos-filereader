@@ -61,6 +61,7 @@ public class MotionPhotoReader {
     private final File file;
     private final Surface surface;
     private final boolean enableStabilization;
+    private final boolean enableCrop;
     private final MediaExtractor extractor;
 
     private MediaCodec decoder;
@@ -108,6 +109,8 @@ public class MotionPhotoReader {
      * @param surfaceHeight The height of the surface to display.
      * @param enableStabilization If true, then the video should be stabilized (if possible).
      * Otherwise, we should not stabilize the video.
+     * @param enableCrop If true, then a crop-transform algorithm will be applied to the video to
+     * center the video in the surface.
      * @param testMode If true, then we use mock video frame and stabilization data. This should
      * only be set to true if the reader is being used in a testing environment.
      * @param inputBufferQueue A blocking queue to hold available input buffer information.
@@ -119,6 +122,7 @@ public class MotionPhotoReader {
                               int surfaceWidth,
                               int surfaceHeight,
                               boolean enableStabilization,
+                              boolean enableCrop,
                               boolean testMode,
                               BlockingQueue<Integer> inputBufferQueue,
                               BlockingQueue<Bundle> outputBufferQueue) {
@@ -127,6 +131,7 @@ public class MotionPhotoReader {
         this.surfaceWidth = surfaceWidth;
         this.surfaceHeight = surfaceHeight;
         this.enableStabilization = enableStabilization;
+        this.enableCrop = enableCrop;
         this.testMode = testMode;
         this.extractor = extractor;
         this.inputBufferQueue = inputBufferQueue;
@@ -140,6 +145,11 @@ public class MotionPhotoReader {
             homographyList.add(new HomographyMatrix());
             prevHomographyDataList.addAll(Arrays.asList(IDENTITY));
         }
+
+        // Set default auto-crop values
+        scaleFactor = 1.0f;
+        xTranslate = 0.0f;
+        yTranslate = 0.0f;
     }
 
     @VisibleForTesting
@@ -149,6 +159,7 @@ public class MotionPhotoReader {
                                   int surfaceWidth,
                                   int surfaceHeight,
                                   boolean enableStabilization,
+                                  boolean enableCrop,
                                   BlockingQueue<Integer> inputBufferQueue,
                                   BlockingQueue<Bundle> outputBufferQueue)
             throws IOException, XMPException {
@@ -160,11 +171,12 @@ public class MotionPhotoReader {
                 surfaceWidth,
                 surfaceHeight,
                 enableStabilization,
+                enableCrop,
                 /* testMode = */ true,
                 inputBufferQueue,
                 outputBufferQueue
         );
-        reader.startRenderThread(motionPhotoInfo, enableStabilization);
+        reader.startRenderThread(motionPhotoInfo, enableStabilization, enableCrop);
         return reader;
     }
 
@@ -175,6 +187,8 @@ public class MotionPhotoReader {
      * @param surfaceWidth The width of the surface, in pixels.
      * @param surfaceHeight The height of the surface, in pixels.
      * @param enableStabilization If true, the video will be stabilized
+     * @param enableCrop If true, the video will automatically be resized and translated to fit in
+     * the surface.
      * @return a MotionPhotoReader object for the specified file.
      * @throws IOException when the file cannot be found.
      * @throws XMPException when parsing invalid XML syntax.
@@ -183,7 +197,8 @@ public class MotionPhotoReader {
                                          Surface surface,
                                          int surfaceWidth,
                                          int surfaceHeight,
-                                         boolean enableStabilization
+                                         boolean enableStabilization,
+                                         boolean enableCrop
     ) throws IOException, XMPException {
         MotionPhotoInfo motionPhotoInfo = MotionPhotoInfo.newInstance(file);
         MotionPhotoReader reader = new MotionPhotoReader(
@@ -193,11 +208,12 @@ public class MotionPhotoReader {
                 surfaceWidth,
                 surfaceHeight,
                 enableStabilization,
+                enableCrop,
                 /* testMode = */ false,
                 /* inputBufferQueue = */ new LinkedBlockingQueue<>(),
                 /* outputBufferQueue = */ new LinkedBlockingQueue<>()
         );
-        reader.startRenderThread(motionPhotoInfo, enableStabilization);
+        reader.startRenderThread(motionPhotoInfo, enableStabilization, enableCrop);
         return reader;
     }
     /**
@@ -209,7 +225,9 @@ public class MotionPhotoReader {
      * set up for the video track to read frame data. If enableStabilization is set to true by the
      * client, then we assume that we want to stabilize the video (if possible).
      */
-    private void startRenderThread(MotionPhotoInfo motionPhotoInfo, boolean enableStabilization)
+    private void startRenderThread(MotionPhotoInfo motionPhotoInfo,
+                                   boolean enableStabilization,
+                                   boolean enableCrop)
             throws IOException {
         // Set up the render handler and thread
         renderWorker = new HandlerThread("renderHandler");
@@ -236,65 +254,64 @@ public class MotionPhotoReader {
                     extractor.selectTrack(i);
                     motionTrackIndex = i;
 
-                    // Find the bounding box intersection of all frames
-                    BoundingBox boundingBox = new BoundingBox();
-                    float error = 0.0f;
+                    if (enableCrop) {
+                        // Find the bounding box intersection of all frames
+                        BoundingBox boundingBox = new BoundingBox();
+                        float error = 0.0f;
 
-                    Float[] bottomLeft = Arrays.copyOf(BOTTOM_LEFT, BOTTOM_LEFT.length);
-                    Float[] bottomRight = Arrays.copyOf(BOTTOM_RIGHT, BOTTOM_RIGHT.length);
-                    Float[] topRight = Arrays.copyOf(TOP_RIGHT, TOP_RIGHT.length);
-                    Float[] topLeft = Arrays.copyOf(TOP_LEFT, TOP_LEFT.length);
+                        Float[] bottomLeft = Arrays.copyOf(BOTTOM_LEFT, BOTTOM_LEFT.length);
+                        Float[] bottomRight = Arrays.copyOf(BOTTOM_RIGHT, BOTTOM_RIGHT.length);
+                        Float[] topRight = Arrays.copyOf(TOP_RIGHT, TOP_RIGHT.length);
+                        Float[] topLeft = Arrays.copyOf(TOP_LEFT, TOP_LEFT.length);
 
-                    int videoWidth = motionPhotoInfo.getWidth();
-                    int videoHeight = motionPhotoInfo.getHeight();
-                    while (extractor.getSampleSize() >= 0) {
-                        ByteBuffer inputBuffer =
-                                ByteBuffer.allocateDirect((int) extractor.getSampleSize());
-                        List<HomographyMatrix> newHomographyList =
-                                MotionPhotoReaderUtils.getHomographies(
-                                        extractor,
-                                        inputBuffer,
-                                        prevHomographyDataList
-                                );
+                        int videoWidth = motionPhotoInfo.getWidth();
+                        int videoHeight = motionPhotoInfo.getHeight();
+                        while (extractor.getSampleSize() >= 0) {
+                            ByteBuffer inputBuffer =
+                                    ByteBuffer.allocateDirect((int) extractor.getSampleSize());
+                            List<HomographyMatrix> newHomographyList =
+                                    MotionPhotoReaderUtils.getHomographies(
+                                            extractor,
+                                            inputBuffer,
+                                            prevHomographyDataList
+                                    );
 
-                        // Update corner positions
-                        bottomLeft = newHomographyList
-                                .get(NUM_OF_STRIPS - 1)
-                                .convertFromImageToGL(videoWidth, videoHeight)
-                                .rightMultiplyBy(bottomLeft);
-                        bottomRight = newHomographyList
-                                .get(NUM_OF_STRIPS - 1)
-                                .convertFromImageToGL(videoWidth, videoHeight)
-                                .rightMultiplyBy(bottomRight);
-                        topRight = newHomographyList
-                                .get(0)
-                                .convertFromImageToGL(videoWidth, videoHeight)
-                                .rightMultiplyBy(topRight);
-                        topLeft = newHomographyList
-                                .get(0)
-                                .convertFromImageToGL(videoWidth, videoHeight)
-                                .rightMultiplyBy(topLeft);
+                            // Update corner positions
+                            bottomLeft = newHomographyList
+                                    .get(NUM_OF_STRIPS - 1)
+                                    .convertFromImageToGL(videoWidth, videoHeight)
+                                    .rightMultiplyBy(bottomLeft);
+                            bottomRight = newHomographyList
+                                    .get(NUM_OF_STRIPS - 1)
+                                    .convertFromImageToGL(videoWidth, videoHeight)
+                                    .rightMultiplyBy(bottomRight);
+                            topRight = newHomographyList
+                                    .get(0)
+                                    .convertFromImageToGL(videoWidth, videoHeight)
+                                    .rightMultiplyBy(topRight);
+                            topLeft = newHomographyList
+                                    .get(0)
+                                    .convertFromImageToGL(videoWidth, videoHeight)
+                                    .rightMultiplyBy(topLeft);
 
-                        BoundingBox newBoundingBox = new BoundingBox(
-                                bottomLeft,
-                                bottomRight,
-                                topRight,
-                                topLeft
-                        );
-                        boundingBox = boundingBox.intersect(newBoundingBox);
-                        error = Math.max(error, newBoundingBox.error());
-                        extractor.advance();
-                    }
-                    Log.d(TAG, "Bounding box dimensions: " + boundingBox.width() + " x " + boundingBox.height() + " with error " + error);
-                    Log.d(TAG, "Bounding box coordinates: " + boundingBox.toString());
+                            BoundingBox newBoundingBox = new BoundingBox(
+                                    bottomLeft,
+                                    bottomRight,
+                                    topRight,
+                                    topLeft
+                            );
+                            boundingBox = boundingBox.intersect(newBoundingBox);
+                            error = Math.max(error, newBoundingBox.error());
+                            extractor.advance();
+                        }
 
-                    // Compute the scale factor: if the box is wider than it is tall, then we want
-                    // to scale the box according to the height; otherwise, we want to scale the
-                    // box according to its width
-                    scaleFactor = Math.max(2.0f / boundingBox.width(), 2.0f / boundingBox.height());
-                    scaleFactor += error;
-                    xTranslate = (boundingBox.xMin + boundingBox.xMax) / 2.0f;
-                    yTranslate = (boundingBox.yMin + boundingBox.yMax) / 2.0f;
+                        // Compute the scale factor: if the box is wider than it is tall, then we want
+                        // to scale the box according to the height; otherwise, we want to scale the
+                        // box according to its width
+                        scaleFactor = Math.max(2.0f / boundingBox.width(), 2.0f / boundingBox.height());
+                        scaleFactor += error;
+                        xTranslate = (boundingBox.xMin + boundingBox.xMax) / 2.0f;
+                        yTranslate = (boundingBox.yMin + boundingBox.yMax) / 2.0f;                    }
                 }
 
                 // Reset the extractor to the beginning
