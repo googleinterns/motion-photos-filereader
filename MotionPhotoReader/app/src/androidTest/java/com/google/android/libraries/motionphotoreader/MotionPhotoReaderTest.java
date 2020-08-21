@@ -135,10 +135,10 @@ public class MotionPhotoReaderTest {
         while (reader.hasNextFrame()) {
             long newTimestampUs = reader.getCurrentTimestampUs();
             reader.nextFrame();
-            boolean flag = currentTimestampUs < newTimestampUs;
+            boolean timeIncreased = currentTimestampUs < newTimestampUs;
             assertTrue("Timestamp did not increase: "
                     + currentTimestampUs + " vs. " + newTimestampUs,
-                    flag);
+                    timeIncreased);
             currentTimestampUs = newTimestampUs;
         }
     }
@@ -150,26 +150,24 @@ public class MotionPhotoReaderTest {
             long newTimestampUs = reader.getCurrentTimestampUs();
             reader.seekTo(reader.getCurrentTimestampUs() + SEEK_AMOUNT_US,
                     MediaExtractor.SEEK_TO_NEXT_SYNC);
-            boolean flag = currentTimestampUs < newTimestampUs;
+            boolean timeIncreased = currentTimestampUs < newTimestampUs;
             assertTrue("Timestamp did not increase: "
                     + currentTimestampUs + " vs. " + newTimestampUs,
-                    flag);
+                    timeIncreased);
             currentTimestampUs = newTimestampUs;
         }
     }
 
     @Test
     public void hasNextFrame_atBeginningOfVideo_returnsTrue() {
-        boolean flag = reader.hasNextFrame();
-        assertTrue("No next frame", flag);
+        assertTrue("No next frame", reader.hasNextFrame());
     }
 
     @Test
     public void hasNextFrame_atLastFrame_returnsFalse() throws IOException, XMPException {
         long timestampUs = reader.getMotionPhotoInfo().getDurationUs();
         reader.seekTo(timestampUs, MediaExtractor.SEEK_TO_NEXT_SYNC);
-        boolean flag = reader.hasNextFrame();
-        assertFalse("Did not seek to end of video", flag);
+        assertFalse("Did not seek to end of video", reader.hasNextFrame());
     }
 
 

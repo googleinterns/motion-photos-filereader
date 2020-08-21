@@ -27,45 +27,44 @@ public class HomographyMatrixTest {
         float sinThetaB = (float) Math.sin(Math.toRadians(THETA_DEGREES_B));
 
 
-        // Rotation around z-axis by 45 degrees
-        A = HomographyMatrix.createRotationMatrix(THETA_DEGREES_A, "z");
+        // Rotation around x-axis by 45 degrees
+        A = HomographyMatrix.createRotationMatrixX(THETA_DEGREES_A);
 
-        // Rotation around x-axis by 60 degrees
-        B = HomographyMatrix.createRotationMatrix(THETA_DEGREES_B, "x");
-        assertFalse("Matrices are equal", A.equals(B));
+        // Rotation around z-axis by 60 degrees
+        B = HomographyMatrix.createRotationMatrixZ(THETA_DEGREES_B);
 
         // Rotation around z-axis by 45 degrees followed by rotation around x-axis by 60 degrees
         BA = new HomographyMatrix();
-        BA.set(0, 0, cosThetaA);
-        BA.set(0, 1, -sinThetaA);
-        BA.set(0, 2, 0.0f);
-        BA.set(1, 0, cosThetaB * sinThetaA);
-        BA.set(1, 1, cosThetaB * cosThetaA);
-        BA.set(1, 2, -sinThetaB);
-        BA.set(2, 0, sinThetaB * sinThetaA);
-        BA.set(2, 1, sinThetaB * cosThetaA);
-        BA.set(2, 2, cosThetaB);
+        BA.set(0, 0, cosThetaB);
+        BA.set(0, 1, -cosThetaA * sinThetaB);
+        BA.set(0, 2, sinThetaA * sinThetaB);
+        BA.set(1, 0, sinThetaB);
+        BA.set(1, 1, cosThetaA * cosThetaB);
+        BA.set(1, 2, -sinThetaA * cosThetaB);
+        BA.set(2, 0, 0.0f);
+        BA.set(2, 1, sinThetaA);
+        BA.set(2, 2, cosThetaA);
 
         // Rotation around x-axis by 60 degrees followed by rotation around z-axis by 45 degrees
         AB = new HomographyMatrix();
-        AB.set(0, 0, cosThetaA);
-        AB.set(0, 1, -sinThetaA * cosThetaB);
-        AB.set(0, 2, sinThetaA * sinThetaB);
-        AB.set(1, 0, sinThetaA);
+        AB.set(0, 0, cosThetaB);
+        AB.set(0, 1, -sinThetaB);
+        AB.set(0, 2, 0.0f);
+        AB.set(1, 0, cosThetaA * sinThetaB);
         AB.set(1, 1, cosThetaA * cosThetaB);
-        AB.set(1, 2, -cosThetaA * sinThetaB);
-        AB.set(2, 0, 0.0f);
-        AB.set(2, 1, sinThetaB);
-        AB.set(2, 2, cosThetaB);
+        AB.set(1, 2, -sinThetaA);
+        AB.set(2, 0, sinThetaA * sinThetaB);
+        AB.set(2, 1, sinThetaA * cosThetaB);
+        AB.set(2, 2, cosThetaA);
     }
 
     @Test
     public void equals_isEqual_isCorrect() {
         HomographyMatrix Aprime = new HomographyMatrix();
-        Aprime.set(0, 0, (float) Math.cos(Math.PI / 4));
-        Aprime.set(0, 1, (float) -Math.sin(Math.PI / 4));
-        Aprime.set(1, 0, (float) Math.sin(Math.PI / 4));
         Aprime.set(1, 1, (float) Math.cos(Math.PI / 4));
+        Aprime.set(1, 2, (float) -Math.sin(Math.PI / 4));
+        Aprime.set(2, 1, (float) Math.sin(Math.PI / 4));
+        Aprime.set(2, 2, (float) Math.cos(Math.PI / 4));
 
         assertTrue("Matrices are not equal", A.equals(Aprime));
         assertTrue("Matrices are not equal", A.equals(A));

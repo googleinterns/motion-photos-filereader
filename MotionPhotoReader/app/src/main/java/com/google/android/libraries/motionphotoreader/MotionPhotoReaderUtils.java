@@ -51,7 +51,7 @@ class MotionPhotoReaderUtils {
      */
     public static void readFromVideoTrack(MediaExtractor extractor, MediaCodec decoder,
                                           ByteBuffer inputBuffer, int bufferIndex) {
-        int sampleSize = extractor.readSampleData(inputBuffer, 0);
+        int sampleSize = extractor.readSampleData(inputBuffer, /* offset = */ 0);
         if (sampleSize < 0) {
             decoder.queueInputBuffer(
                     bufferIndex,
@@ -96,8 +96,10 @@ class MotionPhotoReaderUtils {
      * @return a List of HomographyMatrix objects.
      */
     public static List<HomographyMatrix> getHomographies(MediaExtractor extractor,
-                                                         ByteBuffer inputBuffer) {
+                                                         ByteBuffer inputBuffer,
+                                                         List<Float> prevHomographyDataList) {
         List<HomographyMatrix> homographyList = new ArrayList<>();
+        boolean protocolBufferIsAvailable = true;
         int sampleSize = extractor.readSampleData(inputBuffer, 0);
         if (sampleSize >= 0) {
             // Deserialize data
@@ -105,16 +107,22 @@ class MotionPhotoReaderUtils {
             try {
                 stabilizationData = Stabilization.Data.parseFrom(inputBuffer);
                 if (stabilizationData == null) {
-                    throw new RuntimeException("Protocol buffer is null");
+                    Log.e(TAG, "Protocol buffer is null");
+                    protocolBufferIsAvailable = false;
                 }
             } catch (InvalidProtocolBufferException e) {
                 Log.e(TAG, "Could not parse from protocol buffer");
             }
 
+            // If the protocol buffer was not null, then extract the homography data list from the
+            // protocol buffer data; otherwise, just use the homography data list from the most
+            // recent non-null protocol buffer
+            List<Float> homographyDataList = (protocolBufferIsAvailable) ?
+                    stabilizationData.getMotionHomographyDataList() : prevHomographyDataList;
+
             // Add homography for each strip to the homography list, only if the motion data type
             // for this frame is not MOTION_TYPE_STABILIZATION (this flag indicates the frame has
             // already been stabilized)
-            List<Float> homographyDataList = stabilizationData.getMotionHomographyDataList();
             if (stabilizationData.getMotionDataType() !=
                     Stabilization.Data.MotionDataType.MOTION_TYPE_STABILIZATION) {
                 for (int i = 0; i < NUM_OF_STRIPS; i++) {
@@ -125,7 +133,11 @@ class MotionPhotoReaderUtils {
                     );
                 }
             }
+
+            // Update the most recent homography data list
+            prevHomographyDataList = homographyDataList;
         }
+
         return homographyList;
     }
 }
