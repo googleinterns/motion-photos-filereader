@@ -23,7 +23,8 @@ class HomographyMatrix {
      * The default constructor sets the matrix to an identity matrix.
      */
     public HomographyMatrix() {
-        this.matrix = Arrays.asList(Arrays.copyOf(IDENTITY, IDENTITY.length));
+        matrix = new ArrayList<>();
+        matrix.addAll(Arrays.asList(IDENTITY));
     }
 
     /**
@@ -40,11 +41,13 @@ class HomographyMatrix {
      * Creates a matrix out of an array of floats, stored in row-major order. The array must contain
      * exactly nine elements.
      */
-    public HomographyMatrix(Float[] matrix) {
+    public HomographyMatrix(float[] matrix) {
         Preconditions.checkArgument(matrix.length == 9,
                 "Provided matrix must have exactly 9 elements");
         this.matrix = new ArrayList<>();
-        this.matrix.addAll(Arrays.asList(matrix));
+        for (float f : matrix) {
+            this.matrix.add(f);
+        }
     }
 
     /**
@@ -83,8 +86,8 @@ class HomographyMatrix {
         return new HomographyMatrix(product);
     }
 
-    public Float[] leftMultiplyBy(Float[] vector) {
-        Float[] product = new Float[3];
+    public float[] leftMultiplyBy(float[] vector) {
+        float[] product = new float[3];
         for (int i = 0; i < 3; i++) {
             float vectorElement = vector[0] * this.get(0, i) +
                     vector[1] * this.get(1, i) +
@@ -94,8 +97,8 @@ class HomographyMatrix {
         return product;
     }
 
-    public Float[] rightMultiplyBy(Float[] vector) {
-        Float[] product = new Float[3];
+    public float[] rightMultiplyBy(float[] vector) {
+        float[] product = new float[3];
         for (int i = 0; i < 3; i++) {
             float vectorElement = this.get(i, 0) * vector[0] +
                     this.get(i, 1) * vector[1] +
@@ -105,7 +108,7 @@ class HomographyMatrix {
         return product;
     }
 
-    public static float distanceBetween(Float[] a, Float[] b) {
+    public static float distanceBetween(float[] a, float[] b) {
         return (float) Math.sqrt(Math.pow(a[0] - b[0], 2) +
                 Math.pow(a[1] - b[1], 2) +
                 Math.pow(a[2] - b[2], 2));
@@ -215,12 +218,12 @@ class HomographyMatrix {
         float halfH = imageHeight * 1.0f / 2.0f;
 
         // Change of basis matrices
-        Float[] t1 = {
+        float[] t1 = {
                 halfW,  0.0f, halfW,
                 0.0f, -halfH, halfH,
                 0.0f,   0.0f, 1.0f
         };
-        Float[] t2 = {
+        float[] t2 = {
                 1.0f / halfW,  0.0f, -1.0f,
                 0.0f, -1.0f / halfH,  1.0f,
                 0.0f,          0.0f,  1.0f

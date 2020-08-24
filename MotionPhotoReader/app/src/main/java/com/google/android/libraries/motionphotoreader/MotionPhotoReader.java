@@ -93,9 +93,9 @@ public class MotionPhotoReader {
     private OutputSurface outputSurface;
     private final int surfaceWidth;
     private final int surfaceHeight;
-    private float scaleFactor = 1.0f;
-    private float xTranslate = 0.0f;
-    private float yTranslate = 0.0f;
+    private float scaleFactor;
+    private float xTranslate;
+    private float yTranslate;
 
     /** Flag used for debugging. */
     private final boolean testMode;
@@ -255,14 +255,19 @@ public class MotionPhotoReader {
                     motionTrackIndex = i;
 
                     if (enableCrop) {
-                        // Find the bounding box intersection of all frames
-                        BoundingBox boundingBox = new BoundingBox();
-                        float error = 0.0f;
+                        float[] bottomLeft = Arrays.copyOf(BOTTOM_LEFT, BOTTOM_LEFT.length);
+                        float[] bottomRight = Arrays.copyOf(BOTTOM_RIGHT, BOTTOM_RIGHT.length);
+                        float[] topRight = Arrays.copyOf(TOP_RIGHT, TOP_RIGHT.length);
+                        float[] topLeft = Arrays.copyOf(TOP_LEFT, TOP_LEFT.length);
 
-                        Float[] bottomLeft = Arrays.copyOf(BOTTOM_LEFT, BOTTOM_LEFT.length);
-                        Float[] bottomRight = Arrays.copyOf(BOTTOM_RIGHT, BOTTOM_RIGHT.length);
-                        Float[] topRight = Arrays.copyOf(TOP_RIGHT, TOP_RIGHT.length);
-                        Float[] topLeft = Arrays.copyOf(TOP_LEFT, TOP_LEFT.length);
+                        // Find the bounding box intersection of all frames
+                        BoundingBox boundingBox = new BoundingBox(
+                                bottomLeft,
+                                bottomRight,
+                                topRight,
+                                topLeft
+                        );
+                        float error = boundingBox.error();
 
                         int videoWidth = motionPhotoInfo.getWidth();
                         int videoHeight = motionPhotoInfo.getHeight();

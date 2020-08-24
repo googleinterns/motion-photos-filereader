@@ -43,10 +43,10 @@ class Constants {
     /**
      * Coordinates for corners of frame in OpenGL position coordinate system.
      */
-    public static final Float[] BOTTOM_LEFT  = {-1.0f, -1.0f, 1.0f};
-    public static final Float[] BOTTOM_RIGHT = { 1.0f, -1.0f, 1.0f};
-    public static final Float[] TOP_RIGHT    = { 1.0f,  1.0f, 1.0f};
-    public static final Float[] TOP_LEFT     = {-1.0f,  1.0f, 1.0f};
+    public static final float[] BOTTOM_LEFT  = {-1.0f, -1.0f, 1.0f};
+    public static final float[] BOTTOM_RIGHT = { 1.0f, -1.0f, 1.0f};
+    public static final float[] TOP_RIGHT    = { 1.0f,  1.0f, 1.0f};
+    public static final float[] TOP_LEFT     = {-1.0f,  1.0f, 1.0f};
 
     /**
      * Error threshold for two floats in a homography matrix to be considered equal.
