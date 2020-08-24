@@ -99,7 +99,7 @@ class MotionPhotoReaderUtils {
                                                          ByteBuffer inputBuffer,
                                                          List<Float> prevHomographyDataList) {
         List<HomographyMatrix> homographyList = new ArrayList<>();
-        boolean protocolBufferIsAvailable = true;
+        boolean protocolBufferIsAvailable = false;
         int sampleSize = extractor.readSampleData(inputBuffer, 0);
         if (sampleSize >= 0) {
             // Deserialize data
@@ -108,7 +108,8 @@ class MotionPhotoReaderUtils {
                 stabilizationData = Stabilization.Data.parseFrom(inputBuffer);
                 if (stabilizationData == null) {
                     Log.e(TAG, "Protocol buffer is null");
-                    protocolBufferIsAvailable = false;
+                } else {
+                    protocolBufferIsAvailable = true;
                 }
             } catch (InvalidProtocolBufferException e) {
                 Log.e(TAG, "Could not parse from protocol buffer");
@@ -117,7 +118,7 @@ class MotionPhotoReaderUtils {
             // If the protocol buffer was not null, then extract the homography data list from the
             // protocol buffer data; otherwise, just use the homography data list from the most
             // recent non-null protocol buffer
-            List<Float> homographyDataList = (protocolBufferIsAvailable) ?
+            List<Float> homographyDataList = protocolBufferIsAvailable ?
                     stabilizationData.getMotionHomographyDataList() : prevHomographyDataList;
 
             // Add homography for each strip to the homography list, only if the motion data type
