@@ -29,7 +29,9 @@ import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PH
  *   height: The height of the video (before camera orientation rotations are applied) in pixels.
  *   durationUs: The duration of the video in microseconds.
  *   rotation: The camera orientation while the motion photo was taken, as a rotation about the
- *   z-axis, measured in degrees.
+ *   z-axis, measured in degrees. Holding the phone horizontally with the top of the phone on the
+ *   left corresponds to 0 degrees, and all rotations are measured counterclockwise from this
+ *   orientation.
  *   videoOffset: The byte offset from the end of the file at which the video track begins.
  *   version: The version of this motion photo (either v1 or v2).
  */
