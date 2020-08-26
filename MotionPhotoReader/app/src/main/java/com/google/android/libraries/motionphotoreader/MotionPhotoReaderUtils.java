@@ -16,7 +16,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.android.libraries.motionphotoreader.Constants.NUM_OF_STRIPS;
-import static com.google.android.libraries.motionphotoreader.Constants.TIMEOUT_US;
+import static com.google.android.libraries.motionphotoreader.Constants.TIMEOUT_MS;
 
 /**
  * A collection of helper methods used by MotionPhotoReader to access buffers and read track data.
@@ -32,9 +32,9 @@ class MotionPhotoReaderUtils {
      * timeout.
      */
     public static Integer getInputBuffer(BlockingQueue<Integer> availableInputBuffers) {
-        Integer bufferIndex = -1;
+        Integer bufferIndex = null;
         try {
-            bufferIndex = availableInputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
+            bufferIndex = availableInputBuffers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Log.e(TAG, "No input buffer available", e);
         }
@@ -81,7 +81,7 @@ class MotionPhotoReaderUtils {
     public static Bundle getOutputBuffer(BlockingQueue<Bundle> availableOutputBuffers) {
         Bundle bufferData = null;
         try {
-            bufferData = availableOutputBuffers.poll(TIMEOUT_US, TimeUnit.MILLISECONDS);
+            bufferData = availableOutputBuffers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Log.e(TAG, "No output buffer available", e);
         }
