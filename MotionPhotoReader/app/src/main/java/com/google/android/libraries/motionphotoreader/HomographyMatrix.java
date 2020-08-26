@@ -21,7 +21,7 @@ class HomographyMatrix {
      * The default constructor sets the matrix to an identity matrix.
      */
     public HomographyMatrix() {
-        this.matrix = Arrays.asList(IDENTITY);
+        this.matrix = Arrays.asList(Arrays.copyOf(IDENTITY, IDENTITY.length));
     }
 
     /**
@@ -126,6 +126,52 @@ class HomographyMatrix {
             }
         }
         return new HomographyMatrix(scaled);
+    }
+
+    public static HomographyMatrix createRotationMatrixX(float degrees) {
+        float cosTheta = (float) Math.cos(Math.toRadians(degrees));
+        float sinTheta = (float) Math.sin(Math.toRadians(degrees));
+
+        HomographyMatrix rotationMatrix = new HomographyMatrix();
+        rotationMatrix.set(1, 1, cosTheta);
+        rotationMatrix.set(1, 2, -sinTheta);
+        rotationMatrix.set(2, 1, sinTheta);
+        rotationMatrix.set(2, 2, cosTheta);
+
+        return rotationMatrix;
+    }
+
+    public static HomographyMatrix createRotationMatrixY(float degrees) {
+        float cosTheta = (float) Math.cos(Math.toRadians(degrees));
+        float sinTheta = (float) Math.sin(Math.toRadians(degrees));
+
+        HomographyMatrix rotationMatrix = new HomographyMatrix();
+        rotationMatrix.set(0, 0, cosTheta);
+        rotationMatrix.set(0, 2, sinTheta);
+        rotationMatrix.set(2, 0, -sinTheta);
+        rotationMatrix.set(2, 2, cosTheta);
+
+        return rotationMatrix;
+    }
+
+    public static HomographyMatrix createRotationMatrixZ(float degrees) {
+        float cosTheta = (float) Math.cos(Math.toRadians(degrees));
+        float sinTheta = (float) Math.sin(Math.toRadians(degrees));
+
+        HomographyMatrix rotationMatrix = new HomographyMatrix();
+        rotationMatrix.set(0, 0, cosTheta);
+        rotationMatrix.set(0, 1, -sinTheta);
+        rotationMatrix.set(1, 0, sinTheta);
+        rotationMatrix.set(1, 1, cosTheta);
+
+        return rotationMatrix;
+    }
+
+    public static HomographyMatrix createScaleMatrix(float xScale, float yScale) {
+        HomographyMatrix scaleMatrix = new HomographyMatrix();
+        scaleMatrix.set(0,  0, xScale);
+        scaleMatrix.set(1,  1, yScale);
+        return scaleMatrix;
     }
 
     /**

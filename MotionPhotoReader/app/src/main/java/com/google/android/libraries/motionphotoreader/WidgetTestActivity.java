@@ -2,7 +2,6 @@ package com.google.android.libraries.motionphotoreader;
 
 import android.app.Activity;
 import android.content.res.AssetManager;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -25,7 +24,7 @@ public class WidgetTestActivity extends Activity {
     static final String MOTION_PHOTOS_DIR = "motionphotos/";
 
     private String[] testMotionPhotosList;
-    private int currPhotoIndex = 0;
+    private int currPhotoIndex = 6;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

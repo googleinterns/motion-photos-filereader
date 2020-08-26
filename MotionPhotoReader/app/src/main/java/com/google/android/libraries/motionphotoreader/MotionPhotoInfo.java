@@ -2,7 +2,6 @@ package com.google.android.libraries.motionphotoreader;
 
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
-import android.os.Build;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
@@ -26,11 +25,15 @@ import static com.google.android.libraries.motionphotoreader.Constants.MOTION_PH
  * Contains information relevant to extracting frames in a Motion Photo file.
  *
  * The fields stored are:
- *   - The width of the video (before camera orientation rotations are applied) in pixels.
- *   - The height of the video (before camera orientation rotations are applied) in pixels.
- *   - The duration of the video in microseconds.
- *   - The camera orientation while the motion photo was taken, as a rotation in degrees.
- *   - The byte offset from the end of the file at which the video track begins.
+ *   width: The width of the video (before camera orientation rotations are applied) in pixels.
+ *   height: The height of the video (before camera orientation rotations are applied) in pixels.
+ *   durationUs: The duration of the video in microseconds.
+ *   rotation: The camera orientation while the motion photo was taken, as a rotation about the
+ *   z-axis, measured in degrees. Holding the phone horizontally with the top of the phone on the
+ *   left corresponds to 0 degrees, and all rotations are measured counterclockwise from this
+ *   orientation.
+ *   videoOffset: The byte offset from the end of the file at which the video track begins.
+ *   version: The version of this motion photo (either v1 or v2).
  */
 @RequiresApi(api = 23)
 public class MotionPhotoInfo {
@@ -40,7 +43,6 @@ public class MotionPhotoInfo {
     private static final String V2_XMP_PROP_PREFIX = "Container:Directory[";
     private static final String V2_XMP_PROP_LENGTH_SUFFIX = "]/Container:Item/Item:Length";
     private static final String V2_XMP_PROP_PADDING_SUFFIX = "]/Container:Item/Item:Length";
-
 
     private final int width;
     private final int height;
@@ -87,6 +89,7 @@ public class MotionPhotoInfo {
     /**
      * Finds the video offset encoded in the motion photo XMP metadata.
      * @param meta The XMP metadata for the motion photo file.
+     * @param version The version of this motion photo file.
      * @return the number of bytes from the end of the motion photo file to the beginning of the
      * video track.
      * @throws XMPException when parsing invalid XMP metadata.

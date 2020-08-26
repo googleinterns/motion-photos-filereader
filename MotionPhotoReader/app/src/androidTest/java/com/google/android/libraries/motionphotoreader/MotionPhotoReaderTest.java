@@ -46,6 +46,10 @@ public class MotionPhotoReaderTest {
     private Context context;
     private String[] testMotionPhotosList;
     private String filename;
+    private TrackedLinkedBlockingQueue<Integer> fakeInputBufferQueue;
+    private TrackedLinkedBlockingQueue<Bundle> fakeOutputBufferQueue;
+    private MediaExtractor extractor;
+    private MotionPhotoReader reader;
 
     /** A list of opened motion photo readers to close afterwards. */
     private final List<Runnable> cleanup = new ArrayList<>();
@@ -59,11 +63,31 @@ public class MotionPhotoReaderTest {
             );
 
     @Before 
-    public void setUp() throws IOException {
+    public void setUp() throws IOException, XMPException {
         context = activityRule.getActivity().getApplicationContext();
         AssetManager assetManager = context.getAssets();
         testMotionPhotosList = assetManager.list("motionphotos");
         filename = MOTION_PHOTOS_DIR + testMotionPhotosList[0];
+        
+        // Prepare fake buffer queues
+        fakeInputBufferQueue = new TrackedLinkedBlockingQueue<>();
+        fakeOutputBufferQueue = new TrackedLinkedBlockingQueue<>();
+
+        // Set up a media extractor
+        extractor = new MediaExtractor();
+
+        // Set up motion photo reader
+        reader = MotionPhotoReader.open(
+                ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
+                extractor,
+                /* surface = */ null,
+                /* surfaceWidth = */ 0,
+                /* surfaceHeight = */ 0,
+                /* stabilizationOn = */ true,
+                fakeInputBufferQueue,
+                fakeOutputBufferQueue
+        );
+        cleanup.add(reader::close);
     }
 
     @After
@@ -77,151 +101,96 @@ public class MotionPhotoReaderTest {
     @Test(expected = IOException.class)
     public void openMotionPhotoReader_invalidFile_throwsIOException()
             throws IOException, XMPException {
-        MotionPhotoReader reader = MotionPhotoReader.open("test_photo.jpg", null);
-        cleanup.add(reader::close);
+        MotionPhotoReader badReader = MotionPhotoReader.open(
+                ResourceFetcher.fetchAssetFile(context, "filename", "test_photo", ".jpg"),
+                extractor,
+                /* surface = */ null,
+                /* surfaceWidth = */ 0,
+                /* surfaceHeight = */ 0,
+                /* stabilizationOn = */ true,
+                fakeInputBufferQueue,
+                fakeOutputBufferQueue
+        );
+        cleanup.add(badReader::close);
     }
 
     @Test
-    public void numberOfFramesPlayed_isCorrect() throws IOException, XMPException {
-        MotionPhotoReader reader = MotionPhotoReader.open(
-                ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
-                null
-        );
-
+    public void numberOfFramesPlayed_isCorrect() {
         int frameCount = 0;
         while (reader.hasNextFrame()) {
             reader.nextFrame();
             frameCount++;
         }
         assertEquals(NUM_FRAMES, frameCount);
-        cleanup.add(reader::close);
     }
 
     @Test
-    public void getCurrentTimestamp_onStart_isCorrect() throws IOException, XMPException {
-        MotionPhotoReader reader = MotionPhotoReader.open(
-                ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
-                null
-        );
+    public void getCurrentTimestamp_onStart_isCorrect() {
         assertEquals(0, reader.getCurrentTimestampUs());
-        cleanup.add(reader::close);
     }
 
     @Test
-    public void getCurrentTimestamp_nextFrame_isCorrect() throws IOException, XMPException {
-        MotionPhotoReader reader = MotionPhotoReader.open(
-                ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
-                null
-        );
-
+    public void getCurrentTimestamp_nextFrame_isCorrect() {
         long currentTimestampUs = -1L;
         while (reader.hasNextFrame()) {
             long newTimestampUs = reader.getCurrentTimestampUs();
             reader.nextFrame();
-            boolean flag = currentTimestampUs < newTimestampUs;
+            boolean timeIncreased = currentTimestampUs < newTimestampUs;
             assertTrue("Timestamp did not increase: "
                     + currentTimestampUs + " vs. " + newTimestampUs,
-                    flag);
+                    timeIncreased);
             currentTimestampUs = newTimestampUs;
         }
-        cleanup.add(reader::close);
     }
 
     @Test
-    public void getCurrentTimestamp_seekTo_isCorrect() throws IOException, XMPException {
-        MotionPhotoReader reader = MotionPhotoReader.open(
-                ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
-                null
-        );
-
+    public void getCurrentTimestamp_seekTo_isCorrect() {
         long currentTimestampUs = -1L;
         while (reader.hasNextFrame()) {
             long newTimestampUs = reader.getCurrentTimestampUs();
             reader.seekTo(reader.getCurrentTimestampUs() + SEEK_AMOUNT_US,
                     MediaExtractor.SEEK_TO_NEXT_SYNC);
-            boolean flag = currentTimestampUs < newTimestampUs;
+            boolean timeIncreased = currentTimestampUs < newTimestampUs;
             assertTrue("Timestamp did not increase: "
                     + currentTimestampUs + " vs. " + newTimestampUs,
-                    flag);
+                    timeIncreased);
             currentTimestampUs = newTimestampUs;
         }
-        cleanup.add(reader::close);
     }
 
     @Test
-    public void hasNextFrame_atBeginningOfVideo_returnsTrue() throws IOException, XMPException {
-        MotionPhotoReader reader = MotionPhotoReader.open(
-                ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
-                null
-        );
-        boolean flag = reader.hasNextFrame();
-        assertTrue("No next frame", flag);
-        cleanup.add(reader::close);
+    public void hasNextFrame_atBeginningOfVideo_returnsTrue() {
+        assertTrue("No next frame", reader.hasNextFrame());
     }
 
     @Test
     public void hasNextFrame_atLastFrame_returnsFalse() throws IOException, XMPException {
-        MotionPhotoReader reader = MotionPhotoReader.open(
-                ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
-                null
-        );
-
         long timestampUs = reader.getMotionPhotoInfo().getDurationUs();
         reader.seekTo(timestampUs, MediaExtractor.SEEK_TO_NEXT_SYNC);
-        boolean flag = reader.hasNextFrame();
-        assertFalse("Did not seek to end of video", flag);
+        assertFalse("Did not seek to end of video", reader.hasNextFrame());
+    }
+
+
+    @Test
+    public void availableInputBufferQueue_isNotEmpty() {
+        assertGreaterOrEqual(NUM_FRAMES, fakeInputBufferQueue.getOfferCount());
+        assertGreaterOrEqual(NUM_FRAMES, fakeInputBufferQueue.getPollCount());
         cleanup.add(reader::close);
     }
 
     @Test
-    public void availableInputBufferQueue_isNotEmpty() throws IOException, XMPException {
-        TrackedLinkedBlockingQueue<Integer> fakeAvailableInputBuffers =
-                new TrackedLinkedBlockingQueue<>();
-        TrackedLinkedBlockingQueue<Bundle> fakeAvailableOutputBuffers =
-                new TrackedLinkedBlockingQueue<>();
-
-        MotionPhotoReader reader = MotionPhotoReader.open(
-                ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
-                null,
-                true,
-                fakeAvailableInputBuffers,
-                fakeAvailableOutputBuffers
-        );
-        assertGreaterOrEqual(NUM_FRAMES, fakeAvailableInputBuffers.getOfferCount());
-        assertGreaterOrEqual(NUM_FRAMES, fakeAvailableInputBuffers.getPollCount());
-        cleanup.add(reader::close);
-    }
-
-    @Test
-    public void availableOutputBufferQueue_isQueried() throws IOException, XMPException {
-        TrackedLinkedBlockingQueue<Integer> fakeAvailableInputBuffers =
-                new TrackedLinkedBlockingQueue<>();
-        TrackedLinkedBlockingQueue<Bundle> fakeAvailableOutputBuffers =
-                new TrackedLinkedBlockingQueue<>();
-
-        MotionPhotoReader reader = MotionPhotoReader.open(
-                ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
-                null,
-                true,
-                fakeAvailableInputBuffers,
-                fakeAvailableOutputBuffers
-        );
-
+    public void availableOutputBufferQueue_isQueried() {
         while (reader.hasNextFrame()) {
             reader.nextFrame();
         }
 
-        assertEquals(NUM_FRAMES, fakeAvailableOutputBuffers.getOfferCount());
-        assertEquals(NUM_FRAMES, fakeAvailableOutputBuffers.getPollCount());
+        assertEquals(NUM_FRAMES, fakeOutputBufferQueue.getOfferCount());
+        assertEquals(NUM_FRAMES, fakeOutputBufferQueue.getPollCount());
         cleanup.add(reader::close);
     }
 
     @Test
-    public void getMotionPhotoImage_isNotNull() throws IOException, XMPException {
-        MotionPhotoReader reader = MotionPhotoReader.open(
-                ResourceFetcher.fetchAssetFile(context, filename, "test_photo", ".jpg"),
-                null
-        );
+    public void getMotionPhotoImage_isNotNull() throws IOException {
         Bitmap bmp = reader.getMotionPhotoImageBitmap();
         assertNotNull(bmp);
         cleanup.add(reader::close);
