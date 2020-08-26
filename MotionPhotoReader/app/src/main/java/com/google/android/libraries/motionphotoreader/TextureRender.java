@@ -171,14 +171,14 @@ class TextureRender {
         textureID = textureIds[0];
 
         if (glGetError() != 0) {
-            throw new RuntimeException("Failed to set up textures");
+            Log.e(TAG, "Failed to set up textures");
         }
 
         uTextureUnitHandle = glGetUniformLocation(program, "uTexUnit");
         glUniform1i(uTextureUnitHandle, /* x = */0);
 
         if (glGetError() != 0) {
-            throw new RuntimeException("Failed to get texture unit");
+            Log.e(TAG, "Failed to get texture unit");
         }
     }
 

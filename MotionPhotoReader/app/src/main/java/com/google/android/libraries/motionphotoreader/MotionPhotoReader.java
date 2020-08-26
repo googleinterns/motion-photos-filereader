@@ -220,10 +220,9 @@ public class MotionPhotoReader {
      * Sets up and starts a new handler thread for the rendering pipeline and media decoders and
      * extractors.
      *
-     * An extractor is set up for both the video and motion track (if applicable). The extractor
-     * reads samples for both tracks and passes the information to a buffer processor. A decoder is
-     * set up for the video track to read frame data. If enableStabilization is set to true by the
-     * client, then we assume that we want to stabilize the video (if possible).
+     * The extractor reads samples for both tracks and passes the information to a buffer processor.
+     * A decoder is set up for the video track to read frame data. If enableStabilization is set to
+     * true by the client, then we assume that we want to stabilize the video (if possible).
      */
     private void startRenderThread(MotionPhotoInfo motionPhotoInfo,
                                    boolean enableStabilization,
@@ -310,13 +309,15 @@ public class MotionPhotoReader {
                             extractor.advance();
                         }
 
-                        // Compute the scale factor: if the box is wider than it is tall, then we want
-                        // to scale the box according to the height; otherwise, we want to scale the
-                        // box according to its width
-                        scaleFactor = Math.max(2.0f / boundingBox.width(), 2.0f / boundingBox.height());
+                        // Compute the scale factor: if the box is wider than it is tall, then we
+                        // want to scale the box according to the height; otherwise, we want to
+                        // scale the box according to its width
+                        scaleFactor = Math.max(2.0f / boundingBox.width(),
+                                2.0f / boundingBox.height());
                         scaleFactor += error;
                         xTranslate = (boundingBox.xMin + boundingBox.xMax) / 2.0f;
-                        yTranslate = (boundingBox.yMin + boundingBox.yMax) / 2.0f;                    }
+                        yTranslate = (boundingBox.yMin + boundingBox.yMax) / 2.0f;
+                    }
                 }
 
                 // Reset the extractor to the beginning

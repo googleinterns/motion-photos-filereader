@@ -10,7 +10,7 @@ import static com.google.android.libraries.motionphotoreader.Constants.EPS;
  * A BoundingBox object represents the bounding box for a quadrilateral, i.e. the box enclosing the
  * quadrilateral with the smallest measure.
  */
-public class BoundingBox {
+class BoundingBox {
 
     private static final String TAG = "BoundingBox";
 
@@ -22,12 +22,6 @@ public class BoundingBox {
     public final float xMax;
     public final float yMax;
 
-    /**
-     * A pseudo-measurement of how well the bounding box approximates the quadrilateral. This is
-     * computed by taking the maximum distance from a vertex of the quadrilateral to a neighboring
-     * vertex of the bounding box. Thus, the error lies in the range [0, max(W, H) / 2], where
-     * W is the width of the bounding box and H is the height of the bounding box.
-     */
     private final float error;
 
     /**
@@ -87,13 +81,12 @@ public class BoundingBox {
      * @return A BoundingBox object representing the intersection.
      */
     public BoundingBox intersect(BoundingBox other) {
-        BoundingBox intersection = new BoundingBox(
+        return new BoundingBox(
                 Math.max(this.xMin, other.xMin),
                 Math.max(this.yMin, other.yMin),
                 Math.min(this.xMax, other.xMax),
                 Math.min(this.yMax, other.yMax)
         );
-        return intersection;
     }
 
     /**
@@ -112,6 +105,12 @@ public class BoundingBox {
 
     /**
      * Returns the error of this bounding box.
+     *
+     * The error is a pseudo-measurement of how well the bounding box approximates the
+     * quadrilateral. This is computed by taking the maximum distance from a vertex of the
+     * quadrilateral to a neighboring vertex of the bounding box. Thus, the error lies in the range
+     * [0, max(W, H) / 2], where W is the width of the bounding box and H is the height of the
+     * bounding box.
      */
     public float error() {
         return error;

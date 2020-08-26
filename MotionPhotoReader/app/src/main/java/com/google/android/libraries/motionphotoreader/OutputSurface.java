@@ -28,7 +28,7 @@ import java.util.concurrent.ExecutionException;
  */
 
 @RequiresApi(api = 23)
-public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
+class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private static final String TAG = "OutputSurface";
 
     private final Object frameSyncObject = new Object();

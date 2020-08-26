@@ -29,8 +29,6 @@ import java.util.concurrent.Executors;
  * Customizable attribute fields include:
  *   - autoloop: If true, the video automatically loops when the end is reached. Otherwise, stop
  *     video after it ends.
- *   - fill: If true, the video fills the entire surface it is being played to, in a center-crop
- *     display. Otherwise, scale the video to fit entirely within the surface.
  *   - backgroundColor: The color of the surface which the video does not cover.
  */
 
