@@ -11,7 +11,7 @@ class Constants {
     /**
      * Time to wait for a blocking queue to offer buffer information when polled, in microseconds.
      */
-    public static final long TIMEOUT_US = 1000L;
+    public static final long TIMEOUT_MS = 1000L;
 
     /**
      * Conversion factor from microseconds to nanoseconds.
