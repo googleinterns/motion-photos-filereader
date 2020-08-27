@@ -108,12 +108,6 @@ class HomographyMatrix {
         return product;
     }
 
-    public static float distanceBetween(float[] a, float[] b) {
-        return (float) Math.sqrt(Math.pow(a[0] - b[0], 2) +
-                Math.pow(a[1] - b[1], 2) +
-                Math.pow(a[2] - b[2], 2));
-    }
-
     /**
      * Get the entry of this matrix at row r, column c (both zero-indexed).
      */

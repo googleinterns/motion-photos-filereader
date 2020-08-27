@@ -1,10 +1,6 @@
 package com.google.android.libraries.motionphotoreader;
 
-import android.util.Log;
-
 import androidx.annotation.NonNull;
-
-import static com.google.android.libraries.motionphotoreader.Constants.EPS;
 
 /**
  * A BoundingBox object represents the bounding box for a quadrilateral, i.e. the box enclosing the
@@ -22,8 +18,6 @@ class BoundingBox {
     public final float xMax;
     public final float yMax;
 
-    private final float error;
-
     /**
      * Constructor for a bounding box using the bounding box coordinates.
      * @param xMin The x-coordinate of the lower-left vertex of the bounding box.
@@ -36,42 +30,17 @@ class BoundingBox {
         this.yMin = yMin;
         this.xMax = xMax;
         this.yMax = yMax;
-        error = 0.0f;
     }
 
     /**
      * Constructor for a bounding box using a given quadrilateral.
-     * The arguments a, b, c, d are all homogeneous 2D coordinates (x, y, 1) of the vertices of the
-     * quadrilateral.
+     * The arguments a, b, c, d are all 2D coordinates (x, y) of the vertices of the quadrilateral.
      */
     public BoundingBox(float[] a, float[] b, float[] c, float[] d) {
         xMin = Math.min(Math.min(a[0], b[0]), Math.min(c[0], d[0]));
         yMin = Math.min(Math.min(a[1], b[1]), Math.min(c[1], d[1]));
         xMax = Math.max(Math.max(a[0], b[0]), Math.max(c[0], d[0]));
         yMax = Math.max(Math.max(a[1], b[1]), Math.max(c[1], d[1]));
-
-        float errorA = Math.min(Math.abs(a[0] - xMin), Math.abs(a[0] - xMax));
-        if (errorA < EPS) {
-            errorA = Math.min(Math.abs(a[1] - yMin), Math.abs(a[1] - yMax));
-        }
-
-        float errorB = Math.min(Math.abs(b[0] - xMin), Math.abs(b[0] - xMax));
-        if (errorB < EPS) {
-            errorB = Math.min(Math.abs(b[1] - yMin), Math.abs(b[1] - yMax));
-        }
-
-        float errorC = Math.min(Math.abs(c[0] - xMin), Math.abs(c[0] - xMax));
-        if (errorC < EPS) {
-            errorC = Math.min(Math.abs(c[1] - yMin), Math.abs(c[1] - yMax));
-        }
-
-        float errorD = Math.min(Math.abs(d[0] - xMin), Math.abs(d[0] - xMax));
-        if (errorD < EPS) {
-            errorD = Math.min(Math.abs(d[1] - yMin), Math.abs(d[1] - yMax));
-        }
-
-        error = (float) Math.sqrt(2.0) *
-                Math.max(Math.max(errorA, errorB), Math.max(errorC, errorD));
     }
 
     /**
@@ -101,19 +70,6 @@ class BoundingBox {
      */
     public float height() {
         return yMax - yMin;
-    }
-
-    /**
-     * Returns the error of this bounding box.
-     *
-     * The error is a pseudo-measurement of how well the bounding box approximates the
-     * quadrilateral. This is computed by taking the maximum distance from a vertex of the
-     * quadrilateral to a neighboring vertex of the bounding box. Thus, the error lies in the range
-     * [0, max(W, H) / 2], where W is the width of the bounding box and H is the height of the
-     * bounding box.
-     */
-    public float error() {
-        return error;
     }
 
     @NonNull

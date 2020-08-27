@@ -124,7 +124,6 @@ public class MotionPhotoWidget extends SurfaceView {
                             enableStabilization,
                             enableCrop
                     );
-                    Log.d(TAG, "New motion photo reader created");
                 } catch (IOException | XMPException e) {
                     Log.e(TAG, "Exception occurred while opening file", e);
                 }
@@ -149,11 +148,9 @@ public class MotionPhotoWidget extends SurfaceView {
         super.onVisibilityChanged(changedView, visibility);
         switch (visibility) {
             case VISIBLE:
-                Log.d(TAG, "View is visible");
                 break;
             case INVISIBLE:
             case GONE:
-                Log.d(TAG, "View is invisible or gone");
                 if (reader != null) {
                     reader.close();
                 }
@@ -164,20 +161,17 @@ public class MotionPhotoWidget extends SurfaceView {
     @Override
     public void onAttachedToWindow() {
         super.onAttachedToWindow();
-        Log.d(TAG, "View attached");
         executor = Executors.newSingleThreadExecutor();
     }
 
     @Override
     public void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        Log.d(TAG, "View detached");
         executor.shutdown();
     }
 
     @Override
     public Parcelable onSaveInstanceState() {
-        Log.d(TAG, "Saving instance state");
         // Obtain any state that the super class wants to save
         Parcelable superState = super.onSaveInstanceState();
 
@@ -198,7 +192,6 @@ public class MotionPhotoWidget extends SurfaceView {
 
     @Override
     public void onRestoreInstanceState(Parcelable state) {
-        Log.d(TAG, "Restoring instance state");
         SavedState savedState = (SavedState) state;
         super.onRestoreInstanceState(savedState.getSuperState());
 

@@ -1,8 +1,5 @@
 package com.google.android.libraries.motionphotoreader;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * All internal constant values used within the MotionPhotoReader API.
  */

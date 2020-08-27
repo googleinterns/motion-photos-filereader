@@ -266,7 +266,6 @@ public class MotionPhotoReader {
                                 topRight,
                                 topLeft
                         );
-                        float error = boundingBox.error();
 
                         int videoWidth = motionPhotoInfo.getWidth();
                         int videoHeight = motionPhotoInfo.getHeight();
@@ -305,7 +304,6 @@ public class MotionPhotoReader {
                                     topLeft
                             );
                             boundingBox = boundingBox.intersect(newBoundingBox);
-                            error = Math.max(error, newBoundingBox.error());
                             extractor.advance();
                         }
 
@@ -314,7 +312,6 @@ public class MotionPhotoReader {
                         // scale the box according to its width
                         scaleFactor = Math.max(2.0f / boundingBox.width(),
                                 2.0f / boundingBox.height());
-                        scaleFactor += error;
                         xTranslate = (boundingBox.xMin + boundingBox.xMax) / 2.0f;
                         yTranslate = (boundingBox.yMin + boundingBox.yMax) / 2.0f;
                     }
@@ -337,7 +334,6 @@ public class MotionPhotoReader {
             // appropriate media decoder
             if (mime.startsWith(VIDEO_MIME_PREFIX) && !videoTrackSelected) {
                 extractor.selectTrack(i);
-                Log.d(TAG, "Selected video track: " + i);
                 videoTrackIndex = i;
                 videoFormat = format;
                 decoder = MediaCodec.createDecoderByType(mime);
@@ -345,10 +341,8 @@ public class MotionPhotoReader {
             }
             // Set the motion track (if appropriate)
             if (mime.startsWith(MICROVIDEO_META_MIMETYPE) && !motionTrackSelected) {
-                Log.d(TAG, "enableStabilization: " + enableStabilization);
                 if (enableStabilization) {
                     extractor.selectTrack(i);
-                    Log.d(TAG, "Selected motion track: " + i);
                     motionTrackIndex = i;
                     motionTrackSelected = true;
                 }
@@ -421,7 +415,6 @@ public class MotionPhotoReader {
                 String mime = format.getString(MediaFormat.KEY_MIME);
                 assert mime != null;
                 if (mime.startsWith(MOTION_PHOTO_IMAGE_META_MIMETYPE)) {
-                    Log.d(TAG, "selected image meta track: " + i);
                     extractor.selectTrack(i);
                     ByteBuffer inputBuffer = ByteBuffer.allocateDirect(
                             (int) extractor.getSampleSize()
@@ -451,7 +444,6 @@ public class MotionPhotoReader {
      * Shut down all resources allocated to the MotionPhotoReader instance.
      */
     public void close() {
-        Log.d(TAG, "Closing motion photo reader");
         if (outputSurface != null) {
             outputSurface.release();
         }

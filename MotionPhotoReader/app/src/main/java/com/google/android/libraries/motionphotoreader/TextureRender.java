@@ -143,7 +143,6 @@ class TextureRender {
      * @param surfaceHeight The height of the display Surface that the GL viewport covers, in pixels.
      */
     public void onSurfaceCreated(int surfaceWidth, int surfaceHeight) {
-        Log.d(TAG, "Initializing state");
         this.surfaceWidth = surfaceWidth;
         this.surfaceHeight = surfaceHeight;
 
@@ -210,13 +209,11 @@ class TextureRender {
 
         glViewport(translateOffsetX, translateOffsetY, viewportWidth, viewportHeight);
         if (glGetError() != 0) {
-            throw new RuntimeException("Failed to set up viewport");
+            Log.e(TAG, "Failed to set up viewport");
         }
     }
 
     private static int linkProgram(int vertexShader, int fragmentShader) {
-        Log.d(TAG, "Linking program");
-
         // Create the program
         final int program = glCreateProgram();
         if (program == 0) {
@@ -235,15 +232,13 @@ class TextureRender {
         if (linkStatus[0] == 0) {
             // Delete the program if linking failed
             glDeleteProgram(program);
-            throw new RuntimeException("Failed to link program");
+            Log.e(TAG, "Failed to link program");
         }
 
         return program;
     }
 
     private int compileShader(int type, String shaderSrc) {
-        Log.d(TAG, "Compiling shader: " + type);
-
         // Create new shader object
         final int shader = glCreateShader(type);
         if (shader == 0) {
@@ -277,7 +272,6 @@ class TextureRender {
 
         // Set up rotation matrix if the camera orientation is greater than 0 degrees
         if (videoRotation > 0) {
-            Log.d(TAG, "rotation: " + videoRotation);
             Matrix.rotateM(
                     uMatrix,
                     /* rmOffset = */ 0,
@@ -298,7 +292,7 @@ class TextureRender {
                 /* offset = */ 0
         );
         if (glGetError() != 0) {
-            throw new RuntimeException("Failed to get matrix");
+            Log.e(TAG, "Failed to get matrix");
         }
     }
 
@@ -334,7 +328,7 @@ class TextureRender {
                 triangleVertices.position(TRIANGLE_VERTICES_DATA_POS_OFFSET)
         );
         if (glGetError() != 0) {
-            throw new RuntimeException("Failed to get vertex position");
+            Log.e(TAG, "Failed to get vertex position");
         }
 
         // Set the homography matrix for this strip
@@ -343,7 +337,7 @@ class TextureRender {
         // Draw the strip
         glDrawArrays(GL_TRIANGLE_STRIP, /* first = */ 0, /* count = */ 4);
         if (glGetError() != 0) {
-            throw new RuntimeException("Failed to draw to strip" + stripIndex);
+            Log.e(TAG, "Failed to draw to strip" + stripIndex);
         }
     }
 
@@ -374,7 +368,7 @@ class TextureRender {
                 /* offset = */ 0
         );
         if (glGetError() != 0) {
-            throw new RuntimeException("Failed to get matrix");
+            Log.e(TAG, "Failed to get matrix");
         }
     }
 
@@ -382,8 +376,6 @@ class TextureRender {
      * Render the current frame.
      */
     public void drawFrame(List<HomographyMatrix> homographyList) {
-        Log.d(TAG, "Drawing frame");
-
         glClear(/* mask = */ GL_COLOR_BUFFER_BIT);
         for (int i = 0; i < NUM_OF_STRIPS; i++) {
             drawStrip(
