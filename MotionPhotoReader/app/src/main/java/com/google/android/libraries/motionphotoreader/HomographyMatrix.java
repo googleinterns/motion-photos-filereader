@@ -1,5 +1,7 @@
 package com.google.android.libraries.motionphotoreader;
 
+import androidx.annotation.NonNull;
+
 import com.google.common.base.Preconditions;
 
 import java.util.ArrayList;
@@ -21,7 +23,8 @@ class HomographyMatrix {
      * The default constructor sets the matrix to an identity matrix.
      */
     public HomographyMatrix() {
-        this.matrix = Arrays.asList(Arrays.copyOf(IDENTITY, IDENTITY.length));
+        matrix = new ArrayList<>();
+        matrix.addAll(Arrays.asList(IDENTITY));
     }
 
     /**
@@ -81,6 +84,28 @@ class HomographyMatrix {
             }
         }
         return new HomographyMatrix(product);
+    }
+
+    public float[] leftMultiplyBy(float[] vector) {
+        float[] product = new float[3];
+        for (int i = 0; i < 3; i++) {
+            float vectorElement = vector[0] * this.get(0, i) +
+                    vector[1] * this.get(1, i) +
+                    vector[2] * this.get(2, i);
+            product[i] = vectorElement;
+        }
+        return product;
+    }
+
+    public float[] rightMultiplyBy(float[] vector) {
+        float[] product = new float[3];
+        for (int i = 0; i < 3; i++) {
+            float vectorElement = this.get(i, 0) * vector[0] +
+                    this.get(i, 1) * vector[1] +
+                    this.get(i, 2) * vector[2];
+            product[i] = vectorElement;
+        }
+        return product;
     }
 
     /**
@@ -230,6 +255,7 @@ class HomographyMatrix {
     /**
      * Returns a string containing the elements in this homography listed in row-major order.
      */
+    @NonNull
     public String toString() {
         return Arrays.toString(matrix.toArray());
     }

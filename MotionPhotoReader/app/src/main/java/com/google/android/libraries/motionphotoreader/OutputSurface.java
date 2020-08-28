@@ -28,7 +28,7 @@ import java.util.concurrent.ExecutionException;
  */
 
 @RequiresApi(api = 23)
-public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
+class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private static final String TAG = "OutputSurface";
 
     private final Object frameSyncObject = new Object();
@@ -69,7 +69,6 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
      * @param surfaceHeight The height of the surface on which the video is displayed, in pixels.
      */
     private void setupTextureRender(int surfaceWidth, int surfaceHeight) {
-        Log.d(TAG, "Setup output surface");
         renderHandler.post(() -> {
             textureRender = new TextureRender();
             textureRender.setVideoWidth(motionPhotoInfo.getWidth());
@@ -176,10 +175,8 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
 
             // Initialize EGL surface
             if (surface == null) {
-                Log.d(TAG, "EGL initialized to no surface");
                 eglSurface = EGL14.EGL_NO_SURFACE;
             } else {
-                Log.d(TAG, "Creating EGL surface");
                 eglSurface = EGL14.eglCreateWindowSurface(
                         eglDisplay,
                         eglConfig,
@@ -200,7 +197,6 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
      * Free up all resources associated with this OutputSurface.
      */
     public void release() {
-        Log.d(TAG, "Releasing output surface");
         renderHandler.post(() -> {
             if (eglDisplay != EGL14.EGL_NO_DISPLAY) {
                 EGL14.eglDestroySurface(eglDisplay, eglSurface);
@@ -266,6 +262,10 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         });
     }
 
+    public void setCropTransform(float scaleFactor, float xTranslate, float yTranslate) {
+        renderHandler.post(() -> textureRender.setUMatrix(scaleFactor, xTranslate, yTranslate));
+    }
+
     /**
      * Draw the image to the final display Surface.
      */
@@ -279,7 +279,6 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
 
     @Override
     public void onFrameAvailable(SurfaceTexture surfaceTexture) {
-        Log.d(TAG, "New frame available");
         synchronized (frameSyncObject) {
             if (frameAvailable) {
                 throw new RuntimeException("Available frame already set, frame could be dropped");

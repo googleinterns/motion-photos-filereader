@@ -11,7 +11,6 @@ import androidx.annotation.RequiresApi;
 import com.adobe.internal.xmp.XMPException;
 
 import java.io.IOException;
-import java.util.Arrays;
 
 @RequiresApi(api = 29)
 public class WidgetTestActivity extends Activity {
@@ -37,11 +36,9 @@ public class WidgetTestActivity extends Activity {
         } catch (IOException e) {
             Log.e(TAG, "Error occurred while trying to fetch assets", e);
         }
-        Log.d(TAG, "test image array: " + Arrays.toString(testMotionPhotosList));
 
         // Get the widget and set the default file to v1 motion photo
         MotionPhotoWidget motionPhotoWidget = findViewById(R.id.motion_photo_widget);
-        Log.d(TAG, "Motion photo widget set up");
         try {
             motionPhotoWidget.setFile(
                     ResourceFetcher.fetchAssetFile(

@@ -3,6 +3,7 @@
     <declare-styleable name="MotionPhotoWidget">
         <attr name="autoloop" format="boolean" />
         <attr name="enableStabilization" format="boolean" />
+        <attr name="enableCrop" format="boolean" />
     </declare-styleable>
 
 </resources>

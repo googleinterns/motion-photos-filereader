@@ -83,7 +83,8 @@ public class MotionPhotoReaderTest {
                 /* surface = */ null,
                 /* surfaceWidth = */ 0,
                 /* surfaceHeight = */ 0,
-                /* stabilizationOn = */ true,
+                /* enableStabilization = */ true,
+                /* enableCrop = */ true,
                 fakeInputBufferQueue,
                 fakeOutputBufferQueue
         );
@@ -107,7 +108,8 @@ public class MotionPhotoReaderTest {
                 /* surface = */ null,
                 /* surfaceWidth = */ 0,
                 /* surfaceHeight = */ 0,
-                /* stabilizationOn = */ true,
+                /* enableStabilization = */ true,
+                /* enableCrop = */ true,
                 fakeInputBufferQueue,
                 fakeOutputBufferQueue
         );
